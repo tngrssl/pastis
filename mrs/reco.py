@@ -103,7 +103,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         shims_values = None
         sequence_obj = None
         display_apo = display_apo_hz
-        ngrklmgnfkdlgnfdklmgnfdkmlgnfkdlmgnkfdlmgnkfdlmgnkl
+        # tangi? ngrklmgnfkdlgnfdklmgnfdkmlgnfkdlmgnkfdlmgnkfdlmgnkl
 
         ulTimeStamp_ms = None
 
@@ -1631,17 +1631,31 @@ class MRSData2(suspect.mrsobjects.MRSData):
         # perform peak analysis
         params_trace, params_trace_rel = s_ma._analyse_peak(peak_range, relativeToMean)
 
-        # choose if absolute or relative will be checked
-        params_trace_check = params_trace_rel * 0.0
-        # amplitude: relative in %
-        params_trace_check[:, 0] = params_trace_rel[:, 0]
-        # linewidth: absolute in Hz
-        params_trace_check[:, 1] = params_trace[:, 1]
-        # frequency: relative in ppm
-        params_trace_check[:, 2] = params_trace_rel[:, 2]
-        # phase: absolute in rad
-        params_trace_check[:, 3] = params_trace[:, 3]
-
+        #sssr: use bounds relative to mean (except for linewidth)
+        bRelPOI = True
+        if(bRelPOI):
+            # choose if absolute or relative will be checked
+            params_trace_check = params_trace_rel * 0.0
+            # amplitude: relative in %
+            params_trace_check[:, 0] = params_trace_rel[:, 0]-params_trace_rel[:,0].mean()
+            # linewidth: absolute in Hz
+            params_trace_check[:, 1] = params_trace[:, 1]
+            # frequency: relative in ppm
+            params_trace_check[:, 2] = params_trace_rel[:, 2]-params_trace_rel[:,2].mean()
+            # phase: absolute in rad
+            params_trace_check[:, 3] = params_trace[:, 3]-params_trace[:,3].mean()
+        else:
+            # choose if absolute or relative will be checked
+            params_trace_check = params_trace_rel * 0.0
+            # amplitude: relative in %
+            params_trace_check[:, 0] = params_trace_rel[:, 0]
+            # linewidth: absolute in Hz
+            params_trace_check[:, 1] = params_trace[:, 1]
+            # frequency: relative in ppm
+            params_trace_check[:, 2] = params_trace_rel[:, 2]
+            # phase: absolute in rad
+            params_trace_check[:, 3] = params_trace[:, 3]
+       
         # choose if absolute or relative will be displayed
         params_trace_disp = params_trace_rel * 0.0
         # amplitude: relative in %
@@ -1681,6 +1695,9 @@ class MRSData2(suspect.mrsobjects.MRSData):
             test_snr_list = np.zeros(max_lw_range.shape)
             test_lw_list = np.zeros(max_lw_range.shape)
             test_nrej_list = np.zeros(max_lw_range.shape)
+            #sssr: fullauto
+            auto_maxsnr = 0
+            auto_maxsnr_lw = 0
             for (iLW, this_max_lw) in enumerate(max_lw_range):
                 # for each max lw, reject data and see
                 this_mask_reject_data = np.full([s_ma.shape[0], 4], False)
@@ -1702,10 +1719,20 @@ class MRSData2(suspect.mrsobjects.MRSData):
                     test_lw_list[iLW] = this_s_cor._correct_realign()._correct_average()._correct_apodization().analyse_linewidth(peak_range, '', False, False, [1, 6], True)
                     test_nrej_list[iLW] = this_mask_reject_data_sumup.sum()
 
+                #sssr: find first max SNR (needs 110% better SNR to update)
+                if(auto_maxsnr*1.1 < test_snr_list[iLW]):
+                    auto_maxsnr = test_snr_list[iLW]
+                    auto_maxsnr_lw = this_max_lw
                 # progression
                 self._print_progress_bar(iLW)
 
             print(" done.")
+            #auto adjust phase bounds using std (see doi:10.1002/jmri.26802)
+            auto_phsbounds = 0.60 * params_trace_check[:, 3].std()
+            cprint(" > auto-adjust best limits: LW %d and PHS %.2f rad" % (auto_maxsnr_lw, auto_phsbounds),"cyan", attrs=['bold'])
+            params_max[1] = auto_maxsnr_lw
+            params_min[3] = -auto_phsbounds
+            params_max[3] = auto_phsbounds
 
             # plot SNR / LW combinaisons
             if(display):
@@ -1741,14 +1768,14 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         # for each average, check if peak parameters are in the min / max bounds
         print(">> rejecting data ... ", end="", flush=True)
-        mask_reject_data = np.full([s_ma.shape[0], 4], False)
+        mask_reject_data = np.full([s_ma.shape[0], 4], 0)
         self._print_progress_bar(0, s_ma.shape[0])
         for a in range(0, s_ma.shape[0]):
             for p in range(4):
                 if(params_trace_check[a, p] < params_min[p]):
-                    mask_reject_data[a, p] = True
+                    mask_reject_data[a, p] = (p+1) #True
                 if(params_trace_check[a, p] > params_max[p]):
-                    mask_reject_data[a, p] = True
+                    mask_reject_data[a, p] = (p+1) #True
 
             self._print_progress_bar(a)
 
@@ -1757,10 +1784,10 @@ class MRSData2(suspect.mrsobjects.MRSData):
         # stats regarding data rejection, how many, for what reasons, overall percentage
         print(">> data rejection -> summary")
         print(">> number of averages rejected because of...")
-        print(" > amplitude = %d" % mask_reject_data[:, 0].sum())
-        print(" > linewidth = %d" % mask_reject_data[:, 1].sum())
-        print(" > frequency = %d" % mask_reject_data[:, 2].sum())
-        print(" > phase = %d" % mask_reject_data[:, 3].sum())
+        print(" > amplitude = %d" % (mask_reject_data[:, 0]==1).sum())
+        print(" > linewidth = %d" % (mask_reject_data[:, 1]==2).sum())
+        print(" > frequency = %d" % (mask_reject_data[:, 2]==3).sum())
+        print(" > phase = %d"     % (mask_reject_data[:, 3]==4).sum())
 
         # actually reject data now
         mask_reject_data_sumup = (mask_reject_data.sum(axis=1) > 0)
@@ -1773,7 +1800,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
             fig = plt.figure(131)
             fig.clf()
-            axs = fig.subplots(2, 3, sharex='all')
+            axs = fig.subplots(2, 2, sharex='all')
             fig.canvas.set_window_title("mrs.reco.MRSData2.correct_analyse_and_reject")
 
             k = 0
@@ -1782,33 +1809,43 @@ class MRSData2(suspect.mrsobjects.MRSData):
                     # original data
                     axs[ix, iy].plot(t_ma, params_trace_check[:, k], 'k-x', linewidth=1)
                     # rejected data
-                    t_ma_rej = t_ma[mask_reject_data[:, k]]
-                    this_params_trace_rej = params_trace_check[mask_reject_data[:, k], k]
-                    axs[ix, iy].plot(t_ma_rej, this_params_trace_rej, 'ro', linewidth=1)
+                    #sssr: show all points rejected on all plots
+                    #t_ma_rej = t_ma[mask_reject_data[:, k]]
+                    #this_params_trace_rej = params_trace_check[mask_reject_data[:, k], k]
+                    t_ma_rej_all = t_ma[(mask_reject_data.sum(axis=1) > 0)]
+                    this_params_trace_rej_all = params_trace_check[(mask_reject_data.sum(axis=1) > 0), k]
+                    axs[ix, iy].plot(t_ma_rej_all, this_params_trace_rej_all, 'rx', linewidth=0.5)
+                    t_ma_rej = t_ma[(mask_reject_data[:,k] == (k+1))]
+                    this_params_trace_rej = params_trace_check[(mask_reject_data[:,k] == (k+1)), k]
+                    axs[ix, iy].plot(t_ma_rej, this_params_trace_rej, 'b.', linewidth=1)
+                   
                     axs[ix, iy].plot(t_ma, params_min[k] * np.ones(t_ma.shape), '-r', linewidth=1)
                     axs[ix, iy].plot(t_ma, params_max[k] * np.ones(t_ma.shape), '-r', linewidth=1)
                     k = k + 1
 
             axs[0, 0].set_ylabel('Rel. amplitude change (%)')
             axs[0, 0].grid('on')
-            axs[0, 0].set_title("Rel. amplitude = %.2f + / - %.2f %%" % (params_trace_disp[:, 0].mean(), params_trace_disp[:, 0].std()))
+            #axs[0, 0].set_title("Rel. amplitude = %.2f + / - %.2f %%" % (params_trace_disp[:, 0].mean(), params_trace_disp[:, 0].std()))
 
             axs[0, 1].set_ylabel('Abs. linewidth (Hz)')
             axs[0, 1].grid('on')
-            axs[0, 1].set_title("Abs. linewidth = %.1f + / - %.1f Hz (%.3f + / - %.3f ppm)" % (params_trace_disp[:, 1].mean(), params_trace_disp[:, 1].std(), (params_trace_disp[:, 1] / s_ma.f0).mean(), (params_trace_disp[:, 1] / s_ma.f0).std()))
+            #axs[0, 1].set_title("Abs. linewidth = %.1f + / - %.1f Hz (%.3f + / - %.3f ppm)" % (params_trace_disp[:, 1].mean(), params_trace_disp[:, 1].std(), (params_trace_disp[:, 1] / s_ma.f0).mean(), (params_trace_disp[:, 1] / s_ma.f0).std()))
 
             axs[1, 0].set_xlabel('Acq. time (s)')
             axs[1, 0].set_ylabel('Abs. frequency (ppm)')
             axs[1, 0].grid('on')
-            axs[1, 0].set_title("Abs. frequency = %.2f + / - %.2f ppm ( +  / - %.1f Hz)" % (params_trace_disp[:, 2].mean(), params_trace_disp[:, 2].std(), (params_trace_disp[:, 2] * s_ma.f0).std()))
+            #axs[1, 0].set_title("Abs. frequency = %.2f + / - %.2f ppm ( +  / - %.1f Hz)" % (params_trace_disp[:, 2].mean(), params_trace_disp[:, 2].std(), (params_trace_disp[:, 2] * s_ma.f0).std()))
 
             axs[1, 1].set_xlabel('Acq. time (s)')
             axs[1, 1].set_ylabel('Abs. phase shift (rd)')
             axs[1, 1].grid('on')
-            axs[1, 1].set_title("Abs. phase = %.2f + / - %.2f rad" % (params_trace_disp[:, 3].mean(), params_trace_disp[:, 3].std()))
+            #axs[1, 1].set_title("Abs. phase = %.2f + / - %.2f rad" % (params_trace_disp[:, 3].mean(), params_trace_disp[:, 3].std()))
 
+            fig.tight_layout()
             # nice plot showing all raw data
-            plt.subplot(1, 3, 3)
+            #plt.subplot(1, 3, 3)
+            fig = plt.figure(132)
+            fig.clf()
             ppm = self.frequency_axis_ppm()
             ippm_peak_range = (peak_range[0] > ppm) | (ppm > peak_range[1])
             ystep = np.max(np.mean(s_ma.spectrum().real, axis=0))
@@ -1840,6 +1877,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 fig.tight_layout()
 
             # plt.pause(0.1)
+
 
         # wait, are we removing all data ???
         if(mask_reject_data_sumup.sum() == s.shape[0]):
