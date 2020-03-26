@@ -579,13 +579,8 @@ class fit_pipeline:
         for i in range(covar.shape[0]):
             CRBs[i] = np.sqrt(covar[i, i])
 
-        # evaluate noise in residue
-        mod = self.seq._model(params)
-        diff = mod - self.data
-        # we assume the last 10% time points are noise
-        ia = int(0.9 * diff.shape[0])
-        ib = int(diff.shape[0])
-        noise_std = np.std(diff[ia:ib])
+        # original noise level before apodization
+        noise_std = self.data.noise_level
 
         # normalize to noise: absolute CRBs
         CRBs_abs = CRBs * noise_std
