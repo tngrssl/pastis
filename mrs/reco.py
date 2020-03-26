@@ -29,7 +29,7 @@ import pdb
 class MRSData2(suspect.mrsobjects.MRSData):
     """A class based on suspect's MRSData to store MRS data."""
 
-    def __new__(cls, data_filepath, coil_nChannels, physio_log_file, obj=[], dt=[], f0=[], te=[], ppm0=[], voxel_dimensions=[], transform=[], metadata=[], tr=[], timestamp=[], patient_birthyear=[], patient_sex=[], patient_name=[], patient_weight=[], patient_height=[], vref=[], shims=[], sequence_obj=[], display_apo_hz=[]):
+    def __new__(cls, data_filepath, coil_nChannels, physio_log_file, obj=[], dt=[], f0=[], te=[], ppm0=[], voxel_dimensions=[], transform=[], metadata=[], tr=[], timestamp=[], patient_birthyear=[], patient_sex=[], patient_name=[], patient_weight=[], patient_height=[], vref=[], shims=[], sequence_obj=[], noise_level=[]):
         """
         Construct a MRSData2 object that inherits of Suspect's MRSData class. In short, the MRSData2 class is a copy of MRSData + my custom methods for post-processing. To create a MRSData2 object, you need give a path that points to a SIEMENS DICOM or a SIEMENS TWIX file.
 
@@ -63,8 +63,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
             list of shim voltages in volts
         sequence_obj : sim.mrs_sequence object
             sequence object
-        display_apo_hz : float
-            apodization factor applied when displaying the spectrum (Hz)
+        noise_level : float
+            noise level measured on real FID
 
         Returns
         -------
@@ -85,7 +85,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             obj._vref = vref
             obj._shims = shims
             obj._sequence = sequence_obj
-            obj.display_apo = display_apo_hz
+            obj._noise_level = noise_level
             # bye
             return(obj)
 
@@ -102,9 +102,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         vref_v = None
         shims_values = None
         sequence_obj = None
-        display_apo = display_apo_hz
-        # tangi? ngrklmgnfkdlgnfdklmgnfdkmlgnfkdlmgnkfdlmgnkfdlmgnkl
-
+        noise_level = 0.0
         ulTimeStamp_ms = None
 
         print(" > checking data file path...")
@@ -443,6 +441,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         obj._vref = vref_v
         obj._shims = shims_values
         obj._sequence = sequence_obj
+        obj._noise_level = 0.0
         obj._timestamp = ulTimeStamp_ms
 
         # respiratory trace if any
@@ -591,12 +590,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         self._shims = getattr(obj, 'shims', None)
         self._timestamp = getattr(obj, 'timestamp', None)
         self._sequence = getattr(obj, 'sequence', None)
-        self._pulse_laser_rfc_length = getattr(obj, 'pulse_laser_rfc_length', None)
-        self._pulse_laser_rfc_r = getattr(obj, 'pulse_laser_rfc_r', None)
-        self._pulse_laser_rfc_n = getattr(obj, 'pulse_laser_rfc_n', None)
-        self._pulse_laser_rfc_voltage = getattr(obj, 'pulse_laser_rfc_voltage', None)
-        self._pulse_laser_exc_length = getattr(obj, 'pulse_laser_exc_length', None)
-        self._pulse_laser_exc_voltage = getattr(obj, 'pulse_laser_exc_voltage', None)
+        self._noise_level = getattr(obj, 'noise_level', None)
 
     def inherit(self, obj):
         """
@@ -619,12 +613,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         obj2._shims = getattr(self, 'shims', None)
         obj2._timestamp = getattr(self, 'timestamp', None)
         obj2._sequence = getattr(self, 'sequence', None)
-        obj2._pulse_laser_rfc_length = getattr(self, 'pulse_laser_rfc_length', None)
-        obj2._pulse_laser_rfc_r = getattr(self, 'pulse_laser_rfc_r', None)
-        obj2._pulse_laser_rfc_n = getattr(self, 'pulse_laser_rfc_n', None)
-        obj2._pulse_laser_rfc_voltage = getattr(self, 'pulse_laser_rfc_voltage', None)
-        obj2._pulse_laser_exc_length = getattr(self, 'pulse_laser_exc_length', None)
-        obj2._pulse_laser_exc_voltage = getattr(self, 'pulse_laser_exc_voltage', None)
+        obj2._noise_level = getattr(self, 'noise_level', None)
         return(obj2)
 
     @property
@@ -647,7 +636,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         Returns
         -------
         self._patient_birthyear : int
-            birthyear of patient
+            Birthyear of patient
         """
         return(self._patient_birthyear)
 
@@ -659,7 +648,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         Returns
         -------
         self._patient_sex : int
-            sex of patient (0:M 1:F)
+            Sex of patient (0:M 1:F)
         """
         return(self._patient_sex)
 
@@ -671,7 +660,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         Returns
         -------
         self._patient_name : string
-            name of patient
+            Name of patient
         """
         return(self._patient_name)
 
@@ -707,7 +696,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         Returns
         -------
         self._vref : float
-            reference voltage
+            Reference voltage
         """
         return(self._vref)
 
@@ -719,7 +708,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         Returns
         -------
         self._shims : list of floats
-            shim voltages
+            Shim voltages
         """
         return(self._shims)
 
@@ -736,6 +725,18 @@ class MRSData2(suspect.mrsobjects.MRSData):
         return(self._sequence)
 
     @property
+    def noise_level(self):
+        """
+        Property get function for noise_level.
+
+        Returns
+        -------
+        self._noise_level : float
+            Noise level in time-domain
+        """
+        return(self._noise_level)
+
+    @property
     def timestamp(self):
         """
         Property get function for timestamp (ms).
@@ -743,7 +744,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         Returns
         -------
         self._timestamp : float
-            timestamp in (ms)
+            Timestamp in (ms)
         """
         return(self._timestamp)
 
@@ -1191,13 +1192,14 @@ class MRSData2(suspect.mrsobjects.MRSData):
             axs = fig.subplots(2, 2, sharex='row', sharey='row')
             fig.canvas.set_window_title("mrs.reco.MRSData2.correct_zerofill")
 
-            axs[0, 0].plot(s_disp.time_axis(), np.real(s_disp), 'k-', linewidth=1)
-            axs[0, 0].set_xlabel('time (s)')
+            # no time axis, we want to see the number of points
+            axs[0, 0].plot(np.real(s_disp), 'k-', linewidth=1)
+            axs[0, 0].set_xlabel('number of points')
             axs[0, 0].set_ylabel('original')
             axs[0, 0].grid('on')
 
-            axs[0, 1].plot(s_zf_disp.time_axis(), np.real(s_zf_disp), 'k-', linewidth=1)
-            axs[0, 1].set_xlabel('time (s)')
+            axs[0, 1].plot(np.real(s_zf_disp), 'k-', linewidth=1)
+            axs[0, 1].set_xlabel('number of points')
             axs[0, 1].set_ylabel('zero-filled')
             axs[0, 1].grid('on')
 
@@ -1655,7 +1657,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             params_trace_check[:, 2] = params_trace_rel[:, 2]
             # phase: absolute in rad
             params_trace_check[:, 3] = params_trace[:, 3]
-       
+
         # choose if absolute or relative will be displayed
         params_trace_disp = params_trace_rel * 0.0
         # amplitude: relative in %
@@ -1715,7 +1717,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
                 # analyse snr / lw and number of rejections
                 if(this_mask_reject_data_sumup.sum() < s_ma.shape[0]):
-                    test_snr_list[iLW] = this_s_cor._correct_realign()._correct_average()._correct_apodization().analyse_snr(peak_range, [-1, 0], '', False, False, False, [1, 6], True)
+                    test_snr_list[iLW], _, _ = this_s_cor._correct_realign()._correct_average()._correct_apodization().analyse_snr(peak_range, [-1, 0], '', False, False, False, [1, 6], True)
                     test_lw_list[iLW] = this_s_cor._correct_realign()._correct_average()._correct_apodization().analyse_linewidth(peak_range, '', False, False, [1, 6], True)
                     test_nrej_list[iLW] = this_mask_reject_data_sumup.sum()
 
@@ -1818,7 +1820,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                     t_ma_rej = t_ma[(mask_reject_data[:,k] == (k+1))]
                     this_params_trace_rej = params_trace_check[(mask_reject_data[:,k] == (k+1)), k]
                     axs[ix, iy].plot(t_ma_rej, this_params_trace_rej, 'b.', linewidth=1)
-                   
+
                     axs[ix, iy].plot(t_ma, params_min[k] * np.ones(t_ma.shape), '-r', linewidth=1)
                     axs[ix, iy].plot(t_ma, params_max[k] * np.ones(t_ma.shape), '-r', linewidth=1)
                     k = k + 1
@@ -1904,7 +1906,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         display_range : list [2]
             Range in ppm used for display
         beSilent : boolean
-            No outpur in console (True)
+            No output in console (True)
 
         Returns
         -------
@@ -2351,9 +2353,9 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         return(self.inherit(s_shifted))
 
-    def analyse_snr(self, peak_range, noise_range, lbl, area_integrate=False, magnitude_mode=False, display=True, display_range=[1, 6], beSilent=False):
+    def analyse_snr(self, peak_range, noise_range, lbl, time_domain=False, magnitude_mode=False, display=True, display_range=[1, 6], beSilent=False):
         """
-        Estimate the SNR of a peak in the spectrum ; chemical shift ranges for the peak and the noise regions are specified by the user. !Works only for a 1D MRSData2 object.
+        Estimate the SNR of a peak in the spectrum ; chemical shift ranges for the peak and the noise regions are specified by the user. Can also look at time-domain SNR. Works only for a 1D MRSData2 objects.
 
         Parameters
         ----------
@@ -2363,8 +2365,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
             Range in ppm used to estimate noise
         lbl : string
             Plot label to specify
-        area_integrate : boolean
-            Integrate spectrum within ppm range instead of peak-picking
+        time_domain : boolean
+            Time domain SNR estimation: in real part, signal is max, noise is std of last 100 points
         magnitude_mode : boolean
             Analyse signal in magnitude mode (True) or the real part (False)
         display : boolean
@@ -2372,43 +2374,92 @@ class MRSData2(suspect.mrsobjects.MRSData):
         display_range : list [2]
             Range in ppm used for display
         beSilent : boolean
-            No outpur in console (True)
+            No output in console (True)
 
         Returns
         -------
         snr : float
             Resulting SNR value
+        s : float
+            Resulting signal value
+        n : float
+            Resulting noise value
         """
         # hello
         if(not beSilent):
             cprint(">> mrs.reco.MRSData2.analyse_snr:", 'green')
 
+        # constant for now: number of last time points to analyse for noise
+        npts_noise = 100
+
         # init
         s = self.copy()
-        ppm = s.frequency_axis_ppm()
+        # display
+        if(display):
+            fig = plt.figure(190)
+            fig.clf()
+            axs = fig.subplots(2, 1, sharex='all', sharey='all')
+            fig.canvas.set_window_title("mrs.reco.MRSData2.analyse_snr")
 
-        # find maximum peak in range and its chemical shift
-        sf = s.spectrum()
-        if(magnitude_mode):
-            sf_analyse = np.abs(sf)
-            if(not beSilent):
-                print(" > going to analyse the MAGNITUDE spectrum ", end="", flush=True)
-        else:
-            sf_analyse = np.real(sf)
-            if(not beSilent):
-                print(" > going to analyse the REAL spectrum ", end="", flush=True)
+        if(time_domain):
+            # time-domain SNR estimation
+            t = s.time_axis() * 1000.0
+            if(magnitude_mode):
+                s_analyse = np.abs(s)
+                if(not beSilent):
+                    print(" > going to analyse the MAGNITUDE FID ", end="", flush=True)
+            else:
+                s_analyse = np.real(s)
+                if(not beSilent):
+                    print(" > going to analyse the REAL FID ", end="", flush=True)
 
-        if(area_integrate):
-            # integrate area underneath the peak
-            ippm_peak_range = (peak_range[0] < ppm) & (ppm < peak_range[1])
-            if(not beSilent):
-                print("by integrating the area within [%0.2f-%0.2f] ppm!" % (peak_range[0], peak_range[1]))
-            sf_analyse2 = sf_analyse[ippm_peak_range]
-            ppm2 = ppm[ippm_peak_range]
-            sf_analyse2 = sf_analyse2[::-1]
-            ppm2 = ppm2[::-1]
-            snr_signal = np.trapz(sf_analyse2, ppm2)
+            # signal is the max of signal (usually the first point)
+            imax_time = np.argmax(s_analyse)
+            snr_signal = s_analyse[imax_time]
+            # noise is the std of the last real points, but that is not so simple
+            # we really want real noise, not zeroes from zero-filling
+            s_nonzero_mask = (s != 0.0)
+            t = t[s_nonzero_mask]
+            s_analyse = s_analyse[s_nonzero_mask]
+            # now take the last 100 points
+            snr_noise = np.std(s_analyse[-npts_noise:-1])
+
+            if(display):
+                axs[0].plot(t, np.real(s_analyse.spectrum()), 'k-', linewidth=1)
+                axs[0].set_xlabel('time (ms)')
+                axs[0].set_ylabel('real part')
+                axs[0].grid('on')
+
+                axs[1].plot(t, np.abs(s_analyse.spectrum()), 'k-', linewidth=1)
+                axs[1].set_xlabel('time (ms)')
+                axs[1].set_ylabel('magnitude mode')
+                axs[1].grid('on')
+
+                if(magnitude_mode):
+                    ax = axs[1]
+                else:
+                    ax = axs[0]
+
+                # show peak of interest
+                ax.plot(t[imax_time], s_analyse[imax_time], 'ro')
+
+                # show noise region
+                ax.plot(t[-npts_noise:-1], s_analyse[-npts_noise:-1], 'bo')
         else:
+            # frequency-domain SNR estimation
+
+            # find maximum peak in range and its chemical shift
+            ppm = s.frequency_axis_ppm()
+            sf = s.spectrum()
+            if(magnitude_mode):
+                sf_analyse = np.abs(sf)
+                if(not beSilent):
+                    print(" > going to analyse the MAGNITUDE spectrum ", end="", flush=True)
+            else:
+                sf_analyse = np.real(sf)
+                if(not beSilent):
+                    print(" > going to analyse the REAL spectrum ", end="", flush=True)
+
             ippm_peak_range = (peak_range[0] > ppm) | (ppm > peak_range[1])
             sf_analyse2 = sf_analyse.copy()
             sf_analyse2[ippm_peak_range] = 0
@@ -2423,24 +2474,11 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
             snr_signal = sf_analyse[ippm_peak]
 
-        # estimate noise in user specified spectral region
-        if(not beSilent):
-            print(" > estimating noise from %0.2f to %0.2fppm region!" % (noise_range[0], noise_range[1]))
-        ippm_noise_range = (noise_range[0] < ppm) & (ppm < noise_range[1])
-        snr_noise = np.std(sf_analyse[ippm_noise_range])
-
-        # that's it
-        snr = snr_signal / snr_noise
-        if(not beSilent):
-            print(" > results for [" + lbl + "] coming...")
-        if(not beSilent):
-            print(" > S = %f, N = %f, SNR = %0.2f!" % (snr_signal, snr_noise, snr))
-
-        if(display):
-            fig = plt.figure(190)
-            fig.clf()
-            axs = fig.subplots(2, 1, sharex='all', sharey='all')
-            fig.canvas.set_window_title("mrs.reco.MRSData2.analyse_snr")
+            # estimate noise in user specified spectral region
+            if(not beSilent):
+                print(" > estimating noise from %0.2f to %0.2fppm region!" % (noise_range[0], noise_range[1]))
+            ippm_noise_range = (noise_range[0] < ppm) & (ppm < noise_range[1])
+            snr_noise = np.std(sf_analyse[ippm_noise_range])
 
             axs[0].plot(ppm, np.real(s.spectrum()), 'k-', linewidth=1)
             axs[0].set_xlim(display_range[1], display_range[0])
@@ -2460,18 +2498,23 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 ax = axs[0]
 
             # show peak of interest
-            if(area_integrate):
-                ax.fill_between(ppm[ippm_peak_range], 0, sf_analyse[ippm_peak_range], facecolor='red')
-            else:
-                ax.plot(ppm[ippm_peak], sf_analyse[ippm_peak], 'ro')
-
+            ax.plot(ppm[ippm_peak], sf_analyse[ippm_peak], 'ro')
             # show noise region
             ax.plot(ppm[ippm_noise_range], sf_analyse[ippm_noise_range], 'bo')
 
+        # finish display
+        if(display):
             fig.tight_layout()
             # plt.pause(0.1)
 
-        return(snr)
+        # that's it
+        snr = snr_signal / snr_noise
+        if(not beSilent):
+            print(" > results for [" + lbl + "] coming...")
+        if(not beSilent):
+            print(" > S = %.2E, N = %.2E, SNR = %0.2f!" % (snr_signal, snr_noise, snr))
+
+        return(snr, snr_signal, snr_noise)
 
     def analyse_linewidth(self, peak_range, lbl, magnitude_mode=False, display=True, display_range=[1, 6], beSilent=False):
         """
@@ -2490,7 +2533,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         display_range : list [2]
             Range in ppm used for display
         beSilent : boolean
-            No outpur in console (True)
+            No output in console (True)
 
         Returns
         -------
@@ -2808,8 +2851,6 @@ class pipeline:
         self.analyse_snr_enable = True
         # ppm range to look for a peak to analyse
         self.analyse_snr_s_range_ppm = [1.8, 2.1]  # ppm
-        # should we integrate the peak (True) or just get maximum real intensity (False)?
-        self.analyse_snr_area_integrate = False
         # ppm range to look for pute noise
         self.analyse_snr_n_range_ppm = [-1, 0]  # ppm
         # should we look at the magnitude (True) or real (False) spectrum for signal estimation?
@@ -2866,6 +2907,7 @@ class pipeline:
             * reading the data
             * phasing
             * combining channels
+            * analyse real noise level before going on with processing
             * zero-filling
             * peak analysis & data rejection
             * realigning
@@ -3149,8 +3191,7 @@ class pipeline:
 
                     # replace / store
                     self._data_ref_list[i] = s_ref_combined
-                    print(
-                        "------------------------------------------------------------------")
+                    print("------------------------------------------------------------------")
             print("")
 
         # concatenate data or process / display separatly?
@@ -3177,7 +3218,7 @@ class pipeline:
             # check initial snr
             if(self.analyse_snr_enable and self.analyse_snr_evol_enable):
                 print("------------------------------------------------------------------")
-                this_snr = s._correct_realign()._correct_average()._correct_apodization()._correct_freqshift().analyse_snr(self.analyse_snr_s_range_ppm, self.analyse_snr_n_range_ppm, s_legend, self.analyse_snr_area_integrate, self.analyse_snr_magnitude_mode, self.analyse_snr_display, self.display_range_ppm, True)
+                this_snr, _, _ = s._correct_realign()._correct_average()._correct_apodization()._correct_freqshift().analyse_snr(self.analyse_snr_s_range_ppm, self.analyse_snr_n_range_ppm, s_legend, False, self.analyse_snr_magnitude_mode, self.analyse_snr_display, self.display_range_ppm, True)
                 print("> initial SNR of [" + s_legend + "] = %.2f" % this_snr)
                 self.analyse_snr_evol_list.append([])
                 self.analyse_snr_evol_list[k].append(this_snr)
@@ -3209,7 +3250,7 @@ class pipeline:
                 # check snr
                 if(self.analyse_snr_enable and self.analyse_snr_evol_enable):
                     print("------------------------------------------------------------------")
-                    this_snr = s._correct_realign()._correct_average()._correct_apodization()._correct_freqshift().analyse_snr(self.analyse_snr_s_range_ppm, self.analyse_snr_n_range_ppm, s_legend, self.analyse_snr_area_integrate, self.analyse_snr_magnitude_mode, self.analyse_snr_display, self.display_range_ppm, True)
+                    this_snr, _, _ = s._correct_realign()._correct_average()._correct_apodization()._correct_freqshift().analyse_snr(self.analyse_snr_s_range_ppm, self.analyse_snr_n_range_ppm, s_legend, False, self.analyse_snr_magnitude_mode, self.analyse_snr_display, self.display_range_ppm, True)
                     print("> post zero-filling SNR of [" + s_legend + "] = %.2f" % this_snr)
                     self.analyse_snr_evol_list[k].append(this_snr)
                     self.analyse_snr_evol_list_labels[k].append('post zero-filling')
@@ -3246,7 +3287,7 @@ class pipeline:
                 # check snr
                 if(self.analyse_snr_enable and self.analyse_snr_evol_enable):
                     print("------------------------------------------------------------------")
-                    this_snr = s._correct_realign()._correct_average()._correct_apodization()._correct_freqshift().analyse_snr(self.analyse_snr_s_range_ppm, self.analyse_snr_n_range_ppm, s_legend, self.analyse_snr_area_integrate, self.analyse_snr_magnitude_mode, self.analyse_snr_display, self.display_range_ppm, True)
+                    this_snr, _, _ = s._correct_realign()._correct_average()._correct_apodization()._correct_freqshift().analyse_snr(self.analyse_snr_s_range_ppm, self.analyse_snr_n_range_ppm, s_legend, False, self.analyse_snr_magnitude_mode, self.analyse_snr_display, self.display_range_ppm, True)
                     print("> post analyse / reject SNR of [" + s_legend + "] = %.2f" % this_snr)
                     self.analyse_snr_evol_list[k].append(this_snr)
                     self.analyse_snr_evol_list_labels[k].append('post analyse / reject')
@@ -3273,7 +3314,7 @@ class pipeline:
                 # check snr
                 if(self.analyse_snr_enable and self.analyse_snr_evol_enable):
                     print("------------------------------------------------------------------")
-                    this_snr = s._correct_average()._correct_apodization()._correct_freqshift().analyse_snr(self.analyse_snr_s_range_ppm, self.analyse_snr_n_range_ppm, s_legend, self.analyse_snr_area_integrate, self.analyse_snr_magnitude_mode, self.analyse_snr_display, self.display_range_ppm, True)
+                    this_snr, _, _ = s._correct_average()._correct_apodization()._correct_freqshift().analyse_snr(self.analyse_snr_s_range_ppm, self.analyse_snr_n_range_ppm, s_legend, False, self.analyse_snr_magnitude_mode, self.analyse_snr_display, self.display_range_ppm, True)
                     print("> post realignement SNR of [" + s_legend + "] = %.2f" % this_snr)
                     self.analyse_snr_evol_list[k].append(this_snr)
                     self.analyse_snr_evol_list_labels[k].append('post realignement')
@@ -3300,7 +3341,7 @@ class pipeline:
                 # check snr
                 if(self.analyse_snr_enable and self.analyse_snr_evol_enable):
                     print("------------------------------------------------------------------")
-                    this_snr = s._correct_apodization()._correct_freqshift().analyse_snr(self.analyse_snr_s_range_ppm, self.analyse_snr_n_range_ppm, s_legend, self.analyse_snr_area_integrate, self.analyse_snr_magnitude_mode, self.analyse_snr_display, self.display_range_ppm, True)
+                    this_snr, _, _ = s._correct_apodization()._correct_freqshift().analyse_snr(self.analyse_snr_s_range_ppm, self.analyse_snr_n_range_ppm, s_legend, False, self.analyse_snr_magnitude_mode, self.analyse_snr_display, self.display_range_ppm, True)
                     print("> post averaging SNR of [" + s_legend + "] = %.2f" % this_snr)
                     self.analyse_snr_evol_list[k].append(this_snr)
                     self.analyse_snr_evol_list_labels[k].append('post averaging')
@@ -3315,6 +3356,18 @@ class pipeline:
 
                 print("------------------------------------------------------------------")
                 print("")
+
+            # look at real noise level
+            print("------------------------------------------------------------------")
+            print("> analysing real noise level before denoizing...")
+            print("------------------------------------------------------------------")
+            for i in range(0, len(self._data_list)):
+                cprint("> analysing noise [" + s_legend + "]", 'green', attrs=['bold'])
+                _, _, nl = s.analyse_snr(None, None, s_legend, True, False, False)
+                # store in object for later use (during quantification)
+                s._noise_level = nl
+                print("> time-domain noise level = %.2E" % nl)
+                print("------------------------------------------------------------------")
 
             # apodize
             if(self.apodize_enable):
@@ -3333,7 +3386,7 @@ class pipeline:
                 # check snr
                 if(self.analyse_snr_enable and self.analyse_snr_evol_enable):
                     print("------------------------------------------------------------------")
-                    this_snr = s._correct_freqshift().analyse_snr(self.analyse_snr_s_range_ppm, self.analyse_snr_n_range_ppm, s_legend, self.analyse_snr_area_integrate, self.analyse_snr_magnitude_mode, self.analyse_snr_display, self.display_range_ppm, True)
+                    this_snr, _, _ = s._correct_freqshift().analyse_snr(self.analyse_snr_s_range_ppm, self.analyse_snr_n_range_ppm, s_legend, False, self.analyse_snr_magnitude_mode, self.analyse_snr_display, self.display_range_ppm, True)
                     print("> post apodization SNR of [" + s_legend + "] = %.2f" % this_snr)
                     self.analyse_snr_evol_list[k].append(this_snr)
                     self.analyse_snr_evol_list_labels[k].append('post apodization')
@@ -3386,7 +3439,7 @@ class pipeline:
                 print("> estimating final SNR...")
                 print("------------------------------------------------------------------")
                 cprint("> estimating final SNR of [" + s_legend + "]", 'green', attrs=['bold'])
-                this_snr = s.analyse_snr(self.analyse_snr_s_range_ppm, self.analyse_snr_n_range_ppm, s_legend, self.analyse_snr_area_integrate, self.analyse_snr_magnitude_mode, self.analyse_snr_display, self.display_range_ppm)
+                this_snr, _, _ = s.analyse_snr(self.analyse_snr_s_range_ppm, self.analyse_snr_n_range_ppm, s_legend, False, self.analyse_snr_magnitude_mode, self.analyse_snr_display, self.display_range_ppm)
                 self.analyse_snr_final_list.append(this_snr)
                 if(self.analyse_snr_evol_enable):
                     self.analyse_snr_evol_list[k].append(this_snr)
