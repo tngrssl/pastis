@@ -6,54 +6,97 @@ A user script related to simulation.
 
 @author: Tangi Roussel
 """
-
-from __future__ import division
-import matplotlib.pylab as plt
-import mrs.metabase as xxx
-import mrs.sim as sim
-
+# %% init
 from IPython import get_ipython
-import warnings
-warnings.filterwarnings("ignore", ".*GUI is implemented*")
-get_ipython().magic('clear')
+import matplotlib.pylab as plt
+import mrs.aliases as xxx
+import mrs.sim as sim
+import numpy as np
+from datetime import datetime
+import time
+import os
+import pickle
+get_ipython().magic("clear")
+plt.close("all")
+
+# %% generate sequence database
+
+# metabolite db
+meta_bs = sim.metabolite_basis_set()
+meta_bs.basis_set_xls_file = './metabolite_basis_sets/muscle_7T.xls'
+meta_bs.non_coupled_only = True
+meta_bs.initialize()
+
+# generate smart filename
+today = datetime.now()
+fn = os.path.basename(meta_bs.basis_set_xls_file)
+fn, _ = os.path.splitext(fn)
+pickle_file_fullpath = "./" + fn + today.strftime("_%Y%m%d") + ".pkl"
+
+# simulation ranges
+seq_list = [sim.mrs_seq_press(20.0), sim.mrs_seq_steam(20.0), sim.mrs_seq_eja_svs_slaser(20.0)]
+f0_list = [123.198361, 297.205620]  # MHz
+te_list = np.arange(1.0, 400.0, 5.0)  # ms
+seq_big_list = []
+
+for this_seq in seq_list:
+    for this_f0 in f0_list:
+        for this_te in te_list:
+            # display
+            print("* Sequence = %s | f0 = %.0fMHz | TE = %.0fms" % (this_seq.name, this_f0, this_te))
+            time.sleep(1.0)
+
+            # setup sequence
+            this_seq.te = this_te
+            this_seq.f0 = this_f0
+            try:
+                # te could be too short
+                this_seq.initialize(meta_bs)
+                # store
+                seq_big_list.append(this_seq)
+            except:
+                Warning("* Yeah, TE=%.0fms was a bit too short for %s!" % (this_te, this_seq.name))
+
+with open(pickle_file_fullpath, 'wb') as f:
+    pickle.dump([seq_big_list], f)
 
 # %% load the metabolite database and run a sLASER sequence
 
 te = 55.0
 
-meta_db = sim.metabolite_db()
-meta_db.initialize()
+meta_bs = sim.metabolite_basis_set()
+meta_bs.initialize()
 
 seq = sim.mrs_seq_eja_svs_slaser(te)
 seq.pulse_rfc_r = 50.0
 seq.pulse_rfc_optim_power_enable = True
-seq.initialize(meta_db)
+seq.initialize(meta_bs)
 
 # %% load the metabolite database and run a PRESS sequence
 
 te = 55.0
 
-meta_db = sim.metabolite_db()
-meta_db.initialize()
+meta_bs = sim.metabolite_basis_set()
+meta_bs.initialize()
 
 seq = sim.mrs_seq_eja_svs_press(te)
-seq.initialize(meta_db)
+seq.initialize(meta_bs)
 
 # %% load the metabolite database and run a STEAM sequence
 
 te = 55.0
 
-meta_db = sim.metabolite_db()
-meta_db.initialize()
+meta_bs = sim.metabolite_basis_set()
+meta_bs.initialize()
 
 seq = sim.mrs_seq_eja_svs_steam(te)
-seq.initialize(meta_db)
+seq.initialize(meta_bs)
 
 # %% spectrum for each metabolite
 # left/right margins = 0.2/0.8 maximized over both screens for A3 format
 
-p_human_min = sim.params(meta_db).set_default_human_brain_min()
-p_human_max = sim.params(meta_db).set_default_human_brain_max()
+p_human_min = sim.params(meta_bs).set_default_min()
+p_human_max = sim.params(meta_bs).set_default_max()
 
 p_human = (p_human_min + p_human_max) / 2.0
 p_human[xxx.m_Water, 0] = 1.0

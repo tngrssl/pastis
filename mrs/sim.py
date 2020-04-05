@@ -6,7 +6,7 @@ Three classes' definition in here.
     * a params class which stores and manipulate the parameters of our MRS fitting/simulation model
     * a metabolite class which stores and can compute a MRS modeled signal for a single metabolite, based on the pyGAMMA library (for python 3!) using a specific MR sequence described by pulse flip angles and delays
     * a metabolite_group class which contains several metabolites
-    * a metabolite_db class which contains a whole database of metabolites chemical shifts, J-couplings, nucleis and computed signals. Usefull to simulate all kind of MRS data for various metabolites, concentrations acquired with various sequences...
+    * a metabolite_basis_set class which contains a whole database of metabolites chemical shifts, J-couplings, nucleis and computed signals. Usefull to simulate all kind of MRS data for various metabolites, concentrations acquired with various sequences...
 
 @author: Tangi Roussel
 """
@@ -21,56 +21,78 @@ import suspect
 import numpy as np
 import math as ma
 import mrs.reco as reco
-import mrs.metabase as xxx
+import mrs.aliases as xxx
 import matplotlib.pylab as plt
-import os
+import pickle
 import warnings
 from xlrd import open_workbook
 from termcolor import cprint
 import matplotlib._color_data as mcd
+from enum import Enum
 
 import pdb
 
-GAMMA_DICT = {"1H": 42.577478518, "13C": 10.7084, "19F": 40.052, "23Na": 11.262, "31P": 17.235}
+GAMMA_metabolite_basis_set = {"1H": 42.577478518, "13C": 10.7084, "19F": 40.052, "23Na": 11.262, "31P": 17.235}
 PARS_LONG_NAMES = ["Concentration [mmol/kg]", "Linewidth factor [Hz]", "Frequency shift [Hz]", "Phase [rd]"]
 PARS_SHORT_NAMES = ["cm", "dd", "df", "dp"]
+
+
+class sequence_exc_type(Enum):
+    """The enum sequence_exc_type describes the type of excitation scheme of the sequence. Can be usefull when comparing sequences."""
+
+    PULSE_ACQUIRE = 1
+    STIMULATED_ECHO = 2
+    SPIN_ECHO = 3
 
 
 class params(np.ndarray):
     """A class that stores the parameters used to modelize a MR spectrum during simulation or fit."""
 
-    def __init__(self, metadb):
+    # frozen stuff: a technique to prevent creating new attributes
+    # (https://stackoverflow.com/questions/3603502/prevent-creating-new-attributes-outside-init)
+    __isfrozen = False
+
+    def __setattr__(self, key, value):
+        """Overload of __setattr__ method to check that we are not creating a new attribute."""
+        if self.__isfrozen and not hasattr(self, key):
+            raise TypeError("You are trying to dynamically create a new attribute (%s) to this object and that is not cool! I will not let you do that because I believe it is a bad habit and can lead to terrible bugs. A clean way of doing this is to initialize your attribute (%s) in the __init__ method of this class. Bisou, bye :)" % (key, key))
+        object.__setattr__(self, key, value)
+
+    def __init__(self, meta_bs):
         """
         Initialize a params object.
 
         Parameters
         ----------
-        metadb: metabolite_db
-            A metabolite_db object to which this params object is linked to
+        meta_bs: metabolite_basis_set
+            A metabolite_basis_set object to which this params object is linked to
         """
         super().__init__()
         # those parameters are related to a metabolite database
-        self._metadb = metadb
+        self._meta_bs = meta_bs
         # the link-lock vector used to control the model
         self._linklock = np.zeros(self.shape)
         # the ratio vector
         self._ratios = np.ones(self.shape)
 
-    def __new__(cls, metadb):
+        # freeze
+        self.__isfrozen = True
+
+    def __new__(cls, meta_bs):
         """
         Construct a params object that inherits of numpy array's class. This class is used to deal with metabolite parameters.
 
         Parameters
         ----------
-        metadb: metabolite_db
-            A metabolite_db object to which this params object is linked to
+        meta_bs: metabolite_basis_set
+            A metabolite_basis_set object to which this params object is linked to
 
         Returns
         -------
         obj : params numpy array [n,4]
             Resulting constructed params object
         """
-        obj = super(params, cls).__new__(cls, [len(metadb), 4])
+        obj = super(params, cls).__new__(cls, [len(meta_bs), 4])
         obj[:] = 0.0
         return(obj)
 
@@ -82,14 +104,14 @@ class params(np.ndarray):
         ----------
         obj : params numpy array [n,4]
         """
-        self._metadb = getattr(obj, 'metadb', None)
+        self._meta_bs = getattr(obj, 'meta_bs', None)
         self._linklock = getattr(obj, 'linklock', None)
         self._ratios = getattr(obj, 'ratios', None)
 
     @property
-    def metadb(self):
-        """Property method for metadb."""
-        return(self._metadb)
+    def meta_bs(self):
+        """Property method for meta_bs."""
+        return(self._meta_bs)
 
     @property
     def linklock(self):
@@ -107,10 +129,10 @@ class params(np.ndarray):
 
         Returns
         -------
-        list(self._metadb.keys()) : list
+        list(self._meta_bs.keys()) : list
             List of metabolite names
         """
-        return(list(self._metadb.keys()))
+        return(list(self._meta_bs.keys()))
 
     def check(self):
         """
@@ -190,7 +212,7 @@ class params(np.ndarray):
 
         return(p)
 
-    def set_T2_weighting(self, te, extra_info_key="T2s_human_brain_7T"):
+    def set_T2_weighting(self, te):
         """
         Recalculate metabolite amplitude parameters by applying a T2 relaxation, usefull for simulations.
 
@@ -198,8 +220,6 @@ class params(np.ndarray):
         ----------
         te : float
             Echo time in (ms)
-        extra_info_key : dictionnary key / string
-            Tab name in the metabase XLS file containing T2 values
 
         Returns
         -------
@@ -211,8 +231,8 @@ class params(np.ndarray):
 
         # browse though the database and find T2s
         params_T2s = []
-        for this_metagroup_key, this_metagroup_entry in self._metadb.items():
-            params_T2s.append(this_metagroup_entry[extra_info_key])
+        for this_metagroup_key, this_metagroup_entry in self._meta_bs.items():
+            params_T2s.append(this_metagroup_entry["T2"])
 
         # convert to np
         params_T2s = np.array(params_T2s)
@@ -221,7 +241,7 @@ class params(np.ndarray):
         p[:, xxx.p_cm] = p[:, xxx.p_cm] * np.exp(-te / params_T2s)
         return(p)
 
-    def correct_T2s(self, te, extra_info_key="T2s_human_brain_7T"):
+    def correct_T2s(self, te):
         """
         Correct the concentration values of a parameter array depending on the TE and the common values of T2s for each metabolite.
 
@@ -229,8 +249,6 @@ class params(np.ndarray):
         ----------
         te : float
             Echo time in (ms)
-        extra_info_key : dictionnary key / string
-            Tab name in the metabase XLS file containing T2 values
 
         Returns
         -------
@@ -242,8 +260,8 @@ class params(np.ndarray):
 
         # browse though the database and find T2s
         params_T2s = []
-        for this_metagroup_key, this_metagroup_entry in self._metadb.items():
-            params_T2s.append(this_metagroup_entry[extra_info_key])
+        for this_metagroup_key, this_metagroup_entry in self._meta_bs.items():
+            params_T2s.append(this_metagroup_entry["T2"])
 
         # convert to np
         params_T2s = np.array(params_T2s)
@@ -252,7 +270,7 @@ class params(np.ndarray):
         p[:, xxx.p_cm] = p[:, xxx.p_cm] / np.exp(-te / params_T2s)
         return(p)
 
-    def correct_T1s(self, tr, extra_info_key="T1s_human_brain_7T"):
+    def correct_T1s(self, tr):
         """
         Correct the concentration values of a parameter array depending on the TR and the common values of T1s for each metabolite.
 
@@ -260,8 +278,6 @@ class params(np.ndarray):
         ----------
         tr : float
             Repetition time in (ms)
-        metabase_extra_infos_key : dictionnary key / string
-            Tab name in the metabase XLS file containing T1 values
 
         Returns
         -------
@@ -273,8 +289,8 @@ class params(np.ndarray):
 
         # browse though the database and find T1s
         params_T1s = []
-        for this_metagroup_key, this_metagroup_entry in self._metadb.items():
-            params_T1s.append(this_metagroup_entry[extra_info_key])
+        for this_metagroup_key, this_metagroup_entry in self._meta_bs.items():
+            params_T1s.append(this_metagroup_entry["T1"])
 
         # convert to np
         params_T1s = np.array(params_T1s)
@@ -338,7 +354,7 @@ class params(np.ndarray):
         """
         return(self._correct_normalize_concentrations(params_water[xxx.m_Water, xxx.p_cm] / water_concentration))
 
-    def set_default_min(self):
+    def _set_default_min(self):
         """
         Initialize the params object to the default minimum values, no macromolecules.
 
@@ -356,8 +372,8 @@ class params(np.ndarray):
         self[xxx.m_All_MBs, xxx.p_dp] = -0.1
 
         # link all to the NAA singlet
-        self.linklock[:] = np.tile([0, 2, 3, 4], (xxx.n_ALL, 1))
-        self.linklock[xxx.m_NAA_CH3, :] = [0, -2, -3, -4]
+        self.linklock[:] = np.tile([0, 2, 3, 4], (xxx.n_All, 1))
+        self.linklock[xxx.m_Ref_MB, :] = [0, -2, -3, -4]
         self.linklock[xxx.m_Water, :] = 0
 
         # no MMs
@@ -365,7 +381,7 @@ class params(np.ndarray):
 
         return(self.copy())
 
-    def set_default_max(self):
+    def _set_default_max(self):
         """
         Initialize the params object to the default maximum values, no macromolecules.
 
@@ -383,8 +399,8 @@ class params(np.ndarray):
         self[xxx.m_All_MBs, xxx.p_dp] = +0.1
 
         # link all to the NAA singlet
-        self.linklock[:] = np.tile([0, 2, 3, 4], (xxx.n_ALL, 1))
-        self.linklock[xxx.m_NAA_CH3, :] = [0, -2, -3, -4]
+        self.linklock[:] = np.tile([0, 2, 3, 4], (xxx.n_All, 1))
+        self.linklock[xxx.m_Ref_MB, :] = [0, -2, -3, -4]
         self.linklock[xxx.m_Water, :] = 0
 
         # no MMs
@@ -401,7 +417,7 @@ class params(np.ndarray):
         self.copy() : params object
             Copy of this current object with the applied modification
         """
-        self.set_default_min()
+        self._set_default_min()
         # all concentrations to zero
         self[:, xxx.p_cm] = 0.0
 
@@ -422,7 +438,7 @@ class params(np.ndarray):
         self.copy() : params object
             Copy of this current object with the applied modification
         """
-        self.set_default_max()
+        self._set_default_max()
         # all concentrations to zero
         self[:, xxx.p_cm] = 0.0
 
@@ -435,7 +451,7 @@ class params(np.ndarray):
         self.linklock[xxx.m_Water, :] = 0
         return(self.copy())
 
-    def set_default_human_brain_min(self):
+    def set_default_min(self):
         """
         Initialize the params object to the minimum in vivo human values, no macromolecules.
 
@@ -444,12 +460,12 @@ class params(np.ndarray):
         self.copy() : params object
             Copy of this current object with the applied modification
         """
-        self.set_default_min()
+        self._set_default_min()
 
-        # browse though the database and find human brain min values from literature
+        # browse though the database and find min values from literature
         cmin = []
-        for this_metagroup_key, this_metagroup_entry in self._metadb.items():
-            cmin.append(this_metagroup_entry["Concentrations_human_brain_min"])
+        for this_metagroup_key, this_metagroup_entry in self._meta_bs.items():
+            cmin.append(this_metagroup_entry["Concentration min"])
 
         # convert to np
         cmin = np.array(cmin)
@@ -458,21 +474,21 @@ class params(np.ndarray):
 
         return(self.copy())
 
-    def set_default_human_brain_max(self):
+    def set_default_max(self):
         """
-        Initialize the params object to the maximum in vivo human values, no macromolecules.
+        Initialize the params object to the maximum in vivo values, no macromolecules.
 
         Returns
         -------
         self.copy() : params object
             Copy of this current object with the applied modification
         """
-        self.set_default_max()
+        self._set_default_max()
 
-        # browse though the database and find human brain min values from literature
+        # browse though the database and find min values from literature
         cmax = []
-        for this_metagroup_key, this_metagroup_entry in self._metadb.items():
-            cmax.append(this_metagroup_entry["Concentrations_human_brain_max"])
+        for this_metagroup_key, this_metagroup_entry in self._meta_bs.items():
+            cmax.append(this_metagroup_entry["Concentration max"])
 
         # convert to np
         cmax = np.array(cmax)
@@ -481,9 +497,9 @@ class params(np.ndarray):
 
         return(self.copy())
 
-    def get_MBs_human_above(self, cm_threshold):
+    def get_MBs_above_concentration(self, cm_threshold):
         """
-        Return indexes for metabolites with human brain average concentrations above a threshold.
+        Return indexes for metabolites with average concentrations above a threshold.
 
         Parameters
         ----------
@@ -495,13 +511,13 @@ class params(np.ndarray):
         im : list of integers
             Metabolite indexes
         """
-        cm_mean = (self.set_default_human_brain_min() + self.set_default_human_brain_max()) / 2.0
+        cm_mean = (self.set_default_min() + self.set_default_max()) / 2.0
         cm_mean = cm_mean[:, 0]
         metabolites_inds = np.where(cm_mean > cm_threshold)
         metabolites_inds = metabolites_inds[0]
 
         # display
-        print(">> mrs.sim.params.get_MBs_human_above: found %d metabolites above %f mmol/kg..." % (len(metabolites_inds), cm_threshold))
+        print(">> mrs.sim.params.get_MBs_above_concentration: found %d metabolites above %f mmol/kg..." % (len(metabolites_inds), cm_threshold))
         print(" > ", end="", flush=True)
         meta_names = self.get_meta_names()
         for im in metabolites_inds:
@@ -526,15 +542,14 @@ class params(np.ndarray):
         self[xxx.m_All_MMs, xxx.p_dp] = -0.1
 
         # link all MM parameters to MM1
-        self.linklock[xxx.m_All_MMs, :] = np.tile(
-            [0, 200, 300, 400], (xxx.n_MMs, 1))
-        self.linklock[xxx.m_MM1, :] = [0, -200, -300, -400]
+        self.linklock[xxx.m_All_MMs, :] = np.tile([0, 200, 300, 400], (xxx.n_MMs, 1))
+        self.linklock[xxx.m_Ref_MM, :] = [0, -200, -300, -400]
 
         return(self.copy())
 
     def add_macromolecules_max(self):
         """
-        Initialize the params object to the maximum in vivo human values.
+        Enable the macromolecules modelization, maximum values.
 
         Returns
         -------
@@ -547,9 +562,8 @@ class params(np.ndarray):
         self[xxx.m_All_MMs, xxx.p_dp] = +0.1
 
         # link all MM parameters to MM1
-        self.linklock[xxx.m_All_MMs, :] = np.tile(
-            [0, 200, 300, 400], (xxx.n_MMs, 1))
-        self.linklock[xxx.m_MM1, :] = [0, -200, -300, -400]
+        self.linklock[xxx.m_All_MMs, :] = np.tile([0, 200, 300, 400], (xxx.n_MMs, 1))
+        self.linklock[xxx.m_Ref_MM, :] = [0, -200, -300, -400]
         return(self.copy())
 
     def print(self, bMM=False, bLL=True):
@@ -565,7 +579,7 @@ class params(np.ndarray):
         """
         print(">> mrs.sim.params.display_parameters: parameters...")
         if(bMM):
-            n = xxx.n_ALL
+            n = xxx.n_All
         else:
             n = xxx.n_MBs
 
@@ -605,6 +619,16 @@ class params(np.ndarray):
 class mrs_sequence:
     """A class that stores a sequence and all its parameters used for simulation. This is a generic sequence class that you need to overload. By default, the simulated sequence is a simple pulse-acquire NMR experiment."""
 
+    # frozen stuff: a technique to prevent creating new attributes
+    # (https://stackoverflow.com/questions/3603502/prevent-creating-new-attributes-outside-init)
+    __isfrozen = False
+
+    def __setattr__(self, key, value):
+        """Overload of __setattr__ method to check that we are not creating a new attribute."""
+        if self.__isfrozen and not hasattr(self, key):
+            raise TypeError("You are trying to dynamically create a new attribute (%s) to this object and that is not cool! I will not let you do that because I believe it is a bad habit and can lead to terrible bugs. A clean way of doing this is to initialize your attribute (%s) in the __init__ method of this class. Bisou, bye :)" % (key, key))
+        object.__setattr__(self, key, value)
+
     def __init__(self, te, tr=3500.0, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, scaling_factor=1.0):
         """
         Initialize the sequence.
@@ -628,7 +652,9 @@ class mrs_sequence:
         """
         # all sequences have those parameters
         # name
-        self._name = "fid"
+        self.name = "fid"
+        # type
+        self.exc_type = sequence_exc_type.PULSE_ACQUIRE
         # echo time (ms)
         self.te = te
         # repetition time (ms)
@@ -648,19 +674,23 @@ class mrs_sequence:
         # some 0th phase to add? (rd)
         self.additional_phi0 = 0.0
 
-        # metabolite_db object
-        self._meta_db = metabolite_db()
+        # metabolite_basis_set object
+        self._meta_bs = metabolite_basis_set()
 
         # try to simplify spin systems when possible to speed up simulations
         self.allow_spin_system_simplification = True
         # NMR simulation option: when hard zero-duration RF pulse are employed, should we take into account the duration of the real pulses in the evolution times or not? Experimentally, looks like yes.
         self.allow_evolution_during_hard_pulses = True
 
+        # in case GAMMA could not be loaded, we can load the sequence from a stored file
+        self.seqdb_file = None
+
         # pre-calculated stuff
         # 'metabase': set of numerically computed metabolite FID signals
         self._meta_signals = None
         # time vector
         self._t = []
+
         # initialized or not
         self._ready = False
 
@@ -677,28 +707,16 @@ class mrs_sequence:
         return(self._ready)
 
     @property
-    def name(self):
+    def meta_bs(self):
         """
-        Property get function for name.
+        Property get function for meta_bs.
 
         Returns
         -------
-        self._name : string
-            name of sequence
-        """
-        return(self._name)
-
-    @property
-    def meta_db(self):
-        """
-        Property get function for meta_db.
-
-        Returns
-        -------
-        self._meta_db : metabolite_db object
+        self._meta_bs : metabolite_basis_set object
             Metabolite database to use for simulation
         """
-        return(self._meta_db)
+        return(self._meta_bs)
 
     def _init_pulses(self):
         """Virtual method which initialize RF pulse waveforms if any."""
@@ -710,7 +728,7 @@ class mrs_sequence:
         Parameters
         ----------
         metabolite : dict
-            metabolite_db entry for one single metabolite
+            metabolite_basis_set entry for one single metabolite
         beSilent : boolean
             No output in console (True)
 
@@ -791,7 +809,7 @@ class mrs_sequence:
         Parameters
         ----------
         metabolite : dict
-            metabolite_db entry for one single metabolite
+            metabolite_basis_set entry for one single metabolite
 
         Returns
         -------
@@ -856,9 +874,9 @@ class mrs_sequence:
         s_full_meta = s_full_meta.view(reco.MRSData2)
 
         # browse though the database and display everything
-        for this_metagroup_key, this_metagroup_entry in self._meta_db.items():
+        for this_metagroup_key, this_metagroup_entry in self._meta_bs.items():
             s = s_full_meta.copy()
-            for this_meta_key, this_meta_entry in self._meta_db[this_metagroup_key]["metabolites"].items():
+            for this_meta_key, this_meta_entry in self._meta_bs[this_metagroup_key]["metabolites"].items():
                 print(">>> simulating MRS signal for metabolite [", end="", flush=True)
                 cprint(this_metagroup_key, 'green', attrs=['bold'], end="", flush=True)
                 print("/", end="", flush=True)
@@ -869,31 +887,200 @@ class mrs_sequence:
             # append this metabolite group to the metabase
             self._meta_signals.append(s)
 
-    def initialize(self, metadb=None):
+    def _load_from_seqdb_file(self, te_tol=5.0, f0_tol=5.0):
+        """
+        Try to load the simulated metabolite signals from a stored PKL file.
+
+        Parameters
+        ----------
+        te_tol : float
+            Maximum TE difference tolerated when looking for a sequence (ms)
+        f0_tol : float
+            Maximum f0 difference tolerated when looking for a sequence (MHz)
+        """
+        # hello
+        cprint(">>> mrs.sim.mrs_sequence._load_from_seqdb_file:", 'green', attrs=['bold'])
+
+        if(self.seqdb_file is None):
+            raise Exception(" > PyGAMMA library could not be loaded and no sequence database PKL file (seqdb_file) was specified :(")
+
+        print(" > Reading sequence database file...")
+        # load pickle file
+        with open(self.seqdb_file, 'rb') as f:
+            [seqdb] = pickle.load(f)
+
+        # convert to np
+        seqdb = np.array(seqdb)
+
+        # compare sequences
+        print(" > Trying to find the right simulated sequence for you...")
+
+        # sequence excitation type
+        seqdb_exc_type_mask = np.array([s.exc_type == self.exc_type for s in seqdb])
+        seqdb_exc_type_n = np.sum(seqdb_exc_type_mask)
+        print("   Sequence type match: n=%d (%s)" % (seqdb_exc_type_n, self.exc_type))
+
+        # sequence name
+        seqdb_name_mask = np.array([s.name == self.name for s in seqdb])
+        seqdb_name_n = np.sum(seqdb_name_mask)
+        print("   Sequence name match: n=%d (%s)" % (seqdb_name_n, self.name))
+
+        # initialize final mask
+        if(seqdb_name_n > 0):
+            seqdb_final_mask = seqdb_name_mask
+        else:
+            seqdb_final_mask = seqdb_exc_type_mask
+
+        # nuclei
+        seqdb_nuclei_mask = np.array([s.nuclei == self.nuclei for s in seqdb])
+        seqdb_nuclei_n = np.sum(seqdb_nuclei_mask)
+        print("   Nuclei match: n=%d (%s)" % (seqdb_nuclei_n, self.nuclei))
+        # adjust final mask
+        seqdb_final_mask = np.logical_and(seqdb_final_mask, seqdb_nuclei_mask)
+
+        # f0
+        seqdb_f0_diff = np.abs([s.f0 - self.f0 for s in seqdb])
+        seqdb_f0_diff_mask = (seqdb_f0_diff < f0_tol)
+        seqdb_f0_diff_n = np.sum(seqdb_f0_diff_mask)
+        print("   F0 match: need %.3fMHz, found n=%d sequences simulated at +/-%.3fMHz" % (self.f0, seqdb_f0_diff_n, f0_tol))
+        # adjust final mask
+        seqdb_final_mask = np.logical_and(seqdb_final_mask, seqdb_f0_diff_mask)
+
+        # ppm water
+        seqdb_ppm_water_mask = np.array([s.ppm_water == self.ppm_water for s in seqdb])
+        seqdb_ppm_water_n = np.sum(seqdb_ppm_water_mask)
+        print("   Water ppm match: n=%d (%.2f)" % (seqdb_ppm_water_n, self.ppm_water))
+        # adjust final mask
+        seqdb_final_mask = np.logical_and(seqdb_final_mask, seqdb_ppm_water_mask)
+
+        # additional_phi0
+        seqdb_ph0_mask = np.array([s.additional_phi0 == self.additional_phi0 for s in seqdb])
+        seqdb_ph0_n = np.sum(seqdb_ph0_mask)
+        print("   0th order phase match: n=%d (%.2f)" % (seqdb_ph0_n, self.additional_phi0))
+        # adjust final mask
+        seqdb_final_mask = np.logical_and(seqdb_final_mask, seqdb_ph0_mask)
+
+        # allow_evolution_during_hard_pulses
+        seqdb_evol_mask = np.array([s.allow_evolution_during_hard_pulses == self.allow_evolution_during_hard_pulses for s in seqdb])
+        seqdb_evol_n = np.sum(seqdb_evol_mask)
+        print("   Complicated stuff match: n=%d (%r)" % (seqdb_evol_n, self.allow_evolution_during_hard_pulses))
+        # adjust final mask
+        seqdb_final_mask = np.logical_and(seqdb_final_mask, seqdb_evol_mask)
+
+        # metabolites
+        seqdb_meta_bs_mask = np.array([s.meta_bs == self.meta_bs for s in seqdb])
+        seqdb_meta_bs_n = np.sum(seqdb_meta_bs_mask)
+        print("   Metabolites match: n=%d" % seqdb_meta_bs_n)
+        # adjust final mask
+        seqdb_final_mask = np.logical_and(seqdb_final_mask, seqdb_meta_bs_mask)
+
+        # check mask
+        if(not np.any(seqdb_final_mask)):
+            raise Exception(" > Sorry, there is no simulated sequence that matches with your acquisition criterias :(")
+
+        # mask all the useless sequences and clean memory
+        seqdb_match = seqdb[seqdb_final_mask]
+        seqdb = []
+
+        # te
+        seqdb_te_diff = np.abs([s.te - self.te for s in seqdb_match])
+        imin_te_diff = np.argmin(seqdb_te_diff)
+        print("   TE match: need %.2fms, found %.2fms" % (self.te, seqdb_match[imin_te_diff].te))
+        if(seqdb_te_diff[imin_te_diff] > te_tol and self.meta_bs.non_coupled_only):
+            print("   TE match: This might seem a lot but I see you want to generate only singulet's metabolites so that is really not a big deal ;)")
+
+        # optimal sequence and clean memory
+        optim_seq = seqdb_match[imin_te_diff]
+        seqdb_match = []
+
+        # display
+        print(" > Comparing what you asked/what you got...")
+        print("   Parameter\t\tRequested\t\tObtained")
+        for this_key in list(self.__dict__.keys()):
+            my_val = self.__dict__[this_key]
+            if(len(my_val) == 1):
+                found_val = optim_seq.__dict__[this_key]
+                print("   " + this_key + "\t" + str(my_val) + "\t" + str(found_val))
+
+        # ok well done. Now we maybe have to fix a few issues: number of samples, sampling frequency, amplification factor, this can be done with some signal processing stuff
+
+        # resampling
+        if(self.fs != optim_seq.fs or self.npts != optim_seq.npts):
+            print(" > Resampling the metabolite signals to match your sampling...")
+            old_dt = 1 / optim_seq.fs
+            old_t = np.arange(0, optim_seq.npts * old_dt, old_dt)
+            new_dt = 1 / self.fs
+            new_t = np.arange(0, self.npts * new_dt, new_dt)
+
+            # resample each metabolite signal
+            new_meta_signals = []
+            for s in optim_seq._meta_signals:
+                s2_np = np.interp(new_t, old_t, s)
+                # convert to suspect
+                s_MRSData = suspect.MRSData(s2_np, new_dt, optim_seq.f0)
+                s_MRSData2 = s_MRSData.view(reco.MRSData2)
+                # and rebuild metabase
+                new_meta_signals.append(s_MRSData2)
+        else:
+            # no need in reampling?
+            new_meta_signals = optim_seq._meta_signals.copy()
+
+        # apply changes
+        self._meta_signals = new_meta_signals.copy()
+
+        # amplify
+        if(self.scaling_factor != optim_seq.scaling_factor):
+            # amplify each metabolite signal
+            new_meta_signals = []
+            for s in self._meta_signals:
+                s2 = s * self.scaling_factor / optim_seq.scaling_factor
+                # and rebuild metabase
+                new_meta_signals.append(s2)
+
+            # apply changes
+            self._meta_signals = new_meta_signals.copy()
+
+        # final: carefully copy attributes except private ones (_*) and seqdb_file
+        keys_not_to_copy = ["_meta_bs", "_meta_signals", "_t", "_ready"]
+        for this_key in list(self.__dict__.keys()):
+            if(this_key not in keys_not_to_copy):
+                self.__dict__[this_key] = optim_seq.__dict__[this_key]
+
+        print(" > Successfully imported metabolite signal basis set! :)")
+
+    def initialize(self, meta_bs=None):
         """
         Initialize the sequence object before using it to simulate MRS signals.
 
         Parameters
         ----------
-        metadb : metabolite_db
-            Metabolite database to use for simulation. If none specified, use default metabolite_db object.
+        meta_bs : metabolite_basis_set
+            Metabolite database to use for simulation. If none specified, use default metabolite_basis_set object.
         """
         # hello
         cprint(">> mrs.sim.mrs_sequence.initialize:", 'green', attrs=['bold'])
-        print(" > initializing sequence...")
 
         # want to use a custom metabolite db?
-        if(metadb is not None):
-            self._meta_db = metadb
+        if(meta_bs is not None):
+            self._meta_bs = meta_bs
 
         # now let's initialize the metabolite db if needed
-        if(not self._meta_db.ready):
-            self._meta_db.initialize()
+        if(not self._meta_bs.ready):
+            self._meta_bs.initialize()
 
-        self._init_pulses()
-        self._compute_metabolite_signals()
-        dt = 1 / self.fs
-        self._t = np.arange(0, self.npts * dt, dt)
+        # wait, was the GAMMA library imported ok?
+        if(GAMMA_LIB_LOADED):
+            print(" > initializing sequence using pyGAMMA...")
+            # oh ok, so let's run the simulations and stuff
+            self._init_pulses()
+            self._compute_metabolite_signals()
+            dt = 1 / self.fs
+            self._t = np.arange(0, self.npts * dt, dt)
+        else:
+            print(" > loading sequence from disk...")
+            # ops, so let's try to load the simulations from a pkl file
+            self._load_from_seqdb_file()
+
         self._ready = True
 
     def _model(self, p):
@@ -990,8 +1177,11 @@ class mrs_sequence:
             print(" > adding complex gaussian noise, std. deviation = " + str(sigma_noise))
             s = s + np.random.normal(0.0, sigma_noise, s.shape[0] * 2).view(np.complex128)
 
-        # adding te (fix)
+        # adding a few attributes
         s._te = self.te
+        s._sequence = self
+        _, _, nl = s.analyse_snr(None, None, "", True, False, False)
+        s._noise_level = nl
         return(s)
 
 
@@ -1025,7 +1215,9 @@ class mrs_seq_press(mrs_sequence):
         """
         super().__init__(te, tr, nuclei, npts, fs, f0, scaling_factor)
         # name of sequence
-        self._name = "press (not specific)"
+        self.name = "press (not specific)"
+        # type
+        self.exc_type = sequence_exc_type.SPIN_ECHO
         # TE timing
         if(te1 is None or te2 is None):
             # symmetric TE by default
@@ -1037,6 +1229,9 @@ class mrs_seq_press(mrs_sequence):
         # flip phase for PRESS
         self.additional_phi0 = np.pi
 
+        # freeze
+        self.__isfrozen = True
+
     def _run_sequence(self, metabolite):
         """
         Simulate the NMR signal acquired using a PRESS sequence using the GAMMA library via the pyGAMMA python wrapper for one metabolite (=one spin system).
@@ -1044,7 +1239,7 @@ class mrs_seq_press(mrs_sequence):
         Parameters
         ----------
         metabolite : dict
-            metabolite_db entry for one single metabolite
+            metabolite_basis_set entry for one single metabolite
 
         Returns
         -------
@@ -1149,11 +1344,16 @@ class mrs_seq_steam(mrs_sequence):
         """
         super().__init__(te, tr, nuclei, npts, fs, f0, scaling_factor)
         # name of sequence
-        self._name = "steam (not specific)"
+        self.name = "steam (not specific)"
+        # type
+        self.exc_type = sequence_exc_type.STIMULATED_ECHO
         # mixing time
         self.tm = tm
         # need some 180deg phase here
         self.additional_phi0 = np.pi
+
+        # freeze
+        self.__isfrozen = True
 
     def _run_sequence(self, metabolite):
         """
@@ -1162,7 +1362,7 @@ class mrs_seq_steam(mrs_sequence):
         Parameters
         ----------
         metabolite : dict
-            metabolite_db entry for one single metabolite
+            metabolite_basis_set entry for one single metabolite
 
         Returns
         -------
@@ -1314,7 +1514,9 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
         """
         super().__init__(te, tr, nuclei, npts, fs, f0, scaling_factor)
         # name of sequence
-        self._name = "eja_svs_slaser"
+        self.name = "eja_svs_slaser"
+        # type
+        self.exc_type = sequence_exc_type.SPIN_ECHO
         # excitation and AFP pulse properties
         self.pulse_exc_duration = exc_pulse_duration
         self.pulse_rfc_duration = rfc_pulse_duration
@@ -1328,7 +1530,7 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
         self.spoiler_duration = spoiler_duration
 
         # should we use real shaped RF pulses or not
-        self.pulse_rfc_real_shape_enable = True
+        self.pulse_rfc_real_shape_enable = False
 
         # sLASER needs some rephasing
         self.additional_phi0 = np.pi
@@ -1346,7 +1548,7 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
         # [0] 10% last points (for higher power) used for plateau estimation
         # [1] 10% change allowed
         # [2] 30% power increase to be sure to be in adiabatic regime
-        self.pulse_rfc_optim_power_margins = [10.0, 10.0, 30.0]  # %
+        self.pulse_rfc_optim_power_margins = [10.0, 10.0, 100.0]  # %
         # display all this in a nice fig
         self.pulse_rfc_optim_power_display = True
         # final pulse voltage found by optimization
@@ -1356,6 +1558,9 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
 
         # RF power (w1 in Hz) used for AFP pulses during simulation
         self._pulse_rfc_w1max = None
+
+        # freeze
+        self.__isfrozen = True
 
     def _sech(self, x):
         return(1.0 / np.cosh(x))
@@ -1525,7 +1730,7 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
         # w1_range_uT = w1_range_Hz / gamma
 
         # run RF adjustment
-        meta_db_keys = list(self.meta_db.keys())
+        meta_bs_keys = list(self.meta_bs.keys())
         acquired_signals = []
         peak_max_ppm_index = []
         peak_intensity_abs = np.zeros([len(self.pulse_rfc_optim_power_metabolites), len(w1_range_Hz)])
@@ -1536,8 +1741,8 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
             self._pulse_rfc_w1max = w
             # for each metabolite
             for km, im in enumerate(self.pulse_rfc_optim_power_metabolites):
-                meta_key = meta_db_keys[im]
-                meta_dict_entry = self.meta_db[meta_key]["metabolites"][meta_key]
+                meta_key = meta_bs_keys[im]
+                meta_dict_entry = self.meta_bs[meta_key]["metabolites"][meta_key]
                 # acquire
                 s = self._run_sequence(meta_dict_entry, True)
                 s = s._correct_apodization(10.0)  # silent apodization
@@ -1606,7 +1811,7 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
 
         # for metabolite
         for km, im in enumerate(self.pulse_rfc_optim_power_metabolites):
-            meta_key = meta_db_keys[im]
+            meta_key = meta_bs_keys[im]
             axs[1].plot(peak_intensity_abs[km, :], w1_range_Hz, 'o-', linewidth=1, label=meta_key + " peak intensity at %.2fppm (magnitude)" % peak_max_ppm[km])
             axs[1].plot(peak_intensity_real[km, :], w1_range_Hz, 'o-', linewidth=1, label=meta_key + " peak intensity at %.2fppm (real)" % peak_max_ppm[km])
 
@@ -1647,7 +1852,7 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
         Parameters
         ----------
         metabolite : dict
-            metabolite_db entry for one single metabolite
+            metabolite_basis_set entry for one single metabolite
         beSilent : boolean
             No output in console (True)
 
@@ -1830,7 +2035,7 @@ class mrs_seq_eja_svs_press(mrs_seq_press):
         """
         super().__init__(te, tr, nuclei, npts, fs, f0, scaling_factor, te1, te2)
         # name of sequence
-        self._name = "eja_svs_press"
+        self.name = "eja_svs_press"
 
 
 class mrs_seq_eja_svs_steam(mrs_seq_steam):
@@ -1861,7 +2066,7 @@ class mrs_seq_eja_svs_steam(mrs_seq_steam):
         """
         super().__init__(te, tr, nuclei, npts, fs, f0, scaling_factor, tm)
         # name of sequence
-        self._name = "eja_svs_steam"
+        self.name = "eja_svs_steam"
 
 
 class mrs_seq_fid(mrs_sequence):
@@ -1890,7 +2095,7 @@ class mrs_seq_fid(mrs_sequence):
         """
         super().__init__(te, tr, nuclei, npts, fs, f0, scaling_factor)
         # name of sequence
-        self._name = "fid"
+        self.name = "fid"
 
 
 class mrs_seq_svs_st(mrs_seq_steam):
@@ -1921,7 +2126,7 @@ class mrs_seq_svs_st(mrs_seq_steam):
         """
         super().__init__(te, tr, nuclei, npts, fs, f0, scaling_factor, tm)
         # name of sequence
-        self._name = "svs_st"
+        self.name = "svs_st"
 
 
 class mrs_seq_svs_st_vapor_643(mrs_seq_steam):
@@ -1952,25 +2157,38 @@ class mrs_seq_svs_st_vapor_643(mrs_seq_steam):
         """
         super().__init__(te, tr, nuclei, npts, fs, f0, scaling_factor, tm)
         # name of sequence
-        self._name = "svs_st_vapor_643"
+        self.name = "svs_st_vapor_643"
 
 
-class metabolite_db(dict):
-    """The metabolite_db class is a big dictionnary of metabolites with their respective chemical shift and J coupling information."""
+class metabolite_basis_set(dict):
+    """The metabolite_basis_set class is a big dictionnary of metabolites with their respective chemical shift and J coupling information."""
+
+    # frozen stuff: a technique to prevent creating new attributes
+    # (https://stackoverflow.com/questions/3603502/prevent-creating-new-attributes-outside-init)
+    __isfrozen = False
+
+    def __setattr__(self, key, value):
+        """Overload of __setattr__ method to check that we are not creating a new attribute."""
+        if self.__isfrozen and not hasattr(self, key):
+            raise TypeError("You are trying to dynamically create a new attribute (%s) to this object and that is not cool! I will not let you do that because I believe it is a bad habit and can lead to terrible bugs. A clean way of doing this is to initialize your attribute (%s) in the __init__ method of this class. Bisou, bye :)" % (key, key))
+        object.__setattr__(self, key, value)
 
     def __init__(self):
         """Construct a metabolite object."""
-        super(metabolite_db, self).__init__()
-        # xls file that contains all the info
-        self.xls_file = "./mrs/metabase.xls"
+        super(metabolite_basis_set, self).__init__()
+        # xls file that contains metabolites properties (you should not change that)
+        self._database_xls_file = "./mrs/metabolites_db.xls"
+        # xls file that contains your metabolite basis set
+        self.basis_set_xls_file = "./metabolite_basis_sets/human_brain_7T.xls"
         # include peaks only in this range of chemical shifts
         self.ppm_range = [0, 6]
         # include only non-coupled peaks
         self.non_coupled_only = False
-        # this is the name of the first MM
-        self._first_MM = "MM1"
         # to know if the object is initialized
         self._ready = False
+
+        # freeze
+        self.__isfrozen = True
 
     @property
     def ready(self):
@@ -1987,24 +2205,48 @@ class metabolite_db(dict):
     def _read_xls_file(self):
         """Read the xls file specified by "self.xls_file" and stores all the information (chemical shifts, nuclei, J couplings)."""
         # hello
-        cprint(">> mrs.sim.metabolite_db._read_xls_file:", 'green', attrs=['bold'])
+        # TODO: need to work with gitable xls format, FODS!
+        cprint(">> mrs.sim.metabolite_basis_set._read_xls_file:", 'green', attrs=['bold'])
 
         # remove annoying warning
         warnings.simplefilter(action='ignore', category=FutureWarning)
 
         # first, read xls metabolite basis set file and parse it
         print(" > reading metabolite basis set from XLS file...")
-        book = open_workbook(self.xls_file)
+        book_db = open_workbook(self._database_xls_file)
+        book = open_workbook(self.basis_set_xls_file)
 
-        # get sheets
+        # get sheets from database file
         all_sheets = book.sheet_names()
-        sheet_names = book.sheet_by_name('Names')
-        sheet_groups = book.sheet_by_name('Groups')
-        sheet_ppm = book.sheet_by_name('PPM')
-        sheet_iso = book.sheet_by_name('Nuclei')
+        sheet_names = book_db.sheet_by_name('Metabolites')
+        sheet_ppm = book_db.sheet_by_name('PPM')
+        sheet_iso = book_db.sheet_by_name('Nuclei')
 
-        # find extra sheet names
-        extra_sheet_names = [s for s in all_sheets if "Extra" in s]
+        # get sheets from basis set file
+        sheet_groups = book.sheet_by_name('Metabolites')
+        sheet_ref = book.sheet_by_name('Reference_metabolite')
+        sheet_MMs = book.sheet_by_name('Macromolecules')
+        sheet_refMM = book.sheet_by_name('Reference_macromolecule')
+        sheet_cmin = book.sheet_by_name('Concentrations_min')
+        sheet_cmax = book.sheet_by_name('Concentrations_max')
+        sheet_T1s = book.sheet_by_name('T1s')
+        sheet_T2s = book.sheet_by_name('T2s')
+
+        # metabolite used as a reference, a robust peak
+        ref_meta_name = sheet_ref.col_values(0)[0]
+
+        # MMs list and reference MM
+        MM_list = sheet_MMs.col_values(0)
+        if(len(sheet_refMM.col_values(0)) > 0):
+            ref_MM_name = sheet_refMM.col_values(0)[0]
+        else:
+            ref_MM_name = ""
+
+        # other sheets
+        c_min = np.array(sheet_cmin.col_values(0))
+        c_max = np.array(sheet_cmax.col_values(0))
+        T1s = np.array(sheet_T1s.col_values(0))
+        T2s = np.array(sheet_T2s.col_values(0))
 
         # metagroup list
         for this_metagroup_name in sheet_groups.col_values(0):
@@ -2064,14 +2306,22 @@ class metabolite_db(dict):
                     # append metabolite entry for this metabolite group
                     this_metagroup_entry["metabolites"].update({this_meta_name: {"ppm": this_ppm_list, "iso": this_iso_list, "J": this_j_list}})
 
-            # add extra infos to metabolite group from extra sheets (T2, T1, etc.)
-            for this_extra_sheet_name in extra_sheet_names:
-                # extract string from sheet name
-                this_extra_sheet = book.sheet_by_name(this_extra_sheet_name)
-                this_col = np.array(this_extra_sheet.col_values(0))
-                this_extra_info_val = this_col[this_metagroup_ind]
-                this_extra_info_key = this_extra_sheet_name[6:]  # remove Extra_
-                this_metagroup_entry.update({this_extra_info_key: this_extra_info_val})
+            # add extra infos to metabolite group
+            # is it a MM?
+            this_MM_bool = (this_metagroup_name in MM_list)
+            this_metagroup_entry.update({"Macromecule": this_MM_bool})
+            # omg, is it the reference MM?
+            this_ref_MM_bool = (this_metagroup_name == ref_MM_name)
+            this_metagroup_entry.update({"Reference macromolecule": this_ref_MM_bool})
+            # oh maybe, is it the reference metabolite?
+            this_ref_meta_bool = (this_metagroup_name == ref_meta_name)
+            this_metagroup_entry.update({"Reference metabolite": this_ref_meta_bool})
+            # min/max concentration
+            this_metagroup_entry.update({"Concentration min": c_min[this_metagroup_ind]})
+            this_metagroup_entry.update({"Concentration max": c_max[this_metagroup_ind]})
+            # T1s/T2s
+            this_metagroup_entry.update({"T1": T1s[this_metagroup_ind]})
+            this_metagroup_entry.update({"T2": T2s[this_metagroup_ind]})
 
             # and add the group to the dict
             self.update({this_metagroup_name: this_metagroup_entry})
@@ -2079,45 +2329,76 @@ class metabolite_db(dict):
     def _write_header_file(self):
         """Interesting method here... It generates a python .py and writes very usefull aliases to access quickly to a specific metabolite or parameter. Since metabolite indexes depend on the metabolite database, this python header file is regenerated each time the metabolite basis set is initialized."""
         # hello
-        cprint(">> mrs.sim.metabolite_db._write_header_file:", 'green', attrs=['bold'])
+        cprint(">> mrs.sim.metabolite_basis_set._write_header_file:", 'green', attrs=['bold'])
         print(" > generating metabolite and parameter aliases...")
 
-        with open("./mrs/metabase.py", 'w') as f:
+        with open("./mrs/aliases.py", 'w') as f:
             f.write("#!/usr/bin/env python3")
             f.write("# -*- coding: utf-8 -*-\n")
             f.write('\n')
-            f.write("# This file is automatically generated on the fly by sim.py!\n")
+            f.write("# This file is automatically generated on the fly by sim.py! Do not try to modify it please.\n")
             f.write("\n")
+
+            # metabolite aliases
             metagroup_names = list(self.keys())
-            for k, thisMetaName in enumerate(metagroup_names):
-                f.write("m_" + thisMetaName + " = " + str(k) + "\n")
+            for k, this_meta_name in enumerate(metagroup_names):
+                f.write("m_" + this_meta_name + " = " + str(k) + "\n")
             f.write("\n")
+
+            # parameter aliases
             f.write("p_cm = 0\n")
             f.write("p_dd = 1\n")
             f.write("p_df = 2\n")
             f.write("p_dp = 3\n")
             f.write("\n")
 
-            f.write("m_All_MBs = [0")
-            for im in range(1, metagroup_names.index(self._first_MM)):
-                f.write(", " + str(im))
+            # all metabolite alias
+            ind_ref_meta = None
+            n_meta = 0
+            f.write("m_All_MBs = [")
+            for k, this_meta_name in enumerate(metagroup_names):
+                if(not self[this_meta_name]["Macromecule"]):
+                    f.write(str(k) + ", ")
+                    n_meta += 1
+                if(self[this_meta_name]["Reference metabolite"]):
+                    ind_ref_meta = k
             f.write("]\n")
 
-            f.write("m_All_MMs = [" + str(metagroup_names.index(self._first_MM)))
-            for im in range(metagroup_names.index(self._first_MM) + 1, len(metagroup_names)):
-                f.write(", " + str(im))
-            f.write("]\n")
+            # ref metabolite alias
+            if(ind_ref_meta is None):
+                raise Exception(" > weird, could not find reference metabolite!?")
+            else:
+                f.write("m_Ref_MB = %d\n" % ind_ref_meta)
             f.write("\n")
 
-            f.write("n_ALL = " + str(len(metagroup_names)) + "\n")
-            f.write("n_MBs = " + str(metagroup_names.index(self._first_MM)) + "\n")
-            f.write("n_MMs = " + str(len(metagroup_names) - metagroup_names.index(self._first_MM)) + "\n")
+            # all MMs alias
+            ind_ref_MM = None
+            n_MM = 0
+            f.write("m_All_MMs = [")
+            for k, this_meta_name in enumerate(metagroup_names):
+                if(self[this_meta_name]["Macromecule"]):
+                    f.write(str(k) + ", ")
+                    n_MM += 1
+                if(self[this_meta_name]["Reference macromolecule"]):
+                    ind_ref_MM = k
+            f.write("]\n")
+
+            # ref MM alias
+            if(ind_ref_MM is None):
+                f.write("m_Ref_MM = None\n")
+            else:
+                f.write("m_Ref_MM = %d\n" % ind_ref_MM)
+            f.write("\n")
+
+            f.write("n_All = " + str(n_meta + n_MM) + "\n")
+            f.write("n_MBs = " + str(n_meta) + "\n")
+            f.write("n_MMs = " + str(n_MM) + "\n")
             f.write("\n")
 
     def print_out(self):
         """Print the metabolite database with all the information (chemical shifts, nuclei, J couplings)."""
         # hello
-        cprint(">> mrs.sim.metabolite_db.print_out:", 'green', attrs=['bold'])
+        cprint(">> mrs.sim.metabolite_basis_set.print_out:", 'green', attrs=['bold'])
 
         # and now browse though the database and display everything
         for this_metagroup_key, this_metagroup_entry in self.items():
@@ -2154,13 +2435,12 @@ class metabolite_db(dict):
     def initialize(self):
         """Initialize metabolite database: run the two previous methods."""
         # hello
-        cprint(">> mrs.sim.metabolite_db.initialize:", 'green', attrs=['bold'])
+        cprint(">> mrs.sim.metabolite_basis_set.initialize:", 'green', attrs=['bold'])
         print(" > initializing metabolite database...")
         self.clear()
         self._read_xls_file()
         self._write_header_file()
-        # self.print_out()
-        self._ready = False
+        self._ready = True
 
 
 def disp_bargraph(ax, params_val_list, params_std_list, params_leg_list, colored_LLs=True, bMM=False, bWater=False, bFitMode=False, pIndex=xxx.p_cm, mIndex_list=None, width=0.3):
@@ -2207,7 +2487,7 @@ def disp_bargraph(ax, params_val_list, params_std_list, params_leg_list, colored
 
     # filter out MMs?
     if(not bMM):
-        meta_mask[xxx.m_MM1:, :] = False
+        meta_mask[xxx.m_All_MMs, :] = False
 
     # filter out water?
     if(not bWater):
@@ -2227,7 +2507,7 @@ def disp_bargraph(ax, params_val_list, params_std_list, params_leg_list, colored
 
     # check that we still have something to display
     if(np.all(meta_mask == False)):
-        raise Exception("  > mrs.sim.disp_bargraph: nothing to display! Please check disp_bargraph paramters like pIndex, mIndex_list, bWater and bMM!")
+        raise Exception("  > mrs.sim.disp_bargraph: nothing to display! Please check disp_bargraph parameters like pIndex, mIndex_list, bWater and bMM!")
 
     # filter data now
     params_val_list = [p[meta_mask] for p in params_val_list]

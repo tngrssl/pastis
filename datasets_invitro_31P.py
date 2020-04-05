@@ -5,22 +5,15 @@ A user script used to store calls for the reconstruction of 31P in vitro data.
 
 @author: Tangi Roussel
 """
-
-from __future__ import division
+# %% init
+from IPython import get_ipython
 import matplotlib.pylab as plt
 import mrs.reco as reco
-
-from IPython import get_ipython
-import warnings
-warnings.filterwarnings("ignore", ".*GUI is implemented*")
-plt.close('all')
-get_ipython().magic('clear')
+get_ipython().magic("clear")
+plt.close("all")
 
 # %% 08/08/2019 - phosphates_mix_001 - levure/lessive/javel/serum
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -54,12 +47,8 @@ p.display_magnitude_mode = True
 p.display_range_ppm = [-25, 25]
 s = p.run_pipeline_std()
 
-
 # %% 08/08/2019 - phosphates_mix_002 - levure/lessive/javel/serum
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -109,12 +98,8 @@ p.display_magnitude_mode = True
 p.display_range_ppm = [-25, 25]
 s = p.run_pipeline_std()
 
-
 # %% 08/08/2019 - phosphates_mix_002 - levure/lessive/javel/serum, tests STEAM, sLASER, ISIS
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -146,12 +131,8 @@ p.display_magnitude_mode = True
 p.display_range_ppm = [-25, 25]
 s = p.run_pipeline_std()
 
-
 # %% 08/08/2019 - phosphates_mix_002 - test raw data ISIS
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -204,12 +185,8 @@ p.display_magnitude_mode = False
 p.display_range_ppm = [-25, 25]
 s = p.run_pipeline_std()
 
-
 # %% 13/08/2019 - phosphates_mix_003, optim exc pulse BW
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -276,12 +253,8 @@ p.display_magnitude_mode = True
 p.display_range_ppm = [-25, 25]
 s = p.run_pipeline_std()
 
-
 # %% 13/08/2019 - phosphates_mix_003, optim exc pulse B1
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -339,12 +312,8 @@ p.display_magnitude_mode = True
 p.display_range_ppm = [-25, 25]
 s = p.run_pipeline_std()
 
-
 # %% 21/01/2020 - phantom_31p, optim B1 on levure tube
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -413,12 +382,8 @@ p.display_magnitude_mode = True
 p.display_range_ppm = [-25, 25]
 s = p.run_pipeline_std()
 
-
 # %% 21/01/2020 - phantom_31p, optim B1 on lessive
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()

@@ -8,9 +8,10 @@ A fit_pipeline class that deals with the quantification of MRS data based on the
 
 import numpy as np
 import mrs.sim as sim
-import mrs.metabase as xxx
+import mrs.aliases as xxx
 import matplotlib.pylab as plt
 import scipy.optimize as optimize
+from termcolor import cprint
 from enum import Enum
 import time
 
@@ -31,6 +32,16 @@ class fit_plot_type(Enum):
 
 class prefit_pipeline:
     """The prefit_pipeline class is used to perfom area integration of peaks in the spectrum."""
+
+    # frozen stuff: a technique to prevent creating new attributes
+    # (https://stackoverflow.com/questions/3603502/prevent-creating-new-attributes-outside-init)
+    __isfrozen = False
+
+    def __setattr__(self, key, value):
+        """Overload of __setattr__ method to check that we are not creating a new attribute."""
+        if self.__isfrozen and not hasattr(self, key):
+            raise TypeError("You are trying to dynamically create a new attribute (%s) to this object and that is not cool! I will not let you do that because I believe it is a bad habit and can lead to terrible bugs. A clean way of doing this is to initialize your attribute (%s) in the __init__ method of this class. Bisou, bye :)" % (key, key))
+        object.__setattr__(self, key, value)
 
     def __init__(self, data, seq=None):
         """
@@ -57,7 +68,7 @@ class prefit_pipeline:
             self.seq.initialize()
 
         # metabolite db
-        self._meta_db = self.seq.meta_db
+        self._meta_bs = self.seq.meta_bs
 
         # metabolites to integrate
         self.area_integration_peaks = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
@@ -77,6 +88,9 @@ class prefit_pipeline:
         self.display_fig_index = 1000
         self.display_range_ppm = [1, 6]  # ppm
 
+        # freeze
+        self.__isfrozen = True
+
     @property
     def seq(self):
         """
@@ -90,16 +104,16 @@ class prefit_pipeline:
         return(self._seq)
 
     @property
-    def meta_db(self):
+    def meta_bs(self):
         """
-        Property get function for meta_db.
+        Property get function for meta_bs.
 
         Returns
         -------
-        self._meta_db : metabolite_db object
+        self._meta_bs : metabolite_basis_set() object
             Metabolite database to use for simulation
         """
-        return(self._meta_db)
+        return(self._meta_bs)
 
     def run(self):
         """Run the area integration pipeline."""
@@ -112,11 +126,11 @@ class prefit_pipeline:
         # first find chemical shifts for those peaks
         self._peak_names = []
         self._peak_ppms = []
-        meta_keys = list(self.meta_db.keys())
+        meta_keys = list(self.meta_bs.keys())
         integration_metagroup_keys = [meta_keys[ind] for ind in self.area_integration_peaks]
         for this_metagroup_key in integration_metagroup_keys:
             meta_found_singulet = None
-            for this_meta in list(self.meta_db[this_metagroup_key]["metabolites"].items()):
+            for this_meta in list(self.meta_bs[this_metagroup_key]["metabolites"].items()):
                 # find first meta in this metagroup
                 this_meta_properties = this_meta[1]
                 # check that it is a singlet: only one meta, all Js are zeroes and only one unique ppm
@@ -150,7 +164,7 @@ class prefit_pipeline:
         # now for each peak, integrate the area
         self._peak_areas = []
         self._peak_areas_norm = []
-        p = sim.params(self.meta_db)
+        p = sim.params(self.meta_bs)
         p[:] = 0.0
 
         print("> Integrate peak for...")
@@ -201,6 +215,16 @@ class prefit_pipeline:
 class fit_pipeline:
     """The fit_pipeline class is used to adjust the MRS model implemented in the mrs.sim.metabolite_database class on some experimentally acquired data."""
 
+    # frozen stuff: a technique to prevent creating new attributes
+    # (https://stackoverflow.com/questions/3603502/prevent-creating-new-attributes-outside-init)
+    __isfrozen = False
+
+    def __setattr__(self, key, value):
+        """Overload of __setattr__ method to check that we are not creating a new attribute."""
+        if self.__isfrozen and not hasattr(self, key):
+            raise TypeError("You are trying to dynamically create a new attribute (%s) to this object and that is not cool! I will not let you do that because I believe it is a bad habit and can lead to terrible bugs. A clean way of doing this is to initialize your attribute (%s) in the __init__ method of this class. Bisou, bye :)" % (key, key))
+        object.__setattr__(self, key, value)
+
     def __init__(self, data, seq=None):
         """
         Construct a prefit_pipeline object.
@@ -226,18 +250,18 @@ class fit_pipeline:
             self.seq.initialize()
 
         # metabolite db
-        self._meta_db = self.seq.meta_db
+        self._meta_bs = self.seq.meta_bs
 
         # --- defaut lower bound parameters ---
-        self.params_min = sim.params(self.meta_db)
-        self.params_min.set_default_human_brain_min()
+        self.params_min = sim.params(self.meta_bs)
+        self.params_min.set_default_min()
         self.params_min[xxx.m_All_MBs, xxx.p_dd] = 5.0
         self.params_min[xxx.m_All_MBs, xxx.p_df] = -10.0
         self.params_min[xxx.m_All_MBs, xxx.p_dp] = -np.pi / 4.0
 
         # --- default upper boud parameters ---
-        self.params_max = sim.params(self.meta_db)
-        self.params_max.set_default_human_brain_max()
+        self.params_max = sim.params(self.meta_bs)
+        self.params_max.set_default_max()
         self.params_max[xxx.m_All_MBs, xxx.p_dd] = 50.0
         self.params_max[xxx.m_All_MBs, xxx.p_df] = +10.0
         self.params_max[xxx.m_All_MBs, xxx.p_dp] = +np.pi / 4.0
@@ -259,6 +283,8 @@ class fit_pipeline:
         # --- optimization options ---
         # should we use jacobin information during the fit or not?
         self.optim_jacobian = True
+        # ppm range (By default, use metabolite_basis_set ppm range)
+        self.optim_ppm_range = self.seq.meta_bs.ppm_range
         # stop fit if parameter changes go below this tolerance
         self.optim_xtol = 1e-9
         # stop fit if (error?) function changes go below this tolerance
@@ -292,9 +318,27 @@ class fit_pipeline:
         self.display_normalized_T2_key = "T2s_human_brain_7T"
         self.display_normalized_T1_key = "T1s_human_brain_7T"
         # if yes, use those parameters estimated on reference non water suppressed data
-        self.display_normalized_abs_ref_params = sim.params(self._meta_db)
+        self.display_normalized_abs_ref_params = sim.params(self._meta_bs)
         # and assume a water concentration in mmol/L
         self.display_normalized_abs_water_concentration = 55000.0
+
+        # to know if the object is initialized
+        self._ready = False
+
+        # freeze
+        self.__isfrozen = True
+
+    @property
+    def ready(self):
+        """
+        Property get function for _ready.
+
+        Returns
+        -------
+        self._ready : bool
+            to tell if the object if initialized or not
+        """
+        return(self._ready)
 
     @property
     def seq(self):
@@ -309,16 +353,16 @@ class fit_pipeline:
         return(self._seq)
 
     @property
-    def meta_db(self):
+    def meta_bs(self):
         """
-        Property get function for meta_db.
+        Property get function for meta_bs.
 
         Returns
         -------
-        self._meta_db : metabolite_db object
+        self._meta_bs : metabolite_basis_set() object
             Metabolite database to use for simulation
         """
-        return(self._meta_db)
+        return(self._meta_bs)
 
     def _jac(self, params_free):
         """
@@ -462,25 +506,19 @@ class fit_pipeline:
 
         return(diff_cmplx_odd_even)
 
-    def run(self):
-        """
-        Run the fit.
-
-        Returns
-        -------
-        params_fit : params object
-            Estimated metabolic parameters using the fitting algorithm
-        optim_result : 'OptimizeResult' object returned by scipy.optimize.least_squares
-            Numerical optimization parameters
-        """
+    def initialize(self):
+        """Initialize the fit procedure."""
         # hello
-        print("")
-        print("------------------------------------------------------------------")
-        print("mrs.fit_pipeline.run:")
-        print("------------------------------------------------------------------")
-
-        # init
+        cprint(">> mrs.fit.fit_pipeline.initialize:", 'green', attrs=['bold'])
         print("> Initialization...")
+
+        # do we need to adapt our ppm range?
+        if(self.optim_ppm_range != self.seq.meta_bs.ppm_range):
+            # we need to reinitialize the metabolite basis set
+            self.seq.meta_bs.ppm_range = self.optim_ppm_range
+            self.seq.meta_bs.initialize()
+            # and rerun sequence !
+            self.seq.initialize()
 
         # ckeck consistency lower<>init<>upper bounds
         print("> Checking consistency with parameter bounds...")
@@ -508,6 +546,34 @@ class fit_pipeline:
         self._water_only = (len(where_LL[0]) == 1 and where_LL[0][0] == xxx.m_Water)
         if(self._water_only):
             print("> Mmmmh, looks like you are fitting a water reference scan!")
+
+        # I am ready now
+        self._ready = True
+
+    def run(self):
+        """
+        Run the fit.
+
+        Returns
+        -------
+        params_fit : params object
+            Estimated metabolic parameters using the fitting algorithm
+        params_CRBs_abs : params object
+            Estimated absolute Cramér-Rao Lower Bounds for each parameter
+        params_CRBs_rel : params object
+            Estimated relative Cramér-Rao Lower Bounds for each parameter
+        optim_result : 'OptimizeResult' object returned by scipy.optimize.least_squares
+            Numerical optimization parameters
+        """
+        # hello
+        print("")
+        print("------------------------------------------------------------------")
+        print("mrs.fit_pipeline.run:")
+        print("------------------------------------------------------------------")
+
+        # ready or not, here I come
+        if(not self.ready):
+            raise Exception("> This fit_pipeline object was not initialized!")
 
         # dummy full>free>full>free conversion to apply master/slave rules
         params_free = self.params_init.toFreeParams()

@@ -5,20 +5,15 @@ A script used for group study analysis.
 
 @author: Tangi Roussel
 """
-
-from __future__ import division
-
+# %% init
+from IPython import get_ipython
 import os
 import pickle
 import datetime
 import numpy as np
-import mrs.metabase as xxx
+import mrs.aliases as xxx
 import mrs.sim as sim
-
-from IPython import get_ipython
-import warnings
-warnings.filterwarnings("ignore", ".*GUI is implemented*")
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 
 result_folder = './20191102_quantification.results'
 

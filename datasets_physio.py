@@ -4,21 +4,15 @@
 2019
 @author: Tangi Roussel
 """
-
-from __future__ import division
-import matplotlib.pylab as plt
-import numpy as np
-import mrs.reco as reco
+# %% init
 from IPython import get_ipython
-import warnings
-warnings.filterwarnings("ignore", ".*GUI is implemented*")
-
+import matplotlib.pylab as plt
+import mrs.reco as reco
+get_ipython().magic("clear")
+plt.close("all")
 
 # %% 27/08/2019 - 308-rs-p1-moelle - Ocha - short TR resp test
-
-get_ipython().magic('clear')
-get_ipython().magic('reset -f')
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -58,11 +52,6 @@ s = p.run_pipeline_std()
 
 
 # %% 05/09/2019 - 311-sl-p1-moelle - Simon, test respiration
-
-get_ipython().magic('clear')
-get_ipython().magic('reset -f')
-
-
 p = reco.pipeline()
 
 p.data_filepaths = """
@@ -131,10 +120,7 @@ plt.legend(lbls)
 plt.tight_layout()
 
 # %% 23/09/2019 - 313-ft-p1-moelle - Fransiska, test respiration
-
-get_ipython().magic('clear')
-get_ipython().magic('reset -f')
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -177,10 +163,7 @@ s = p.run_pipeline_std()
 
 
 # %% 25/09/2019 - 314-yt-p1-moelle - Yolanda, test physio
-
-get_ipython().magic('clear')
-get_ipython().magic('reset -f')
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -234,10 +217,7 @@ s = p.run_pipeline_std()
 
 
 # %% 03/10/2019 - 316-ap-p1-moelle - Anissa, test resp
-
-get_ipython().magic('clear')
-get_ipython().magic('reset -f')
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -285,10 +265,7 @@ p.remove_water_enable = False
 s = p.run_pipeline_std()
 
 # %% 05/11/2019 - 328-af-p1-moelle - Anne, test apnea/breath hold
-
-get_ipython().magic('clear')
-get_ipython().magic('reset -f')
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
