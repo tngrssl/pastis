@@ -5,31 +5,25 @@ A user script to be called once some data was processed using the MRSData2 class
 
 @author: Tangi Roussel
 """
-
 # %% init
-from __future__ import division
-
 import mrs.fit as fit
 import mrs.sim as sim
-import mrs.metabase as xxx
+import mrs.aliases as xxx
 import numpy as np
 import matplotlib.pylab as plt
-import warnings
-import pickle
 
 # constants
 fit_cre_concentration = 7.5  # mmol/kg
 
 # init
-warnings.filterwarnings("ignore", ".*GUI is implemented*")
 fit_metabolites = np.sort(fit_metabolites)
 data = s
 data_ref = s_ref
 
 # %% prepare virtual sequence
 seq = data.sequence
-meta_db = sim.metabolite_db()
-seq.initialize(meta_db)
+meta_bs = sim.metabolite_basis_set()()
+seq.initialize(meta_bs)
 
 # %% prefit data
 prefittool = fit.prefit_pipeline(data, seq)

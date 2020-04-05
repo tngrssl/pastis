@@ -5,13 +5,10 @@ A user script to be called once some data was processed using the MRSData2 class
 
 @author: Tangi Roussel
 """
-
 # %% init
-from __future__ import division
-
 import mrs.fit as fit
 import mrs.sim as sim
-import mrs.metabase as xxx
+import mrs.aliases as xxx
 import numpy as np
 import matplotlib.pylab as plt
 import warnings
@@ -21,19 +18,18 @@ import pickle
 fit_cre_concentration = 7.5  # mmol/kg
 
 # init
-warnings.filterwarnings("ignore", ".*GUI is implemented*")
 fit_metabolites_prefit = np.sort(fit_metabolites_prefit)
 data = s
 data_ref = s_ref
 
 # %% prepare virtual sequence
 seq = data.sequence
-meta_db = sim.metabolite_db()
-seq.initialize(meta_db)
+meta_bs = sim.metabolite_basis_set()
+seq.initialize(meta_bs)
 
 # %% add metabolites according to threshold
 if(fit_metabolite_concentration_threshold is not None):
-    fit_metabolites_threshold = sim.params(meta_db).get_MBs_human_above(fit_metabolite_concentration_threshold)
+    fit_metabolites_threshold = sim.params(meta_bs).get_MBs_above_concentration(fit_metabolite_concentration_threshold)
     fit_metabolites = np.unique(np.concatenate((np.array(fit_metabolites), fit_metabolites_threshold)))
 
 # %% prefit data
@@ -74,6 +70,7 @@ if(data_ref is not None):
     fittool.params_init[xxx.m_Water, xxx.p_dd] = fittool.params_min[xxx.m_Water, xxx.p_dd] * 1.1
     fittool.params_init[xxx.m_Water, xxx.p_cm] = 0.1
     # go
+    fittool.initialize()
     [params_ref_fit, params_CRBs_abs, params_CRBs_rel, optim_result] = fittool.run()
 
     # --- 2nd fit ---
@@ -83,6 +80,7 @@ if(data_ref is not None):
     fittool.params_init = (fittool.params_min + fittool.params_max) / 2.0
     fittool.params_init[xxx.m_Water, xxx.p_dd] = fittool.params_min[xxx.m_Water, xxx.p_dd] * 1.1
     # go
+    fittool.initialize()
     [params_ref_fit, params_CRBs_abs, params_CRBs_rel, optim_result] = fittool.run()
 else:
     params_ref_fit = params_prefit_abs.copy()
@@ -97,10 +95,10 @@ fittool = fit.fit_pipeline(data, seq)
 
 # --- 1st fit ---
 # min bound
-fittool.params_min.set_default_human_brain_min()
+fittool.params_min.set_default_min()
 fittool.params_min[:, xxx.p_cm] = 0.0
 # max bound
-fittool.params_max.set_default_human_brain_max()
+fittool.params_max.set_default_max()
 fittool.params_max[:, xxx.p_cm] = 60.0
 # init
 fittool.params_init = (fittool.params_min + fittool.params_max) / 2.0
@@ -120,6 +118,7 @@ fittool.display_normalized = False
 fittool.display_normalized_abs_ref_params = params_ref_fit.copy()
 
 # go
+fittool.initialize()
 [params_fit_singlets, params_CRBs_abs, params_CRBs_rel, optim_result] = fittool.run()
 
 # --- 2nd fit ---
@@ -129,6 +128,7 @@ fittool.params_max[fit_metabolites_prefit, xxx.p_cm] = params_fit_singlets[fit_m
 fittool.params_init[fit_metabolites_prefit, :] = (fittool.params_min[fit_metabolites_prefit, :] + fittool.params_max[fit_metabolites_prefit, :]) / 2.0
 fittool.params_init[fit_metabolites_prefit, xxx.p_cm] = fittool.params_min[fit_metabolites_prefit, xxx.p_cm] + 0.1 * (fittool.params_max[fit_metabolites_prefit, xxx.p_cm] - fittool.params_min[fit_metabolites_prefit, xxx.p_cm])
 # go
+fittool.initialize()
 [params_fit_singlets, params_CRBs_abs, params_CRBs_rel, optim_result] = fittool.run()
 
 # %% fit all metabolites
@@ -154,6 +154,7 @@ fittool.params_init.linklock[xxx.m_NAA_CH3, xxx.p_cm] = -7
 fittool.params_init.linklock[xxx.m_NAA_CH2, xxx.p_cm] = +7
 
 # go
+fittool.initialize()
 [params_fit_all_freq_locked, params_CRBs_abs, params_CRBs_rel, optim_result] = fittool.run()
 
 # --- 2nd fit ---
@@ -163,6 +164,7 @@ fittool.params_max[fit_metabolites, xxx.p_cm] = params_fit_all_freq_locked[fit_m
 fittool.params_init[fit_metabolites, :] = (fittool.params_min[fit_metabolites, :] + fittool.params_max[fit_metabolites, :]) / 2.0
 fittool.params_init[fit_metabolites, xxx.p_cm] = fittool.params_min[fit_metabolites, xxx.p_cm] + 0.1 * (fittool.params_max[fit_metabolites, xxx.p_cm] - fittool.params_min[fit_metabolites, xxx.p_cm])
 # go
+fittool.initialize()
 [params_fit_all_freq_locked, params_CRBs_abs, params_CRBs_rel, optim_result] = fittool.run()
 
 # %% fit again all metabolites letting their shifts free
@@ -191,6 +193,7 @@ fittool.params_init.linklock[xxx.m_NAA_CH3, xxx.p_cm] = -5
 fittool.params_init.linklock[xxx.m_NAA_CH2, xxx.p_cm] = +5
 
 # go, final fit
+fittool.initialize()
 [params_fit_all, params_CRBs_abs, params_CRBs_rel, optim_result] = fittool.run()
 
 # %% normalize concentrations
@@ -219,11 +222,11 @@ ax = plt.subplot(2, 2, 2)
 pZeroes = params_prefit_abs * 0.0
 
 sim.disp_bargraph(ax,
-                  [sim.params(meta_db).set_default_human_brain_min(),
+                  [sim.params(meta_bs).set_default_human_brain_min(),
                    params_prefit_abs,
                    params_fit_all_linked_Ts_abs_water,
                    params_fit_all_linked_Ts_abs_cre,
-                   sim.params(meta_db).set_default_human_brain_max()],
+                   sim.params(meta_bs).set_default_human_brain_max()],
 
                   [pZeroes,
                       pZeroes,

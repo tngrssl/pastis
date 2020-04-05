@@ -5,16 +5,10 @@ A user script to run shim and voltage prediction.
 
 @author: Tangi Roussel
 """
-
-from __future__ import division
-
+# %% init
+from IPython import get_ipython
 import pickle
 import mrs.predict as predict
-
-from IPython import get_ipython
-import warnings
-warnings.filterwarnings("ignore", ".*GUI is implemented*")
-get_ipython().magic('clear')
 
 p = predict.predict_shim()
 

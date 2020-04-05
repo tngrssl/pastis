@@ -6,22 +6,16 @@ A user script used to store calls for the reconstruction of in vivo data.
 @author: Tangi Roussel
 """
 # %% init
-
-from __future__ import division
+from IPython import get_ipython
 import matplotlib.pylab as plt
-import mrs.metabase as xxx
+import mrs.aliases as xxx
 import mrs.reco as reco
 import numpy as np
-
-from IPython import get_ipython
-import warnings
-warnings.filterwarnings("ignore", ".*GUI is implemented*")
-plt.close('all')
-get_ipython().magic('clear')
+get_ipython().magic("clear")
+plt.close("all")
 
 # %% 15/03/2019 - 291-vs-moelle-spectro-p1 - STEAM #1 :(
-
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -62,8 +56,7 @@ fit_metabolites = fit_metabolites_prefit + [
     xxx.m_Tau]
 
 # %% 15/03/2019 - 291-vs-moelle-spectro-p1 - sLASER #1 :(
-
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -102,8 +95,7 @@ fit_metabolites = fit_metabolites_prefit + [
     xxx.m_mI, xxx.m_Tau]
 
 # %% 15/03/2019 - 291-vs-moelle-spectro-p1 - sLASER #2 :(
-
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -132,8 +124,7 @@ fit_metabolites = fit_metabolites_prefit + [
     xxx.m_mI, xxx.m_Tau]
 
 # %% 20/06/2019 - 296_ym_p1_brainmoelle - brain - sLASER DICOM and TWIX :)
-
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -170,9 +161,6 @@ p.apodize_damping_hz = 3
 p.remove_water_enable = False
 
 p.analyse_and_reject_enable = False
-p.analyse_and_reject_min = [-100, 3, -1, -3.14]
-p.analyse_and_reject_max = [100, 50, 1, 3.14]
-p.analyse_and_reject_auto = False
 
 p.analyse_snr_evol = True
 p.analyse_linewidth_evol = True
@@ -195,8 +183,7 @@ fit_metabolites = fit_metabolites_prefit + [
     xxx.m_mI, xxx.m_Tau]
 
 # %% 20/06/2019 - 296_ym_p1_brainmoelle - brain - STEAM DICOM and TWIX :) but bad phase
-
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -238,8 +225,7 @@ fit_metabolites = fit_metabolites_prefit + [
     xxx.m_mI, xxx.m_Tau]
 
 # %% 25/06/2019 - 296_ym_p1_brainmoelle - brain - in vivo sLASER TWIX FID modulus tests to compare with conventional MRS
-
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -270,8 +256,7 @@ fit_metabolites = fit_metabolites_prefit + [
     xxx.m_mI, xxx.m_Tau]
 
 # %% 26/06/2019 - 296_ym_p1_brainmoelle - STEAM and sLASER :)
-
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -300,8 +285,6 @@ TWIX sLASER R:N=20:1
 p.display_amp_factor_list = [1 / 25000, 6 / 25000, 1 / 7.3e-5, 1 / 7.3e-5]
 
 p.analyse_and_reject_enable = True
-p.analyse_and_reject_min = [-100, 0, -0.04, -3.14]
-p.analyse_and_reject_max = [+100, 20, +0.04, +3.14]
 
 p.apodize_enable = True
 p.apodize_damping_hz = 10
@@ -317,8 +300,7 @@ fit_metabolites = fit_metabolites_prefit + [
     xxx.m_mI]
 
 # %% 16/07/2019 - 300-pm-p1-moelle - sLASER trig or not, DICOM and TWIX :)
-
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -340,9 +322,6 @@ sLASER R:N=25:1 trig (TWIX)
 p.display_amp_factor_list = [1e-8, 1e-8, 1, 1]
 
 p.analyse_and_reject_enable = True
-p.analyse_and_reject_min = [-100, 1, -0.5, -1.5]
-p.analyse_and_reject_max = [+200, 25, +0.5, +1.5]
-p.analyse_and_reject_auto = False
 
 p.apodize_enable = True
 p.apodize_damping_hz = 5
@@ -358,8 +337,7 @@ fit_metabolites = fit_metabolites_prefit + [
     xxx.m_mI]
 
 # %% 14/08/2019 - 304-ka-p1-moelle - sLASER, bad day :(
-
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -388,8 +366,7 @@ fit_metabolites = fit_metabolites_prefit + [
     xxx.m_mI, xxx.m_Tau]
 
 # %% 21/08/2019 - 307-ap-p1-moelle - sLASER on Ariane :) ok bof
-
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -431,8 +408,6 @@ sLASER 10:1 repos. + resp trig (TWIX)
 """
 
 p.analyse_and_reject_enable = True
-p.analyse_and_reject_min = [-100, 0, -0.1, -3.14]
-p.analyse_and_reject_max = [100, 40, 0.1, 3.14]
 
 p.apodize_enable = True
 p.apodize_damping_hz = 5
@@ -449,8 +424,7 @@ fit_metabolites = fit_metabolites_prefit + [
     xxx.m_mI]
 
 # %% 27/08/2019 - 308-rs-p1-moelle - brain - sLASER on Ocha
-
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -475,8 +449,6 @@ p.recombine_phasing = True
 p.realign_enable = True
 
 p.analyse_and_reject_enable = True
-p.analyse_and_reject_min = [-100, 0, -1, -3.14]
-p.analyse_and_reject_max = [100, 50, 1, 3.14]
 
 p.apodize_enable = True
 p.apodize_damping_hz = 5
@@ -503,8 +475,7 @@ fit_metabolites = fit_metabolites_prefit + [
     xxx.m_mI, xxx.m_Tau, xxx.m_Glu]
 
 # %% 27/08/2019 - 308-rs-p1-moelle - sLASER on Ocha :(
-
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -525,8 +496,6 @@ sLASER 20:1 resp trig (TWIX)
 """
 
 p.analyse_and_reject_enable = True
-p.analyse_and_reject_min = [-100, 0, -1, -3.14]
-p.analyse_and_reject_max = [100, 50, 1, 3.14]
 
 p.apodize_enable = True
 p.apodize_damping_hz = 5
@@ -543,8 +512,7 @@ fit_metabolites = fit_metabolites_prefit + [
     xxx.m_mI]
 
 # %% 29/08/2019 - 310-mg-p1-moelle - Maxime :(
-
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -562,8 +530,6 @@ sLASER 20:1 SC
 """
 
 p.analyse_and_reject_enable = True
-p.analyse_and_reject_min = [-100, 0, -1, -3.14]
-p.analyse_and_reject_max = [100, 50, 1, 3.14]
 
 p.apodize_enable = True
 p.apodize_damping_hz = 15
@@ -578,8 +544,7 @@ fit_metabolites = fit_metabolites_prefit + [
     xxx.m_mI]
 
 # %% 05/09/2019 - 311-sl-p1-moelle - Simon :)
-
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -600,9 +565,6 @@ sLASER 20:1 (TWIX)
 """
 
 p.analyse_and_reject_enable = True
-p.analyse_and_reject_min = [-100, 0, -1, -3.14]
-p.analyse_and_reject_max = [100, 21, 1, 3.14]
-p.analyse_and_reject_auto = False
 
 p.apodize_enable = True
 p.apodize_damping_hz = 10
@@ -618,8 +580,7 @@ fit_metabolites = fit_metabolites_prefit + [
     xxx.m_mI]
 
 # %% 23/09/2019 - 313-ft-p1-moelle - Fransiska :(
-
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -637,8 +598,6 @@ sLASER 20:1
 """
 
 p.analyse_and_reject_enable = True
-p.analyse_and_reject_min = [-30, 0, -0.1, -0.5]
-p.analyse_and_reject_max = [30, 35, 0.1, 0.5]
 
 p.apodize_enable = True
 p.apodize_damping_hz = 20
@@ -655,8 +614,7 @@ fit_metabolites = fit_metabolites_prefit + [
     xxx.m_mI]
 
 # %% 25/09/2019 - 314-yt-p1-moelle - Yolanda :)))
-
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -694,8 +652,6 @@ sLASER 5:5 (DICOM)
 """
 
 p.analyse_and_reject_enable = True
-p.analyse_and_reject_min = [-50, 0, -0.1, -0.5]
-p.analyse_and_reject_max = [50, 20, 0.1, 0.5]
 
 p.apodize_enable = True
 p.apodize_damping_hz = 10
@@ -716,11 +672,10 @@ fit_metabolites = fit_metabolites_prefit + [
     xxx.m_Cr_CH2,
     xxx.m_NAA_CH2,
     xxx.m_mI]
-fit_metabolite_threshold = 0.75  # mmol/kg
+fit_metabolite_concentration_threshold = 0.75  # mmol/kg
 
 # %% 03/10/2019 - 316-ap-p1-moelle - Anissa :)
-
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -754,8 +709,6 @@ sLASER 5:5 (DICOM)
 """
 
 p.analyse_and_reject_enable = True
-p.analyse_and_reject_min = [-100, 0, -0.1, -0.9]
-p.analyse_and_reject_max = [100, 25, 0.1, 0.9]
 
 p.realign_moving_averages = 1
 p.realign_POI_range_ppm = [4.5, 4.8]
@@ -776,8 +729,7 @@ fit_metabolites = fit_metabolites_prefit + [
     xxx.m_mI]
 
 # %% 17/10/2019 - 319-fc-p1-moelle - Fernando :)
-
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -794,11 +746,6 @@ sLASER 10:2 (TWIX)
 """
 
 p.analyse_and_reject_enable = True
-p.analyse_and_reject_moving_averages = 3
-p.analyse_and_reject_min = [-100, 0, -0.1, -1.5]
-p.analyse_and_reject_max = [100, 13, 0.1, 1.5]
-p.analyse_and_reject_auto = False
-
 p.apodize_enable = True
 p.apodize_damping_hz = 10
 
@@ -817,8 +764,7 @@ fit_metabolites = fit_metabolites_prefit + [
     xxx.m_mI]
 
 # %% 05/11/2019 - 328-af-p1-moelle - Anne :(
-
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -836,11 +782,6 @@ sLASER 20:1 (TWIX)
 """
 
 p.analyse_and_reject_enable = True
-p.analyse_and_reject_moving_averages = 1
-p.analyse_and_reject_min = [-100, 0, -0.1, -1.5]
-p.analyse_and_reject_max = [100, 40, 0.1, 1.5]
-p.analyse_and_reject_auto = True
-
 p.apodize_enable = True
 p.apodize_damping_hz = 10
 
@@ -854,8 +795,7 @@ fit_metabolites = fit_metabolites_prefit + [
     xxx.m_mI]
 
 # %% 08/11/2019 - 329-pi-p1-moelle - Pujalina
-
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -876,11 +816,6 @@ sLASER 10:2 (TWIX)
 """
 
 p.analyse_and_reject_enable = True
-p.analyse_and_reject_moving_averages = 1
-p.analyse_and_reject_min = [-100, 0, -0.1, -1.5]
-p.analyse_and_reject_max = [100, 60, 0.1, 1.5]
-p.analyse_and_reject_auto = False
-
 p.apodize_enable = True
 p.apodize_damping_hz = 10
 
@@ -899,8 +834,7 @@ fit_metabolites = fit_metabolites_prefit + [
     xxx.m_mI]
 
 # %% 26/11/2019 - 333-sc-p1-moelle - Shirley :(((
-
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -918,11 +852,6 @@ sLASER 20:1 IR (TWIX)
 """
 
 p.analyse_and_reject_enable = False
-p.analyse_and_reject_moving_averages = 1
-p.analyse_and_reject_min = [-100, 0, -0.1, -1.5]
-p.analyse_and_reject_max = [100, 60, 0.1, 1.5]
-p.analyse_and_reject_auto = False
-
 p.apodize_enable = True
 p.apodize_damping_hz = 10
 
@@ -940,8 +869,7 @@ fit_metabolites = fit_metabolites_prefit + [
     xxx.m_mI]
 
 # %% 09/12/2019 - 336-nb-p1-moelle - Naouelle :)
-
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -970,10 +898,6 @@ sLASER 20:1 IR (DCM)
 p.display_amp_factor_list = [1e8, 1e8, 1, 1]
 
 p.analyse_and_reject_enable = False
-p.analyse_and_reject_moving_averages = 1
-p.analyse_and_reject_min = [-100, 0, -0.1, -1.5]
-p.analyse_and_reject_max = [100, 60, 0.1, 1.5]
-p.analyse_and_reject_auto = False
 
 p.apodize_enable = True
 p.apodize_damping_hz = 10
@@ -992,8 +916,7 @@ fit_metabolites = fit_metabolites_prefit + [
     xxx.m_mI]
 
 # %% 10/12/2019 - 338-ro-p1-moelle - Rischa :)
-
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -1036,9 +959,8 @@ fit_metabolites = fit_metabolites_prefit + [
     xxx.m_mI]
 
 # %% 23/01/2019 - 347-re-p1-moelle - Renaud - brain - MM
-
-get_ipython().magic('clear')
-# plt.close("all")
+# get_ipython().magic("clear")
+plt.close("all")
 
 p = reco.pipeline()
 
@@ -1076,7 +998,7 @@ p.data_process_only_this_data_index = [1]
 s_mm, s_mm_ref = p.run_pipeline_std()
 
 # %% 23/01/2019 - 347-re-p1-moelle - Renaud - brain - Metabolites :)
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -1117,11 +1039,11 @@ s.display_spectrum()
 
 fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
 fit_metabolites = fit_metabolites_prefit
-fit_metabolite_threshold = 0.5
+fit_metabolite_concentration_threshold = 0.5
 fit_include_MMs = False
 
 # %% 28/01/2019 - 300-pm-p2-moelle - Pelayo :)
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -1171,11 +1093,11 @@ s, s_ref = p.run_pipeline_std()
 
 fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
 fit_metabolites = fit_metabolites_prefit
-fit_metabolite_threshold = 0.5
+fit_metabolite_concentration_threshold = 0.5
 fit_include_MMs = False
 
 # %% 06/02/2019 - 349-ap-p1-moelle - Ahmad Fajar :s
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -1213,12 +1135,12 @@ s, s_ref = p.run_pipeline_std()
 
 fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
 fit_metabolites = fit_metabolites_prefit
-fit_metabolite_threshold = 0.5
+fit_metabolite_concentration_threshold = 0.5
 fit_include_MMs = False
 
 
 # %% 24/02/2019 - 355-st-p1-moelle - Steven
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -1240,8 +1162,7 @@ p.apodize_damping_hz = 10.0
 s, s_ref = p.run_pipeline_std()
 
 # %% 04/03/2020 - 304-ka-p2-moelle - Karen :((( very weird artefact
-
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()

@@ -6,21 +6,16 @@ A user script used to store calls for the reconstruction of in vitro data.
 @author: Tangi Roussel
 """
 # %% init
-from __future__ import division
+from IPython import get_ipython
 import matplotlib.pylab as plt
-import mrs.metabase as xxx
+import mrs.aliases as xxx
 import numpy as np
 import mrs.reco as reco
-
-from IPython import get_ipython
-import warnings
-warnings.filterwarnings("ignore", ".*GUI is implemented*")
-plt.close('all')
-get_ipython().magic('clear')
+get_ipython().magic("clear")
+plt.close("all")
 
 # %% 27/02/2019 - spinal cord phantom - nice WS STEAM, testing TWIX reco
-
-get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -44,12 +39,8 @@ p.phase_display = False
 p.remove_water_enable = False
 p.run_pipeline_std()
 
-
 # %% 27/02/2019 - spinal cord phantom - OVS optim
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -69,12 +60,8 @@ p.phase_display = False
 p.remove_water_enable = False
 p.run_pipeline_std()
 
-
 # %% 27/02/2019 - spinal cord phantom - spoiler optim
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -100,12 +87,8 @@ p.phase_display = False
 p.remove_water_enable = False
 p.run_pipeline_std()
 
-
 # %% 27/02/2019 - spinal cord phantom - various optim
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -127,12 +110,8 @@ p.phase_display = False
 p.remove_water_enable = False
 p.run_pipeline_std()
 
-
 # %% 27/02/2019 - spinal cord phantom - TM optim
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -160,12 +139,8 @@ p.phase_display = False
 p.remove_water_enable = False
 p.run_pipeline_std()
 
-
 # %% 27/02/2019 - spinal cord phantom - compare svs-st-vapor-643, eja-svs-steam and eja_svs_slaser
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -185,12 +160,8 @@ p.phase_display = False
 p.remove_water_enable = False
 p.run_pipeline_std()
 
-
 # %% 12/03/2019 - spinal cord phantom - TR optim
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -220,12 +191,8 @@ p.phase_display = False
 p.remove_water_enable = False
 p.run_pipeline_std()
 
-
 # %% 20/03/2019 - fatty_braino_002, bad B1/B0 conditions - STEAM
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -253,12 +220,8 @@ p.phase_display = False
 p.remove_water_enable = False
 p.run_pipeline_std()
 
-
 # %% 20/03/2019 - fatty_braino_002, bad B1/B0 conditions - STEAM - VOI traces
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.voi_pipeline()
@@ -284,12 +247,8 @@ OVS on
 
 p.run_pipeline_std()
 
-
 # %% 20/03/2019 - fatty_braino_002, bad B1/B0 conditions - sLASER
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -317,12 +276,8 @@ p.phase_display = False
 p.remove_water_enable = False
 p.run_pipeline_std()
 
-
 # %% 20/03/2019 - fatty_braino_002, bad B1/B0 conditions - STEAM versus sLASER
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -340,12 +295,8 @@ p.phase_display = False
 p.remove_water_enable = False
 p.run_pipeline_std()
 
-
 # %% 20/03/2019 - fatty_braino_002 - sLASER optim invitro in invivo B1/B0 conditions - VOI 1/2 profiles
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.voi_pipeline()
@@ -371,12 +322,8 @@ increasing R 20->25
 
 p.run_pipeline_std()
 
-
 # %% 20/03/2019 - fatty_braino_002 - sLASER optim invitro in invivo B1/B0 conditions, R factor - VOI 1/2 profiles
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.voi_pipeline()
@@ -402,12 +349,8 @@ increasing R=40
 
 p.run_pipeline_std()
 
-
 # %%20/03/2019 - fatty_braino_002, bad B1/B0 conditions - STEAM - testing TWIX reco (1/2)
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -430,14 +373,11 @@ p.phase_high_snr_mode = False
 p.phase_weak_ws_mode = False
 p.phase_order = 0
 p.remove_water_enable = False
+
 p.run_pipeline_std()
 
-
 # %%20/03/2019 - fatty_braino_002, bad B1/B0 conditions - STEAM - compare previous TWIX with DICOM (2/2)
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -460,14 +400,11 @@ p.phase_high_snr_mode = False
 p.phase_weak_ws_mode = False
 p.phase_order = 0
 p.remove_water_enable = False
+
 p.run_pipeline_std()
 
-
 # %% 03/05/2019 - fatty_braino_003, bad B1/B0 conditions - sym vs asym STEAM
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -488,14 +425,11 @@ sym STEAM
 
 p.phase_display = False
 p.remove_water_enable = False
+
 p.run_pipeline_std()
 
-
 # %% 03/05/2019 - fatty_braino_003, bad B1/B0 conditions - sym vs asym STEAM - VOI profiles
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.voi_pipeline()
@@ -512,12 +446,8 @@ asym sSTEAM
 p.analyze_selectivity_range_list = [[-2000, 1600], [-12500, -9000], [-3800, 2600]]
 p.run_pipeline_std()
 
-
 # %% 03/05/2019 - fatty_braino_003, bad B1/B0 conditions - settling time in STEAM
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -542,12 +472,8 @@ p.phase_display = False
 p.remove_water_enable = False
 p.run_pipeline_std()
 
-
 # %% 03/05/2019 - fatty_braino_003, bad B1/B0 conditions - settling time in STEAM - VOI profiles
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.voi_pipeline()
@@ -565,12 +491,8 @@ STEAM 500us settling
 
 p.run_pipeline_std()
 
-
 # %% 07/05/2019 - fatty_braino_004, bad B1/B0 conditions - OVS in STEAM
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -593,12 +515,8 @@ p.phase_display = False
 p.remove_water_enable = False
 p.run_pipeline_std()
 
-
 # %% 03/05/2019 - fatty_braino_003, bad B1/B0 conditions - OVS in STEAM - VOI profiles
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.voi_pipeline()
@@ -614,12 +532,8 @@ OVS 45deg
 
 p.run_pipeline_std()
 
-
 # %% 07/05/2019 - fatty_braino_004, bad B1/B0 conditions - ramp time in STEAM
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -645,12 +559,8 @@ p.phase_display = False
 p.remove_water_enable = False
 p.run_pipeline_std()
 
-
 # %% 03/05/2019 - fatty_braino_003, bad B1/B0 conditions - OVS in STEAM - VOI profiles
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.voi_pipeline()
@@ -670,12 +580,8 @@ p.display_legends = """
 
 p.run_pipeline_std()
 
-
 # %% 07/05/2019 - fatty_braino_004, bad B1/B0 conditions - spoilers in STEAM
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -701,12 +607,8 @@ p.phase_display = False
 p.remove_water_enable = False
 p.run_pipeline_std()
 
-
 # %% 03/05/2019 - fatty_braino_003, bad B1/B0 conditions - spoilers in STEAM - VOI profiles
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.voi_pipeline()
@@ -724,12 +626,8 @@ p.display_legends = """
 
 p.run_pipeline_std()
 
-
 # %% 07/05/2019 - fatty_braino_004, bad B1/B0 conditions - VAPOR BW in STEAM
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -758,12 +656,8 @@ p.phase_display = False
 p.remove_water_enable = False
 p.run_pipeline_std()
 
-
 # %% 07/05/2019 - fatty_braino_004, bad B1/B0 conditions - testing 30/30/60 OVS in STEAM - VOI profiles
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.voi_pipeline()
@@ -779,12 +673,8 @@ no OVS
 
 p.run_pipeline_std()
 
-
 # %% 07/05/2019 - fatty_braino_004, bad B1/B0 conditions - R/pulse length in sLASER - VOI profiles
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.voi_pipeline()
@@ -806,12 +696,8 @@ OVS 90
 
 p.run_pipeline_std()
 
-
 # %% 07/05/2019 - fatty_braino_004, bad B1/B0 conditions - R/N pulses in sLASER - VOI profiles
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.voi_pipeline()
@@ -1050,12 +936,8 @@ cb = fig.colorbar(ax=ax, mappable=im, orientation='vertical')
 cb.set_label('TE (ms)')
 plt.show()
 
-
 # %% 07/05/2019 - fatty_braino_005, bad B1/B0 conditions - R/N pulses in sLASER TE fixed at 50ms
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -1168,12 +1050,8 @@ cb = fig.colorbar(ax=ax, mappable=im, orientation='vertical')
 cb.set_label('SNR')
 plt.show()
 
-
 # %% 16/05/2019 - fatty_braino_007, bad B1/B0 conditions - R/N pulses in sLASER TE minimal
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -1286,12 +1164,8 @@ cb = fig.colorbar(ax=ax, mappable=im, orientation='vertical')
 cb.set_label('SNR')
 plt.show()
 
-
 # %%16/05/2019 - fatty_braino_007, bad B1/B0 conditions - STEAM - testing TWIX reco
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -1325,12 +1199,8 @@ p.display_amp_factor_list = [80000000, 1]
 p.remove_water_enable = False
 p.run_pipeline_std()
 
-
 # %% 21/05/2019 - fatty_braino_007, bad B1/B0 conditions - R/N pulses in sLASER TE minimal
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -1371,12 +1241,8 @@ p.display_range_ppm = [1, 6]
 p.remove_water_enable = False
 p.run_pipeline_std()
 
-
 # %% 21/05/2019 - fatty_braino_007, better B1/B0 conditions - R/N pulses in sLASER TE minimal
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -1417,12 +1283,8 @@ p.display_range_ppm = [1, 6]
 p.remove_water_enable = False
 p.run_pipeline_std()
 
-
 # %% 21/05/2019 - fatty_braino_007, better B1/B0 conditions, stronger spoilers - R/N pulses in sLASER TE minimal
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -1469,12 +1331,8 @@ p.display_range_ppm = [1, 6]
 p.remove_water_enable = False
 p.run_pipeline_std()
 
-
 # %% 21/05/2019 - fatty_braino_007, better B1/B0 conditions, even more stronger spoilers - R/N pulses in sLASER TE minimal
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -1515,12 +1373,8 @@ p.display_range_ppm = [1, 6]
 p.remove_water_enable = False
 p.run_pipeline_std()
 
-
 # %% 03/06/2019 - fatty_braino_head_coil_002, test non-WS steam
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -1552,12 +1406,8 @@ p.display_range_ppm = [1, 6]
 p.remove_water_enable = True
 p.run_pipeline_std()
 
-
 # %% 05/06/2019 - fatty_braino_head_coil_002, bad B1/B0 conditions with head coil - VOI profiles
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.voi_pipeline()
@@ -1798,12 +1648,8 @@ cb = fig.colorbar(ax=ax, mappable=im, orientation='vertical')
 cb.set_label('TE (ms)')
 plt.show()
 
-
 # %% 05/06/2019 - fatty_braino_head_coil_002, bad B1/B0 conditions with head coil - sLASER spectra
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -1936,12 +1782,8 @@ cb = fig.colorbar(ax=ax, mappable=im, orientation='vertical')
 cb.set_label('SNR')
 plt.show()
 
-
 # %% 05/06/2019 - fatty_braino_head_coil_002, bad B1/B0 conditions with head coil - STEAM WS spectra
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -1973,12 +1815,8 @@ p.analyze_snr_enable = False
 p.calibrate_enable = False
 p.run_pipeline_std()
 
-
 # %% 12/06/2019 - fatty_braino_head_coil_002, bad B1/B0 conditions with head coil - testing non WS STEAM spectra
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -2012,12 +1850,8 @@ p.remove_water_hsvd_range = [4.6, 4.8]
 p.calibrate_enable = False
 p.run_pipeline_std()
 
-
 # %% 12/06/2019 - fatty_braino_head_coil_002, bad B1/B0 conditions with head coil - testing DCM reco with right ref scans...
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -2042,12 +1876,8 @@ p.remove_water_enable = False
 
 p.run_pipeline_std()
 
-
 # %% 12/06/2019 - fatty_braino_head_coil_002, bad B1/B0 conditions with head coil - testing TWIX reco with right ref scans...
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -2077,12 +1907,8 @@ p.apodize_damping_hz = 20
 
 p.run_pipeline_std()
 
-
 # %% 12/06/2019 - fatty_braino_head_coil_002, bad B1/B0 conditions with head coil - testing TWIX reco and non WS STEAM
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -2116,12 +1942,8 @@ p.remove_water_enable = True
 
 p.run_pipeline_std()
 
-
 # %%16/05/2019 - fatty_braino_007, bad B1/B0 conditions - STEAM - testing TWIX reco
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 for chan_to_turn_off in range(0, 9):
@@ -2155,12 +1977,8 @@ for chan_to_turn_off in range(0, 9):
 
     p.run_pipeline_std()
 
-
 # %%27/11/2019 - phantom_test_inv, sLASER - inv test
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -2186,10 +2004,7 @@ WS double inv TI=770ms
 p.run_pipeline_std()
 
 # %%20/12/2019 - test_IR_sLASER - inv tests
-
-get_ipython().magic('clear')
-
-
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -2290,8 +2105,7 @@ p.calibrate_enable = False
 p.run_pipeline_std()
 
 # %%20/12/2019 - test_IR_sLASER - head coil - WS/noWS/FID modulus tests
-
-get_ipython().magic('clear')
+plt.close('all')
 
 p = reco.pipeline()
 p.data_coil_nChannels = 32
@@ -2318,8 +2132,6 @@ p.data_process_only_this_data_index = [0]
 p.run_pipeline_std()
 
 # %% 22/01/2020 - test_IR_sLASER - head coil - WS tests
-
-get_ipython().magic('clear')
 plt.close('all')
 
 p = reco.pipeline()
@@ -2354,8 +2166,6 @@ p.data_process_only_this_data_index = []
 p.run_pipeline_std()
 
 # %% 03/03/2020 - Jojo's data about with several concentration of creatine
-
-get_ipython().magic('clear')
 plt.close('all')
 
 p = reco.pipeline()
@@ -2378,8 +2188,6 @@ p.display_legends = ["a",
 p.run_pipeline_std()
 
 # %% 09/03/2020 - Comparing sLASER w/o offset exc
-
-get_ipython().magic('clear')
 plt.close('all')
 
 p = reco.pipeline()
@@ -2412,8 +2220,6 @@ p.display_offset = 0.0
 s, s_ref = p.run_pipeline_std()
 
 # %% 11/03/2020 - Jojo's creatine phantom : Comparing different concentrations at 7T
-
-get_ipython().magic('clear')
 plt.close('all')
 
 p = reco.pipeline()

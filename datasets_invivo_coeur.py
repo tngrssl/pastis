@@ -5,23 +5,16 @@ A user script used to store calls for the reconstruction of in vivo data.
 
 @author: Tangi Roussel
 """
-
-from __future__ import division
-import matplotlib.pylab as plt
-import mrs.metabase as xxx
-import mrs.sim as sim
-import mrs.reco as reco
-
+# %% init
 from IPython import get_ipython
-import warnings
-warnings.filterwarnings("ignore", ".*GUI is implemented*")
+import matplotlib.pylab as plt
+import mrs.aliases as xxx
+import mrs.reco as reco
+get_ipython().magic("clear")
 plt.close('all')
-get_ipython().magic('clear')
 
 # %% checking what twix could be fitted
-
-# get_ipython().magic('clear')
-
+# get_ipython().magic("clear")
 # plt.close("all")
 
 # p = reco.pipeline()
@@ -140,8 +133,7 @@ get_ipython().magic('clear')
 
 
 # %% top10 exploitable twix data
-
-#get_ipython().magic('clear')
+get_ipython().magic("clear")
 plt.close("all")
 
 # file paths to water-suppressed raw data

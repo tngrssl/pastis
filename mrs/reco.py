@@ -105,6 +105,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
         noise_level = 0.0
         ulTimeStamp_ms = None
 
+        sequence_name = None
+
         print(" > checking data file path...")
         data_filename, data_file_extension = os.path.splitext(data_filepath)
         if(len(data_file_extension) == 0):
@@ -418,15 +420,17 @@ class MRSData2(suspect.mrsobjects.MRSData):
         if(sequence_name == "eja_svs_slaser"):
             sequence_obj = sim.mrs_seq_eja_svs_slaser(obj.te, obj.tr, nucleus, npts, 1.0 / obj.dt, obj.f0, 1.0, pulse_laser_exc_length / 1000.0, pulse_laser_exc_voltage, pulse_laser_rfc_length / 1000.0, pulse_laser_rfc_fa, pulse_laser_rfc_r, pulse_laser_rfc_n, pulse_laser_rfc_voltage, vref_v, spoiler_length / 1000.0)
         elif(sequence_name == "eja_svs_press"):
-            sequence_obj = sim.mrs_sequence.mrs_seq_eja_svs_press(obj.te, obj.tr, nucleus, npts, 1.0 / obj.dt, obj.f0, 1.0)
+            sequence_obj = sim.mrs_seq_eja_svs_press(obj.te, obj.tr, nucleus, npts, 1.0 / obj.dt, obj.f0, 1.0)
         elif(sequence_name == "eja_svs_steam"):
-            sequence_obj = sim.mrs_sequence.mrs_seq_eja_svs_steam(obj.te, obj.tr, nucleus, npts, 1.0 / obj.dt, obj.f0, 1.0)
+            sequence_obj = sim.mrs_seq_eja_svs_steam(obj.te, obj.tr, nucleus, npts, 1.0 / obj.dt, obj.f0, 1.0)
         elif(sequence_name == "fid"):
-            sequence_obj = sim.mrs_sequence.mrs_seq_fid(obj.te, obj.tr, nucleus, npts, 1.0 / obj.dt, obj.f0, 1.0)
+            sequence_obj = sim.mrs_seq_fid(obj.te, obj.tr, nucleus, npts, 1.0 / obj.dt, obj.f0, 1.0)
         elif(sequence_name == "svs_st"):
             sequence_obj = sim.mrs_seq_svs_st(obj.te, obj.tr, nucleus, npts, 1.0 / obj.dt, obj.f0, 1.0)
         elif(sequence_name == "svs_st_vapor_643"):
             sequence_obj = sim.mrs_seq_svs_st_vapor_643(obj.te, obj.tr, nucleus, npts, 1.0 / obj.dt, obj.f0, 1.0, TM_ms)
+        elif(sequence_name is None):
+            sequence_obj = None
         else:
             # unknown!
             raise Exception(' > ouch unknown sequence!')
@@ -811,7 +815,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         csd = [None, None, None]
         df_abs_Hz = self.f0  # yes, 1ppm==f0[MHz]/1e6=297Hz at 7T
 
-        if(self.sequence_name == sim.mrs_sequence.SLASER):
+        if(type(self.sequence) == sim.mrs_seq_eja_svs_slaser):
             # assuming X-Y-Z is done with 90-180-180
             print(" > estimating CS displacement for semiLASER: assuming (90x)-(180y)-(180z)!...")
 
@@ -845,6 +849,28 @@ class MRSData2(suspect.mrsobjects.MRSData):
             print(" > no idea how to calculate CS displacement for this sequence...")
 
         return(csd)
+
+    def correct_amplify(self, scaling_factor=1e8):
+        """
+        Amplify the FID signals. Sounds useless but can actually help during quantification! Yes, it is not a good idea to fit signals which have intensities around 1e-6 or lower because of various fit tolerances and also digital problems (epsilon)...
+
+        Parameters
+        ----------
+        scaling_factor : float
+            Amplification factor
+
+        Returns
+        -------
+        s : MRSData2 numpy array [whatever dimensions]
+            Resulting amplified MRSData2 object
+        """
+        # hello
+        cprint(">> mrs.reco.MRSData2.correct_amplify:", 'green')
+        print(" > multiplying time-domain signals by %E..." % scaling_factor)
+        # make this louder
+        s = self.copy() * scaling_factor
+        s = s.inherit(s)
+        return(s)
 
     def correct_fidmodulus(self):
         """
@@ -1260,7 +1286,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         return(s_ma)
 
-    def _analyse_peak(self, peak_range, relativeToMean=False):
+    def _analyse_peak(self, peak_range):
         """
         Analyse a peak in the spectrum by estimating its amplitude, linewidth, frequency shift and phase for each average.
 
@@ -1268,15 +1294,15 @@ class MRSData2(suspect.mrsobjects.MRSData):
         ----------
         peak_range : array [2]
             Range in ppm used to analyse peak phase when no reference signal is specified
-        relativeToMean : boolean
-            The variation calculation needs a reference. Use the average over the whole data (True) or the first shot (False)
 
         Returns
         -------
         peak_trace : numpy array [averages,4]
             Peak changes (amplitude, linewidth, frequency and phase) for each average in raw data
-        peak_trace_rel : numpy array [averages,4]
-            Peak relative changes (amplitude, linewidth, frequency and phase) for each average in raw data
+        peak_trace_rel2mean : numpy array [averages,4]
+            Peak changes (amplitude, linewidth, frequency and phase) for each average in raw data relative to mean value
+        peak_trace_rel2firstpt : numpy array [averages,4]
+            Peak relative changes (amplitude, linewidth, frequency and phase) for each average in raw data relative to 1st point
         """
         # hello
         print(">>> mrs.reco.MRSData2._analyse_peak:")
@@ -1333,20 +1359,23 @@ class MRSData2(suspect.mrsobjects.MRSData):
             self._print_progress_bar(a)
 
         # normalize stuff
-        peak_trace_rel = np.zeros([self.shape[0], 4])
-        if(relativeToMean):
-            peak_trace_rel[:, 0] = peak_trace[:, 0] / peak_trace[:, 0].mean() * 100 - 100
-            peak_trace_rel[:, 1] = peak_trace[:, 1] - peak_trace[:, 1].mean()
-            peak_trace_rel[:, 2] = peak_trace[:, 2] - peak_trace[:, 2].mean()
-            peak_trace_rel[:, 3] = peak_trace[:, 3] - peak_trace[:, 3].mean()
-        else:
-            peak_trace_rel[:, 0] = peak_trace[:, 0] / peak_trace[0, 0] * 100 - 100
-            peak_trace_rel[:, 1] = peak_trace[:, 1] - peak_trace[0, 1]
-            peak_trace_rel[:, 2] = peak_trace[:, 2] - peak_trace[0, 2]
-            peak_trace_rel[:, 3] = peak_trace[:, 3] - peak_trace[0, 3]
+
+        # relative to mean
+        peak_trace_rel2mean = np.zeros([self.shape[0], 4])
+        peak_trace_rel2mean[:, 0] = peak_trace[:, 0] / peak_trace[:, 0].mean() * 100 - 100
+        peak_trace_rel2mean[:, 1] = peak_trace[:, 1] - peak_trace[:, 1].mean()
+        peak_trace_rel2mean[:, 2] = peak_trace[:, 2] - peak_trace[:, 2].mean()
+        peak_trace_rel2mean[:, 3] = peak_trace[:, 3] - peak_trace[:, 3].mean()
+
+        # relative to 1st pt
+        peak_trace_rel2firstpt = np.zeros([self.shape[0], 4])
+        peak_trace_rel2firstpt[:, 0] = peak_trace[:, 0] / peak_trace[0, 0] * 100 - 100
+        peak_trace_rel2firstpt[:, 1] = peak_trace[:, 1] - peak_trace[0, 1]
+        peak_trace_rel2firstpt[:, 2] = peak_trace[:, 2] - peak_trace[0, 2]
+        peak_trace_rel2firstpt[:, 3] = peak_trace[:, 3] - peak_trace[0, 3]
 
         print(" done.")
-        return(peak_trace, peak_trace_rel)
+        return(peak_trace, peak_trace_rel2mean, peak_trace_rel2firstpt)
 
     def analyse_physio(self, peak_range, delta_time_range, display=True):
         """
@@ -1369,14 +1398,14 @@ class MRSData2(suspect.mrsobjects.MRSData):
             return()
 
         # perform peak analysis
-        params_trace, params_trace_rel = self._analyse_peak(peak_range, False)
+        peak_prop_abs, _, _ = self._analyse_peak(peak_range)
 
         # physio signal
         resp_t = self.resp_trace[0]
         resp_s = self.resp_trace[3]
 
         # init
-        mri_t = np.linspace(self.timestamp, self.timestamp + self.tr * params_trace.shape[0], params_trace.shape[0])
+        mri_t = np.linspace(self.timestamp, self.timestamp + self.tr * peak_prop_abs.shape[0], peak_prop_abs.shape[0])
         dt_array = np.arange(-delta_time_range / 2.0, delta_time_range / 2.0, 1.0)
         cc_2d = np.zeros([dt_array.shape[0], 4])
 
@@ -1391,9 +1420,9 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
             # now crop the signals to have the same length
             final_length = min(
-                this_resp_s_interp.shape[0], params_trace.shape[0])
+                this_resp_s_interp.shape[0], peak_prop_abs.shape[0])
             this_mri_t = mri_t[0:final_length]
-            this_params_trace = params_trace[0:final_length, :]
+            this_params_trace = peak_prop_abs[0:final_length, :]
             this_resp_s_interp = this_resp_s_interp[0:final_length]
 
             # now remove points where resp trace is at 0 or 1
@@ -1456,9 +1485,9 @@ class MRSData2(suspect.mrsobjects.MRSData):
         this_resp_s_interp = np.interp(this_resp_t_interp, resp_t, resp_s)
 
         # now crop the signals to have the same length
-        final_length = min(this_resp_s_interp.shape[0], params_trace.shape[0])
+        final_length = min(this_resp_s_interp.shape[0], peak_prop_abs.shape[0])
         this_mri_t = mri_t[0:final_length]
-        this_params_trace = params_trace[0:final_length, :]
+        this_params_trace = peak_prop_abs[0:final_length, :]
         this_resp_s_interp = this_resp_s_interp[0:final_length]
 
         # evaluate correlation coeff.
@@ -1590,24 +1619,28 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         # done
 
-    def correct_analyse_and_reject(self, peak_range, moving_Naverages, params_min, params_max, relativeToMean=False, auto_adjust_bounds=False, display=True):
+    def correct_analyse_and_reject(self, peak_range, moving_Naverages, peak_properties_ranges, peak_properties_rel2mean=True, auto_adjust_lw_bound=False, auto_adjust_allowed_snr_change=-10.0, display=True):
         """
         Analyse peak in each average in terms intensity, linewidth, chemical shift and phase and reject data if one of these parameters goes out of the min / max bounds. Usefull to understand what the hell went wrong during your acquisition when you have the raw data (TWIX) and to try to improve things a little...
 
         Parameters
         ----------
-        peak_range : array [2]
+        peak_range : list
             Range in ppm used to analyse peak phase when no reference signal is specified
         moving_Naverages : int
             Number of averages to perform when using moving average, need to be an odd number
-        params_min : array [4]
-            Minimum values allowed for peak analysis parameters in order to keep the data: amplitude (%), linewidth (Hz), chemical shift (ppm) and phase (rd)
-        params_max : array [4]
-            Maximum values allowed for peak analysis parameters in order to keep the data: amplitude (%), linewidth (Hz), chemical shift (ppm) and phase (rd)
-        relativeToMean : boolean
-            The variation calculation needs a reference. Use the average over the whole data (True) or the first shot (False)
-        auto_adjust_bounds : boolean
-            Try to adjust the peak parameter thresholds automatically (LW only for now)
+        peak_properties_ranges : dict
+            Dictionnary that contains 4 entries, 4 rejection criterias for
+                "amplitude (%)": amplitude relative changes: keep data if within +/-val % range
+                "linewidth (Hz)": linewidth changes: keep data is below val Hz
+                "chemical shift (ppm)": chemical shift changes: keep data is within +/-val ppm
+                "phase std. factor (%)": phase changes: keep data if within +/- val/100 * std(phase) rd
+        peak_properties_rel2mean : boolean
+            Relative peak properties (amplitude, chemical shift and phase) should be caculated based on the mean value over the whole acquisition (True) or only the first acquired point (False)
+        auto_adjust_lw_bound : boolean
+            Try to adjust the peak linewidth rejection criteria automatically
+        auto_adjust_allowed_snr_change : float
+            Allowed change in SNR (%), a positive or negative relative to the initial SNR without data rejection
         display : boolean
             Display correction process (True) or not (False)
 
@@ -1631,84 +1664,95 @@ class MRSData2(suspect.mrsobjects.MRSData):
         s_ma = self._build_moving_average_data(moving_Naverages)
 
         # perform peak analysis
-        params_trace, params_trace_rel = s_ma._analyse_peak(peak_range, relativeToMean)
+        peak_prop_abs, peak_prop_rel2mean, peak_prop_rel2firstpt = s_ma._analyse_peak(peak_range)
 
-        #sssr: use bounds relative to mean (except for linewidth)
-        bRelPOI = True
-        if(bRelPOI):
-            # choose if absolute or relative will be checked
-            params_trace_check = params_trace_rel * 0.0
-            # amplitude: relative in %
-            params_trace_check[:, 0] = params_trace_rel[:, 0]-params_trace_rel[:,0].mean()
-            # linewidth: absolute in Hz
-            params_trace_check[:, 1] = params_trace[:, 1]
-            # frequency: relative in ppm
-            params_trace_check[:, 2] = params_trace_rel[:, 2]-params_trace_rel[:,2].mean()
-            # phase: absolute in rad
-            params_trace_check[:, 3] = params_trace[:, 3]-params_trace[:,3].mean()
+        # first set the data according to relative option: this is a user option
+        if(peak_properties_rel2mean):
+            peak_prop_rel = peak_prop_rel2mean
         else:
-            # choose if absolute or relative will be checked
-            params_trace_check = params_trace_rel * 0.0
-            # amplitude: relative in %
-            params_trace_check[:, 0] = params_trace_rel[:, 0]
-            # linewidth: absolute in Hz
-            params_trace_check[:, 1] = params_trace[:, 1]
-            # frequency: relative in ppm
-            params_trace_check[:, 2] = params_trace_rel[:, 2]
-            # phase: absolute in rad
-            params_trace_check[:, 3] = params_trace[:, 3]
+            peak_prop_rel = peak_prop_rel2firstpt
+
+        # choose if absolute or relative will be analysed: this is hard-coded
+        peak_prop_analyse = peak_prop_abs * 0.0
+        # amplitude: relative in %
+        peak_prop_analyse[:, 0] = peak_prop_rel[:, 0]
+        # linewidth: absolute in Hz
+        peak_prop_analyse[:, 1] = peak_prop_abs[:, 1]
+        # frequency: relative in ppm
+        peak_prop_analyse[:, 2] = peak_prop_rel[:, 2]
+        # phase: absolute in rad
+        peak_prop_analyse[:, 3] = peak_prop_abs[:, 3]
 
         # choose if absolute or relative will be displayed
-        params_trace_disp = params_trace_rel * 0.0
+        peak_prop_disp = peak_prop_rel * 0.0
         # amplitude: relative in %
-        params_trace_disp[:, 0] = params_trace_rel[:, 0]
+        peak_prop_disp[:, 0] = peak_prop_rel[:, 0]
         # linewidth: absolute in Hz
-        params_trace_disp[:, 1] = params_trace[:, 1]
+        peak_prop_disp[:, 1] = peak_prop_abs[:, 1]
         # frequency: absolute in ppm
-        params_trace_disp[:, 2] = params_trace[:, 2]
+        peak_prop_disp[:, 2] = peak_prop_abs[:, 2]
         # phase: absolute in rad
-        params_trace_disp[:, 3] = params_trace[:, 3]
+        peak_prop_disp[:, 3] = peak_prop_abs[:, 3]
 
         # our time scale
         t_ma = np.linspace(0, self.tr * s.shape[0], s_ma.shape[0]) / 1000.0  # s
 
         # stats
-        print(">> peak analysis -> means + / - std. deviations")
-        print(" > Rel. peak amplitude = %.2f + / - %.2f %%" % (params_trace_disp[:, 0].mean(), params_trace_disp[:, 0].std()))
-        print(" > Abs. linewidth = %.1f + / - %.1f Hz (%.3f + / - %.3f ppm)" % (params_trace_disp[:, 1].mean(), params_trace_disp[:, 1].std(), (params_trace_disp[:, 1] / s_ma.f0).mean(), (params_trace_disp[:, 1] / s_ma.f0).std()))
-        print(" > Abs. frequency = %.2f + / - %.2f ppm ( +  / - %.1f Hz)" % (params_trace_disp[:, 2].mean(), params_trace_disp[:, 2].std(), (params_trace_disp[:, 2] * s_ma.f0).std()))
-        print(" > Abs. phase = %.2f + / - %.2f rad" % (params_trace_disp[:, 3].mean(), params_trace_disp[:, 3].std()))
+        print(">> peak analysis -> means ± std. deviations")
+        print(" > Rel. peak amplitude = %.2f ± %.2f %%" % (peak_prop_disp[:, 0].mean(), peak_prop_disp[:, 0].std()))
+        print(" > Abs. linewidth = %.1f ± %.1f Hz (%.3f ± %.3f ppm)" % (peak_prop_disp[:, 1].mean(), peak_prop_disp[:, 1].std(), (peak_prop_disp[:, 1] / s_ma.f0).mean(), (peak_prop_disp[:, 1] / s_ma.f0).std()))
+        print(" > Abs. frequency = %.2f ± %.2f ppm (± %.1f Hz)" % (peak_prop_disp[:, 2].mean(), peak_prop_disp[:, 2].std(), (peak_prop_disp[:, 2] * s_ma.f0).std()))
+        print(" > Abs. phase = %.2f ± %.2f rad" % (peak_prop_disp[:, 3].mean(), peak_prop_disp[:, 3].std()))
 
-        if(auto_adjust_bounds):
-            # auto mode
+        # check for Nones
+        peak_properties_ranges_list = list(peak_properties_ranges.values())
+        peak_properties_ranges_list[peak_properties_ranges_list == None] = np.inf
 
-            # copy min / max params
-            params_min_auto = params_min.copy()
-            params_max_auto = params_max.copy()
+        # special for phase: rejection range is a factor of std
+        phase_std = peak_prop_analyse[:, 3].std()
+        phase_std_reject_range = peak_properties_ranges_list[3] / 100.0 * phase_std
+
+        # prepare rejection ranges
+        peak_prop_min = [-peak_properties_ranges_list[0],
+                         0.0,
+                         -peak_properties_ranges_list[2],
+                         -phase_std_reject_range]
+
+        peak_prop_max = [+peak_properties_ranges_list[0],
+                         peak_properties_ranges_list[1],
+                         +peak_properties_ranges_list[2],
+                         +phase_std_reject_range]
+
+        if(auto_adjust_lw_bound):
+            # automatic rejection based on lw
+
+            # first find optimal lw sweeping range
+            lw_min = (np.floor(peak_prop_analyse[:, 1].min() / 10.0)) * 10.0
+            lw_max = (np.floor(peak_prop_analyse[:, 1].max() / 10.0) + 1.0) * 10.0
+            lw_range = np.arange(lw_min, lw_max, 1.0)
 
             # iterate between max and min for linewidth, and test the resulting data
-            print(">> adjusting linewidth bounds ... ", end="", flush=True)
-            p = 1
-            max_lw_range = np.arange(int(params_min_auto[p]), int(params_max_auto[p]))
-            if(len(max_lw_range) == 0):
-                raise Exception(" > You chose to automatically adjust the linewidth threshold but you did not leave any range for it %.0f-%.0fHz!" % (int(params_min_auto[p]), int(params_max_auto[p])))
+            print(">> adjusting linewidth threshold ... ", end="", flush=True)
+            self._print_progress_bar(0, lw_range.shape[0])
 
-            self._print_progress_bar(0, max_lw_range.shape[0])
-            test_snr_list = np.zeros(max_lw_range.shape)
-            test_lw_list = np.zeros(max_lw_range.shape)
-            test_nrej_list = np.zeros(max_lw_range.shape)
-            #sssr: fullauto
-            auto_maxsnr = 0
-            auto_maxsnr_lw = 0
-            for (iLW, this_max_lw) in enumerate(max_lw_range):
-                # for each max lw, reject data and see
+            test_snr_list = np.zeros(lw_range.shape)
+            test_lw_list = np.zeros(lw_range.shape)
+            test_nrej_list = np.zeros(lw_range.shape)
+            # test each lw
+            for (ilw, this_lw) in enumerate(lw_range):
+                # rebuild min/max rejection bounds
+                peak_prop_min_auto = peak_prop_min.copy()
+                peak_prop_min_auto[1] = 0.0
+                peak_prop_max_auto = peak_prop_max.copy()
+                peak_prop_max_auto[1] = this_lw
+
+                # now see what we can reject
                 this_mask_reject_data = np.full([s_ma.shape[0], 4], False)
-                params_max_auto[1] = this_max_lw
                 for a in range(0, s_ma.shape[0]):
                     for p in range(4):
-                        if(params_trace_check[a, p] < params_min_auto[p]):
+                        if(peak_prop_analyse[a, p] < peak_prop_min_auto[p]):
                             this_mask_reject_data[a, p] = True
-                        if(params_trace_check[a, p] > params_max_auto[p]):
+                        if(peak_prop_analyse[a, p] > peak_prop_max_auto[p]):
                             this_mask_reject_data[a, p] = True
 
                 # reject data now
@@ -1717,67 +1761,77 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
                 # analyse snr / lw and number of rejections
                 if(this_mask_reject_data_sumup.sum() < s_ma.shape[0]):
-                    test_snr_list[iLW], _, _ = this_s_cor._correct_realign()._correct_average()._correct_apodization().analyse_snr(peak_range, [-1, 0], '', False, False, False, [1, 6], True)
-                    test_lw_list[iLW] = this_s_cor._correct_realign()._correct_average()._correct_apodization().analyse_linewidth(peak_range, '', False, False, [1, 6], True)
-                    test_nrej_list[iLW] = this_mask_reject_data_sumup.sum()
+                    test_snr_list[ilw], _, _ = this_s_cor._correct_realign()._correct_average()._correct_apodization().analyse_snr(peak_range, [-1, 0], '', False, False, False, [1, 6], True)
+                    test_lw_list[ilw] = this_s_cor._correct_realign()._correct_average()._correct_apodization().analyse_linewidth(peak_range, '', False, False, [1, 6], True)
+                    test_nrej_list[ilw] = this_mask_reject_data_sumup.sum()
 
-                #sssr: find first max SNR (needs 110% better SNR to update)
-                if(auto_maxsnr*1.1 < test_snr_list[iLW]):
-                    auto_maxsnr = test_snr_list[iLW]
-                    auto_maxsnr_lw = this_max_lw
                 # progression
-                self._print_progress_bar(iLW)
+                self._print_progress_bar(ilw)
 
             print(" done.")
-            #auto adjust phase bounds using std (see doi:10.1002/jmri.26802)
-            auto_phsbounds = 0.60 * params_trace_check[:, 3].std()
-            cprint(" > auto-adjust best limits: LW %d and PHS %.2f rad" % (auto_maxsnr_lw, auto_phsbounds),"cyan", attrs=['bold'])
-            params_max[1] = auto_maxsnr_lw
-            params_min[3] = -auto_phsbounds
-            params_max[3] = auto_phsbounds
 
-            # plot SNR / LW combinaisons
+            # analyse SNR curve choose LW threshold
+            snr_initial = test_snr_list[-1]
+            snr_threshold = snr_initial + snr_initial * auto_adjust_allowed_snr_change / 100.0
+            test_snr_list_rel = test_snr_list / snr_initial * 100.0 - 100.0
+            test_snr_list_mask = (test_snr_list_rel > auto_adjust_allowed_snr_change)
+
+            if(not test_snr_list_mask.any()):
+                # that was a bit ambitious
+                Warning(" > Sorry but your exceptation regarding the SNR was a bit ambitious! You are refusing to go under %.0f%% SNR change. While trying to adjust the linewidth criteria for data rejection, the best we found was a %.0f%% SNR change :(" % (auto_adjust_allowed_snr_change, test_snr_list_rel.max()))
+                # set optimal LW to max
+                optim_lw = lw_max
+            else:
+                # we found SNR values which matches our request
+                # let's choose the one with the lowest LW
+                ind_lowest_lw = np.argmax(test_snr_list_rel > auto_adjust_allowed_snr_change)
+                optim_lw = lw_range[ind_lowest_lw]
+                print(" > Found optimal linewidth for data rejection = %.1f Hz" % optim_lw)
+                # adjusting bounds
+                peak_prop_max[1] = optim_lw
+
+            # plot SNR / LW combinaisons and optimal choice
             if(display):
                 fig = plt.figure(130)
                 fig.clf()
                 axs = fig.subplots(1, 2, sharex='all')
                 ax2 = axs[0].twinx()
                 ax3 = axs[1].twinx()
-                fig.canvas.set_window_title(
-                    "mrs.reco.MRSData2.correct_analyse_and_reject (auto)")
+                fig.canvas.set_window_title("mrs.reco.MRSData2.correct_analyse_and_reject (auto)")
 
-                axs[0].plot(max_lw_range, test_snr_list, 'rx-', label='SNR')
-                axs[0].set_xlabel('Max allowed linewidth (Hz)')
-                axs[0].set_ylabel('Estimated SNR (u.a)')
+                axs[0].plot(lw_range, test_snr_list, 'rx-', label='SNR')
+                axs[0].plot([optim_lw, optim_lw], [test_snr_list.min(), test_snr_list.max()], 'm--', label='Optimal linewidth')
+                axs[0].plot([lw_range.min(), lw_range.max()], [snr_threshold, snr_threshold], 'g--', label='SNR threshold')
+                axs[0].set_xlabel('Max allowed linewidth (Hz)', fontsize=9)
+                axs[0].set_ylabel('Estimated SNR (u.a)', fontsize=9)
                 axs[0].grid('on')
                 axs[0].legend(loc='lower left')
 
-                ax2.plot(max_lw_range, test_lw_list, 'bx-', label='Linewidth')
-                ax2.set_ylabel('Estimated linewidth (Hz)')
+                ax2.plot(lw_range, test_lw_list, 'bx-', label='Linewidth')
+                ax2.set_ylabel('Estimated linewidth (Hz)', fontsize=9)
                 ax2.legend(loc='lower right')
 
-                axs[1].plot(max_lw_range, test_nrej_list, 'ko-',
-                            label='Number of scans rejected')
-                axs[1].set_xlabel('Max allowed linewidth (Hz)')
-                axs[1].set_ylabel('Number of scans rejected')
+                axs[1].plot(lw_range, test_nrej_list, 'ko-', label='Number of scans rejected')
+                axs[1].set_xlabel('Max allowed linewidth (Hz)', fontsize=9)
+                axs[1].set_ylabel('Number of scans rejected', fontsize=9)
                 axs[1].grid('on')
 
-                ax3.plot(max_lw_range, test_nrej_list / s_ma.shape[0] * 100, 'ko-', label='Total percentage of scans rejected')
-                ax3.set_ylabel('Estimated linewidth (Hz)')
-                ax3.set_ylabel('Rejection percentage (%)')
+                ax3.plot(lw_range, test_nrej_list / s_ma.shape[0] * 100, 'ko-', label='Total percentage of scans rejected')
+                ax3.set_ylabel('Estimated linewidth (Hz)', fontsize=9)
+                ax3.set_ylabel('Rejection percentage (%)', fontsize=9)
 
                 fig.tight_layout()
 
         # for each average, check if peak parameters are in the min / max bounds
         print(">> rejecting data ... ", end="", flush=True)
-        mask_reject_data = np.full([s_ma.shape[0], 4], 0)
+        mask_reject_data = np.full([s_ma.shape[0], 4], False)
         self._print_progress_bar(0, s_ma.shape[0])
         for a in range(0, s_ma.shape[0]):
             for p in range(4):
-                if(params_trace_check[a, p] < params_min[p]):
-                    mask_reject_data[a, p] = (p+1) #True
-                if(params_trace_check[a, p] > params_max[p]):
-                    mask_reject_data[a, p] = (p+1) #True
+                if(peak_prop_analyse[a, p] < peak_prop_min[p]):
+                    mask_reject_data[a, p] = True
+                if(peak_prop_analyse[a, p] > peak_prop_max[p]):
+                    mask_reject_data[a, p] = True
 
             self._print_progress_bar(a)
 
@@ -1786,10 +1840,10 @@ class MRSData2(suspect.mrsobjects.MRSData):
         # stats regarding data rejection, how many, for what reasons, overall percentage
         print(">> data rejection -> summary")
         print(">> number of averages rejected because of...")
-        print(" > amplitude = %d" % (mask_reject_data[:, 0]==1).sum())
-        print(" > linewidth = %d" % (mask_reject_data[:, 1]==2).sum())
-        print(" > frequency = %d" % (mask_reject_data[:, 2]==3).sum())
-        print(" > phase = %d"     % (mask_reject_data[:, 3]==4).sum())
+        print(" > amplitude = %d" % mask_reject_data[:, 0].sum())
+        print(" > linewidth = %d" % mask_reject_data[:, 1].sum())
+        print(" > frequency = %d" % mask_reject_data[:, 2].sum())
+        print(" > phase = %d" % mask_reject_data[:, 3].sum())
 
         # actually reject data now
         mask_reject_data_sumup = (mask_reject_data.sum(axis=1) > 0)
@@ -1802,52 +1856,42 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
             fig = plt.figure(131)
             fig.clf()
-            axs = fig.subplots(2, 2, sharex='all')
+            axs = fig.subplots(2, 3, sharex='all')
             fig.canvas.set_window_title("mrs.reco.MRSData2.correct_analyse_and_reject")
 
             k = 0
             for ix in range(2):
                 for iy in range(2):
                     # original data
-                    axs[ix, iy].plot(t_ma, params_trace_check[:, k], 'k-x', linewidth=1)
+                    axs[ix, iy].plot(t_ma, peak_prop_analyse[:, k], 'k-x', linewidth=1)
                     # rejected data
-                    #sssr: show all points rejected on all plots
-                    #t_ma_rej = t_ma[mask_reject_data[:, k]]
-                    #this_params_trace_rej = params_trace_check[mask_reject_data[:, k], k]
-                    t_ma_rej_all = t_ma[(mask_reject_data.sum(axis=1) > 0)]
-                    this_params_trace_rej_all = params_trace_check[(mask_reject_data.sum(axis=1) > 0), k]
-                    axs[ix, iy].plot(t_ma_rej_all, this_params_trace_rej_all, 'rx', linewidth=0.5)
-                    t_ma_rej = t_ma[(mask_reject_data[:,k] == (k+1))]
-                    this_params_trace_rej = params_trace_check[(mask_reject_data[:,k] == (k+1)), k]
-                    axs[ix, iy].plot(t_ma_rej, this_params_trace_rej, 'b.', linewidth=1)
-
-                    axs[ix, iy].plot(t_ma, params_min[k] * np.ones(t_ma.shape), '-r', linewidth=1)
-                    axs[ix, iy].plot(t_ma, params_max[k] * np.ones(t_ma.shape), '-r', linewidth=1)
+                    t_ma_rej = t_ma[mask_reject_data[:, k]]
+                    this_peak_prop_analyse_rej = peak_prop_analyse[mask_reject_data[:, k], k]
+                    axs[ix, iy].plot(t_ma_rej, this_peak_prop_analyse_rej, 'ro', linewidth=1)
+                    axs[ix, iy].plot(t_ma, peak_prop_min[k] * np.ones(t_ma.shape), '-r', linewidth=1)
+                    axs[ix, iy].plot(t_ma, peak_prop_max[k] * np.ones(t_ma.shape), '-r', linewidth=1)
                     k = k + 1
 
-            axs[0, 0].set_ylabel('Rel. amplitude change (%)')
+            axs[0, 0].set_ylabel('Rel. amplitude change (%)', fontsize=9)
             axs[0, 0].grid('on')
-            #axs[0, 0].set_title("Rel. amplitude = %.2f + / - %.2f %%" % (params_trace_disp[:, 0].mean(), params_trace_disp[:, 0].std()))
+            axs[0, 0].set_title("Rel. amplitude = %.2f ± %.2f %%" % (peak_prop_disp[:, 0].mean(), peak_prop_disp[:, 0].std()), fontsize=9)
 
-            axs[0, 1].set_ylabel('Abs. linewidth (Hz)')
+            axs[0, 1].set_ylabel('Abs. linewidth (Hz)', fontsize=9)
             axs[0, 1].grid('on')
-            #axs[0, 1].set_title("Abs. linewidth = %.1f + / - %.1f Hz (%.3f + / - %.3f ppm)" % (params_trace_disp[:, 1].mean(), params_trace_disp[:, 1].std(), (params_trace_disp[:, 1] / s_ma.f0).mean(), (params_trace_disp[:, 1] / s_ma.f0).std()))
+            axs[0, 1].set_title("Abs. linewidth = %.1f ± %.1f Hz (%.3f ± %.3f ppm)" % (peak_prop_disp[:, 1].mean(), peak_prop_disp[:, 1].std(), (peak_prop_disp[:, 1] / s_ma.f0).mean(), (peak_prop_disp[:, 1] / s_ma.f0).std()), fontsize=9)
 
-            axs[1, 0].set_xlabel('Acq. time (s)')
-            axs[1, 0].set_ylabel('Abs. frequency (ppm)')
+            axs[1, 0].set_xlabel('Acq. time (s)', fontsize=9)
+            axs[1, 0].set_ylabel('Abs. frequency (ppm)', fontsize=9)
             axs[1, 0].grid('on')
-            #axs[1, 0].set_title("Abs. frequency = %.2f + / - %.2f ppm ( +  / - %.1f Hz)" % (params_trace_disp[:, 2].mean(), params_trace_disp[:, 2].std(), (params_trace_disp[:, 2] * s_ma.f0).std()))
+            axs[1, 0].set_title("Abs. frequency = %.2f ± %.2f ppm (± %.1f Hz)" % (peak_prop_disp[:, 2].mean(), peak_prop_disp[:, 2].std(), (peak_prop_disp[:, 2] * s_ma.f0).std()), fontsize=9)
 
-            axs[1, 1].set_xlabel('Acq. time (s)')
-            axs[1, 1].set_ylabel('Abs. phase shift (rd)')
+            axs[1, 1].set_xlabel('Acq. time (s)', fontsize=9)
+            axs[1, 1].set_ylabel('Abs. phase shift (rd)', fontsize=9)
             axs[1, 1].grid('on')
-            #axs[1, 1].set_title("Abs. phase = %.2f + / - %.2f rad" % (params_trace_disp[:, 3].mean(), params_trace_disp[:, 3].std()))
+            axs[1, 1].set_title("Abs. phase = %.2f ± %.2f rad" % (peak_prop_disp[:, 3].mean(), peak_prop_disp[:, 3].std()), fontsize=9)
 
-            fig.tight_layout()
             # nice plot showing all raw data
-            #plt.subplot(1, 3, 3)
-            fig = plt.figure(132)
-            fig.clf()
+            plt.subplot(1, 3, 3)
             ppm = self.frequency_axis_ppm()
             ippm_peak_range = (peak_range[0] > ppm) | (ppm > peak_range[1])
             ystep = np.max(np.mean(s_ma.spectrum().real, axis=0))
@@ -1870,16 +1914,15 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 plt.plot(ppm[ippm_half_peak], sf_masked[ippm_half_peak].spectrum().real * ampfactor + ystep * k, 'k-', linewidth=1)
 
             plt.xlim(peak_range[1], peak_range[0])
-            plt.xlabel('chemical shift (ppm)')
-            plt.ylabel('individual spectra')
+            plt.xlabel('chemical shift (ppm)', fontsize=9)
+            plt.ylabel('individual spectra', fontsize=9)
             plt.grid('on')
 
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                fig.tight_layout()
+                fig.tight_layout(rect=[0, 0, 1, 1])
 
             # plt.pause(0.1)
-
 
         # wait, are we removing all data ???
         if(mask_reject_data_sumup.sum() == s.shape[0]):
@@ -2151,10 +2194,13 @@ class MRSData2(suspect.mrsobjects.MRSData):
         # crop
         if(nPoints_final < s_apo.shape[0]):
             if(not beSilent):
-                print(", cropping data, updating sequence npts ", end="", flush=True)
+                print(", cropping data ", end="", flush=True)
             s_apo = s_apo[0:nPoints_final]
-            self.sequence.npts = nPoints_final
-            self.sequence._ready = False
+            if(self.sequence is not None):
+                if(not beSilent):
+                    print(", updating sequence npts ", end="", flush=True)
+                self.sequence.npts = nPoints_final
+                self.sequence._ready = False
 
         if(display):
             t_apo = s_apo.time_axis()
@@ -2480,27 +2526,28 @@ class MRSData2(suspect.mrsobjects.MRSData):
             ippm_noise_range = (noise_range[0] < ppm) & (ppm < noise_range[1])
             snr_noise = np.std(sf_analyse[ippm_noise_range])
 
-            axs[0].plot(ppm, np.real(s.spectrum()), 'k-', linewidth=1)
-            axs[0].set_xlim(display_range[1], display_range[0])
-            axs[0].set_xlabel('chemical shift (ppm)')
-            axs[0].set_ylabel('real part')
-            axs[0].grid('on')
+            if(display):
+                axs[0].plot(ppm, np.real(s.spectrum()), 'k-', linewidth=1)
+                axs[0].set_xlim(display_range[1], display_range[0])
+                axs[0].set_xlabel('chemical shift (ppm)')
+                axs[0].set_ylabel('real part')
+                axs[0].grid('on')
 
-            axs[1].plot(ppm, np.abs(s.spectrum()), 'k-', linewidth=1)
-            axs[1].set_xlim(display_range[1], display_range[0])
-            axs[1].set_xlabel('chemical shift (ppm)')
-            axs[1].set_ylabel('magnitude mode')
-            axs[1].grid('on')
+                axs[1].plot(ppm, np.abs(s.spectrum()), 'k-', linewidth=1)
+                axs[1].set_xlim(display_range[1], display_range[0])
+                axs[1].set_xlabel('chemical shift (ppm)')
+                axs[1].set_ylabel('magnitude mode')
+                axs[1].grid('on')
 
-            if(magnitude_mode):
-                ax = axs[1]
-            else:
-                ax = axs[0]
+                if(magnitude_mode):
+                    ax = axs[1]
+                else:
+                    ax = axs[0]
 
-            # show peak of interest
-            ax.plot(ppm[ippm_peak], sf_analyse[ippm_peak], 'ro')
-            # show noise region
-            ax.plot(ppm[ippm_noise_range], sf_analyse[ippm_noise_range], 'bo')
+                # show peak of interest
+                ax.plot(ppm[ippm_peak], sf_analyse[ippm_peak], 'ro')
+                # show noise region
+                ax.plot(ppm[ippm_noise_range], sf_analyse[ippm_noise_range], 'bo')
 
         # finish display
         if(display):
@@ -2689,6 +2736,16 @@ class MRSData2(suspect.mrsobjects.MRSData):
 class pipeline:
     """The pipeline class is used to store all the reconstruction parameters needed for a specific bunch of acquired signals. Once the parameters are set, the pipeline can be run using one of the methods."""
 
+    # frozen stuff: a technique to prevent creating new attributes
+    # (https://stackoverflow.com/questions/3603502/prevent-creating-new-attributes-outside-init)
+    __isfrozen = False
+
+    def __setattr__(self, key, value):
+        """Overload of __setattr__ method to check that we are not creating a new attribute."""
+        if self.__isfrozen and not hasattr(self, key):
+            raise TypeError("You are trying to dynamically create a new attribute (%s) to this object and that is not cool! I will not let you do that because I believe it is a bad habit and can lead to terrible bugs. A clean way of doing this is to initialize your attribute (%s) in the __init__ method of this class. Bisou, bye :)" % (key, key))
+        object.__setattr__(self, key, value)
+
     def __init__(self):
 
         # --- water-suppressed data ---
@@ -2725,6 +2782,9 @@ class pipeline:
         self.data_process_only_this_data_index = []
         # by default, process each data/ref.data separatly. If this option is set to true, all data will be concatenated
         self.data_concatenate = False
+
+        # --- Amplification ---
+        self.scaling_factor = 1e8
 
         # --- FID modulus process ---
         self.fid_modulus = False
@@ -2775,14 +2835,24 @@ class pipeline:
         self.analyse_and_reject_POI_range_ppm = [4.5, 5]
         # size of moving average window
         self.analyse_and_reject_moving_averages = 1
-        # lower parameter bounds for amplitude changes (%), linewidth (Hz), chemical shift changes (ppm) and phase (rd)
-        self.analyse_and_reject_min = [-100, 0, -0.5, -3.14]
-        # upper parameter bounds for amplitude changes (%), linewidth (Hz), chemical shift changes (ppm) and phase (rd)
-        self.analyse_and_reject_max = [+100, 200, +0.5, +3.14]
-        # for relative parameters such as amplitude and chemical shift changes, relative to average over whole data (True) or first point (False)?
-        self.analyse_and_reject_relative_mean = True
-        # automatic linewidth rejection criteria based on SNR/linewidth evolution
+        # rejection criterias for
+        # amplitude relative changes: keep data if within +/-val % range
+        # linewidth changes: keep data is below val Hz
+        # chemical shift changes: keep data is within +/-val ppm
+        # phase changes: keep data if within +/-val/100 * std(phase) rd
+        self.analyse_and_reject_ranges = {"amplitude (%)": None,
+                                          "linewidth (Hz)": 30.0,
+                                          "chemical shift (ppm)": 0.5,
+                                          "phase std. factor (%)": 60.0}
+
+        # for amplitude, chemical shift and phase, the rejection of data is based on ranges of relative changes of those metrics. Relative to what? The mean value over the whole acquisition (True) or the first acquired point (False)
+        self.analyse_and_reject_rel2mean = True
+        # automatic adjustement of linewidth criteria
         self.analyse_and_reject_auto = False
+        # minimum allowed SNR change (%) when adjusting the linewidth criteria
+        # this can be positive (we want to increase SNR +10% by rejecting crappy data)
+        # or negative (we are ok in decreasing the SNR -10% in order to get better resolved spectra)
+        self.analyse_and_reject_auto_allowed_snr_change = -10.0
         # display all this process to check what the hell is going on
         self.analyse_and_reject_display = True
 
@@ -2885,6 +2955,9 @@ class pipeline:
         # list of linewidhs measured per processed signals
         self.analyse_linewidth_final_list = []
 
+        # freeze the object and prevent the creation of new attributes
+        self.__isfrozen = True
+
     def get_te_list(self):
         """
         Return the TEs for all the data signals in this pipeline.
@@ -2930,6 +3003,7 @@ class pipeline:
         print("------------------------------------------------------------------")
         print("> phase_enable = ", end="", flush=True)
         cprint("%r" % self.phase_enable, ('green' if self.phase_enable else 'red'), attrs=['bold'])
+        print("> scaling_factor = %E" % self.scaling_factor)
         print("> fid_modulus = ", end="", flush=True)
         cprint("%r" % self.fid_modulus, ('green' if self.fid_modulus else 'red'), attrs=['bold'])
         print("> recombine_enable = ", end="", flush=True)
@@ -3145,6 +3219,20 @@ class pipeline:
                     print("------------------------------------------------------------------")
             print("")
 
+        # amplification
+        if(self.scaling_factor > 0):
+            print("------------------------------------------------------------------")
+            print("> Amplifying...")
+            print("------------------------------------------------------------------")
+            for i in range(0, len(self._data_list)):
+                cprint("> Amplification of [" + self._display_legends_list[i] + "]", 'green', attrs=['bold'])
+                s = self._data_list[i]
+                s_amplified = s.correct_amplify(self.scaling_factor)
+                # replace / store
+                self._data_list[i] = s_amplified
+            print("------------------------------------------------------------------")
+            print("")
+
         # FID modulus
         if(self.fid_modulus):
             print("------------------------------------------------------------------")
@@ -3282,7 +3370,7 @@ class pipeline:
                 print("> data analysis and rejection...")
                 print("------------------------------------------------------------------")
                 cprint("> data analysing / rejecting [" + s_legend + "]", 'green', attrs=['bold'])
-                s = s.correct_analyse_and_reject(self.analyse_and_reject_POI_range_ppm, self.analyse_and_reject_moving_averages, self.analyse_and_reject_min, self.analyse_and_reject_max, self.analyse_and_reject_relative_mean, self.analyse_and_reject_auto, self.analyse_and_reject_display)
+                s = s.correct_analyse_and_reject(self.analyse_and_reject_POI_range_ppm, self.analyse_and_reject_moving_averages, self.analyse_and_reject_ranges, self.analyse_and_reject_rel2mean, self.analyse_and_reject_auto, self.analyse_and_reject_auto_allowed_snr_change, self.analyse_and_reject_display)
 
                 # check snr
                 if(self.analyse_snr_enable and self.analyse_snr_evol_enable):
@@ -3512,8 +3600,21 @@ class pipeline:
 class voi_pipeline:
     """The voi_pipeline class is similar to pipeline class above but for VOI trace signals."""
 
+    # frozen stuff: a technique to prevent creating new attributes
+    # (https://stackoverflow.com/questions/3603502/prevent-creating-new-attributes-outside-init)
+    __isfrozen = False
+
+    def __setattr__(self, key, value):
+        """Overload of __setattr__ method to check that we are not creating a new attribute."""
+        if self.__isfrozen and not hasattr(self, key):
+            raise TypeError("You are trying to dynamically create a new attribute (%s) to this object and that is not cool! I will not let you do that because I believe it is a bad habit and can lead to terrible bugs. A clean way of doing this is to initialize your attribute (%s) in the __init__ method of this class. Bisou, bye :)" % (key, key))
+        object.__setattr__(self, key, value)
+
     def __init__(self):
+        # full paths to data files
         self.data_filepaths = ""
+
+        # private attributes
         self._data_filepaths_list = []
         self._data_list = []
         self._xdata = []
@@ -3523,12 +3624,17 @@ class voi_pipeline:
         self._ydata_axis = []
         self._zdata_axis = []
 
+        # display options
         self.display_fig_index = 1
         self.display_legends = ""
         self._display_legends_list = []
 
+        # regions in the spatial profile to analyze (number of points)
         self.analyze_selectivity_range_list = [[800, 3550], [-10600, -7800], [-3650, 1850]]
         self.analyze_selectivity_list = np.array([])
+
+        # freeze objet
+        self.__isfrozen = True
 
     def get_te_list(self):
         """
