@@ -1,4 +1,4 @@
-SHRIMP
+# SHRIMP
 
 ## SHRIMP
 
@@ -46,5 +46,12 @@ SHRIMP can be used to process and quantify single-voxel Magnetic Resonance SPect
 ## TODO
 
 - Use a gitable non-binary format for the metabolite db and basis sets (thinking of FODS)
+- HDF5 format save/load: for now, only save the MRS signal with a few attributes. If needed, will complete implementation
 - Implement partial volume stuff for absolute quantification
 - Merge with Yasmin's code for DW MRS
+- implement FQN fit criteria + real-time indicator
+- peak-linewidth for prefit
+- adapt reco/fit pipelines for heart/muscle
+- extract header from dicoms: patient name, etc.
+- keep track of data rejection stats in pipeline
++ check # TODO tags in the code :)

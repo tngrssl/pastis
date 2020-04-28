@@ -20,15 +20,18 @@ except ImportError:
 import suspect
 import numpy as np
 import math as ma
-import mrs.reco as reco
-import mrs.aliases as xxx
 import matplotlib.pylab as plt
 import pickle
 import warnings
+import pathlib
 from xlrd import open_workbook
 from termcolor import cprint
 import matplotlib._color_data as mcd
 from enum import Enum
+import mrs.reco as reco
+import mrs.aliases as xxx
+import mrs.log as log
+import mrs.paths as default_paths
 
 import pdb
 
@@ -517,12 +520,12 @@ class params(np.ndarray):
         metabolites_inds = metabolites_inds[0]
 
         # display
-        print(">> mrs.sim.params.get_MBs_above_concentration: found %d metabolites above %f mmol/kg..." % (len(metabolites_inds), cm_threshold))
-        print(" > ", end="", flush=True)
+        log.info("found %d metabolites above %f mmol/kg..." % (len(metabolites_inds), cm_threshold))
         meta_names = self.get_meta_names()
+        found_meta_names = ""
         for im in metabolites_inds:
-            print("%s " % str(meta_names[im]), end="", flush=True)
-        print()
+            found_meta_names += str(meta_names[im]) + " "
+        log.info(found_meta_names)
 
         return(metabolites_inds)
 
@@ -577,7 +580,10 @@ class params(np.ndarray):
         bLL : boolean
             Displays link-lock status for each parameter (True) or not (False)
         """
-        print(">> mrs.sim.params.display_parameters: parameters...")
+        cell_nchar = 11
+
+        log.info("displaying parameters...")
+        log.info_line________________________()
         if(bMM):
             n = xxx.n_All
         else:
@@ -587,10 +593,9 @@ class params(np.ndarray):
         LLtransTab = str.maketrans("-+0123456789", "⁻⁺⁰¹²³⁴⁵⁶⁷⁸⁹")
         LLcolors = ['white', 'grey', 'yellow', 'blue', 'magenta', 'cyan', 'white', 'grey', 'yellow', 'blue', 'magenta', 'cyan', 'green']
 
-        print("[#] Metabolite name          \t [cm] \t\t[dd] \t\t[df] \t\t [dp]")
+        print("[#] " + "Metabolite".ljust(cell_nchar) + "[cm]".ljust(cell_nchar) + "[dd]".ljust(cell_nchar) + "[df]".ljust(cell_nchar) + "[dp]".ljust(cell_nchar))
         for k in range(n):
-            print("#%2d %-20s" %
-                  (k, meta_names[k]), end="", flush=True)
+            print(("#%2d " % k) + meta_names[k].ljust(cell_nchar), end="")
             for kp in range(4):
                 if(bLL):
                     thisLL = self.linklock[k, kp]
@@ -607,13 +612,14 @@ class params(np.ndarray):
                     else:
                         ind_color = -int(np.mod(np.abs(thisLL), len(LLcolors)))
                         thisLL_color = LLcolors[ind_color]
-                    cprint("\t(%4.1f)" % self[k, kp], thisLL_color, attrs=['bold'], end="", flush=True)
-                    cprint(thisLL_str, thisLL_color, attrs=['bold'], end="", flush=True)
-                else:
-                    print("\t(%4.1f)" % self[k, kp], end="", flush=True)
 
-            print()
-        print()
+                    this_cell_str = ("(%4.1f)" % self[k, kp]) + thisLL_str
+                    cprint(this_cell_str.ljust(cell_nchar), thisLL_color, attrs=['bold'], end="")
+                else:
+                    print(("(%4.1f)" % self[k, kp]).ljust(cell_nchar), end="")
+
+            print("", flush=True)
+        log.info_line________________________()
 
 
 class mrs_sequence:
@@ -721,7 +727,7 @@ class mrs_sequence:
     def _init_pulses(self):
         """Virtual method which initialize RF pulse waveforms if any."""
 
-    def _prepare_spin_system(self, metabolite, bSilent=False):
+    def _prepare_spin_system(self, metabolite):
         """
         Return pyGAMMA spin system for a given metabolite, knowing all its properties. Simplify the system in simple cases like singulets (one single chemical shift, no J-couplings).
 
@@ -729,8 +735,6 @@ class mrs_sequence:
         ----------
         metabolite : dict
             metabolite_basis_set entry for one single metabolite
-        beSilent : boolean
-            No output in console (True)
 
         Returns
         -------
@@ -739,10 +743,7 @@ class mrs_sequence:
         scaling_factor : float
             Scaling factor after system simplification
         """
-        # hello
-        if(not bSilent):
-            cprint(">>>> mrs.sim.mrs_sequence._prepare_spin_system:", 'green', attrs=['bold'])
-            print("  > preparing spin system", end="", flush=True)
+        log.debug("preparing spin system")
 
         # init
         scaling_factor = 1.0
@@ -754,15 +755,13 @@ class mrs_sequence:
 
         # check if we can simplify
         if(self.allow_spin_system_simplification and len(ppm) > 1 and not np.any(j != 0.0) and len(np.unique(ppm)) == 1):
+            log.debug("simplifying the spin system")
             # we have a non-coupled singulet with N spins here
             # let's simplify to one single spin + amplification factor
             scaling_factor = float(len(ppm))
             ppm = np.array([ppm[0]])
             iso = np.array([iso[0]])
             j = np.array([j[0, 0]])
-
-            if(not bSilent):
-                print(", simplified it.", end="", flush=True)
 
         # init system
         nSpins = len(ppm)
@@ -779,7 +778,7 @@ class mrs_sequence:
             elif(iso[i_spin] == 31):
                 sys.isotope(i_spin, '31P')
             else:
-                raise Exception("  > mrs.sim.mrs_sequence._run_sequence: " + str(iso[i_spin]) + ", that is weird nuclei!")
+                log.error(str(iso[i_spin]) + ", that is weird nuclei!")
 
             # set the ppm
             sys.PPM(i_spin, ppm[i_spin])
@@ -788,17 +787,8 @@ class mrs_sequence:
             for icolJ in range(i_spin + 1, len(ppm)):
                 sys.J(i_spin, icolJ, j[i_spin, icolJ])
 
-                if(not bSilent):
-                    print(".", end="", flush=True)
-
-            if(not bSilent):
-                print(".", end="", flush=True)
-
         # water shift
         sys.offsetShifts(self.ppm_water * self.f0, self.nuclei)
-
-        if(not bSilent):
-            print("done.")
 
         return(sys, scaling_factor)
 
@@ -816,13 +806,9 @@ class mrs_sequence:
         s_MRSData2 : MRSData2 object
             Containing the MRS signal simulated for this metabolite
         """
-        # hello
-        # cprint(">>> mrs.sim.mrs_sequence._run_sequence:", 'green', attrs=['bold'])
-
+        log.debug("acquiring pulse-acquire sequence: (90)...")
         # create spin system
         sys, amp_factor_spins = self._prepare_spin_system(metabolite)
-
-        print("  > acquiring.", end="", flush=True)
 
         # amplitude normalization
         afactor = self.scaling_factor / sys.HS()
@@ -840,13 +826,10 @@ class mrs_sequence:
         # excitation: hard 90 pulse
         sigma1 = pg.Iypuls(sys, sigma0, self.nuclei, 90.0)
         te_real += 0.0
-        print(".90.", end="", flush=True)
         # evolution
         sigma0 = pg.evolve(sigma1, pg.prop(H, self.te / 1000.0))  # TE evolution
         te_real += self.te / 1000.0
-        print(".", end="", flush=True)
         data = pg.FID(sigma0, pg.gen_op(D), H, dt, self.npts)  # acquisition
-        print(".", end="", flush=True)
 
         # extract complex time data points
         s = np.full([self.npts, ], np.nan, dtype=np.complex)
@@ -857,15 +840,12 @@ class mrs_sequence:
         s_MRSData = suspect.MRSData(s, dt, self.f0)
         s_MRSData2 = s_MRSData.view(reco.MRSData2)
 
-        print("done. (real TE=%.2fms)" % (te_real * 1000.0))
+        log.debug("done. (real TE=%.2fms)" % (te_real * 1000.0))
 
         return(s_MRSData2)
 
     def _compute_metabolite_signals(self):
         """For each goup of metabolites, generate the simulated MRS signal."""
-        # hello
-        cprint(">>> mrs.sim.mrs_sequence._compute_metabolite_signals:", 'green', attrs=['bold'])
-
         # clear metabase
         self._meta_signals = []
 
@@ -877,11 +857,7 @@ class mrs_sequence:
         for this_metagroup_key, this_metagroup_entry in self._meta_bs.items():
             s = s_full_meta.copy()
             for this_meta_key, this_meta_entry in self._meta_bs[this_metagroup_key]["metabolites"].items():
-                print(">>> simulating MRS signal for metabolite [", end="", flush=True)
-                cprint(this_metagroup_key, 'green', attrs=['bold'], end="", flush=True)
-                print("/", end="", flush=True)
-                cprint(this_meta_key, 'green', attrs=['bold'], end="", flush=True)
-                print("]")
+                log.info("simulating MRS signal for metabolite [%s/%s]..." % (this_metagroup_key, this_meta_key))
                 # build up the metabolite group
                 s = s + self._run_sequence(this_meta_entry)
             # append this metabolite group to the metabase
@@ -898,13 +874,10 @@ class mrs_sequence:
         f0_tol : float
             Maximum f0 difference tolerated when looking for a sequence (MHz)
         """
-        # hello
-        cprint(">>> mrs.sim.mrs_sequence._load_from_seqdb_file:", 'green', attrs=['bold'])
-
         if(self.seqdb_file is None):
-            raise Exception(" > PyGAMMA library could not be loaded and no sequence database PKL file (seqdb_file) was specified :(")
+            log.error("pyGAMMA library could not be loaded and no sequence database PKL file (seqdb_file) was specified :(")
 
-        print(" > Reading sequence database file...")
+        log.info("reading sequence database file...")
         # load pickle file
         with open(self.seqdb_file, 'rb') as f:
             [seqdb] = pickle.load(f)
@@ -913,17 +886,17 @@ class mrs_sequence:
         seqdb = np.array(seqdb)
 
         # compare sequences
-        print(" > Trying to find the right simulated sequence for you...")
+        log.info("trying to find the right simulated sequence for you...")
 
         # sequence excitation type
         seqdb_exc_type_mask = np.array([s.exc_type == self.exc_type for s in seqdb])
         seqdb_exc_type_n = np.sum(seqdb_exc_type_mask)
-        print("   Sequence type match: n=%d (%s)" % (seqdb_exc_type_n, self.exc_type))
+        log.info("sequence type match: n=%d (%s)" % (seqdb_exc_type_n, self.exc_type))
 
         # sequence name
         seqdb_name_mask = np.array([s.name == self.name for s in seqdb])
         seqdb_name_n = np.sum(seqdb_name_mask)
-        print("   Sequence name match: n=%d (%s)" % (seqdb_name_n, self.name))
+        log.info("sequence name match: n=%d (%s)" % (seqdb_name_n, self.name))
 
         # initialize final mask
         if(seqdb_name_n > 0):
@@ -934,7 +907,7 @@ class mrs_sequence:
         # nuclei
         seqdb_nuclei_mask = np.array([s.nuclei == self.nuclei for s in seqdb])
         seqdb_nuclei_n = np.sum(seqdb_nuclei_mask)
-        print("   Nuclei match: n=%d (%s)" % (seqdb_nuclei_n, self.nuclei))
+        log.info("nuclei match: n=%d (%s)" % (seqdb_nuclei_n, self.nuclei))
         # adjust final mask
         seqdb_final_mask = np.logical_and(seqdb_final_mask, seqdb_nuclei_mask)
 
@@ -942,41 +915,41 @@ class mrs_sequence:
         seqdb_f0_diff = np.abs([s.f0 - self.f0 for s in seqdb])
         seqdb_f0_diff_mask = (seqdb_f0_diff < f0_tol)
         seqdb_f0_diff_n = np.sum(seqdb_f0_diff_mask)
-        print("   F0 match: need %.3fMHz, found n=%d sequences simulated at +/-%.3fMHz" % (self.f0, seqdb_f0_diff_n, f0_tol))
+        log.info("f0 match: need %.3fMHz, found n=%d sequences simulated at +/-%.3fMHz" % (self.f0, seqdb_f0_diff_n, f0_tol))
         # adjust final mask
         seqdb_final_mask = np.logical_and(seqdb_final_mask, seqdb_f0_diff_mask)
 
         # ppm water
         seqdb_ppm_water_mask = np.array([s.ppm_water == self.ppm_water for s in seqdb])
         seqdb_ppm_water_n = np.sum(seqdb_ppm_water_mask)
-        print("   Water ppm match: n=%d (%.2f)" % (seqdb_ppm_water_n, self.ppm_water))
+        log.info("water ppm match: n=%d (%.2f)" % (seqdb_ppm_water_n, self.ppm_water))
         # adjust final mask
         seqdb_final_mask = np.logical_and(seqdb_final_mask, seqdb_ppm_water_mask)
 
         # additional_phi0
         seqdb_ph0_mask = np.array([s.additional_phi0 == self.additional_phi0 for s in seqdb])
         seqdb_ph0_n = np.sum(seqdb_ph0_mask)
-        print("   0th order phase match: n=%d (%.2f)" % (seqdb_ph0_n, self.additional_phi0))
+        log.info("0th order phase match: n=%d (%.2f)" % (seqdb_ph0_n, self.additional_phi0))
         # adjust final mask
         seqdb_final_mask = np.logical_and(seqdb_final_mask, seqdb_ph0_mask)
 
         # allow_evolution_during_hard_pulses
         seqdb_evol_mask = np.array([s.allow_evolution_during_hard_pulses == self.allow_evolution_during_hard_pulses for s in seqdb])
         seqdb_evol_n = np.sum(seqdb_evol_mask)
-        print("   Complicated stuff match: n=%d (%r)" % (seqdb_evol_n, self.allow_evolution_during_hard_pulses))
+        log.info("complicated stuff match: n=%d (%r)" % (seqdb_evol_n, self.allow_evolution_during_hard_pulses))
         # adjust final mask
         seqdb_final_mask = np.logical_and(seqdb_final_mask, seqdb_evol_mask)
 
         # metabolites
         seqdb_meta_bs_mask = np.array([s.meta_bs == self.meta_bs for s in seqdb])
         seqdb_meta_bs_n = np.sum(seqdb_meta_bs_mask)
-        print("   Metabolites match: n=%d" % seqdb_meta_bs_n)
+        log.info("metabolites match: n=%d" % seqdb_meta_bs_n)
         # adjust final mask
         seqdb_final_mask = np.logical_and(seqdb_final_mask, seqdb_meta_bs_mask)
 
         # check mask
         if(not np.any(seqdb_final_mask)):
-            raise Exception(" > Sorry, there is no simulated sequence that matches with your acquisition criterias :(")
+            log.error("sorry, there is no simulated sequence that matches with your acquisition criterias :(")
 
         # mask all the useless sequences and clean memory
         seqdb_match = seqdb[seqdb_final_mask]
@@ -985,28 +958,28 @@ class mrs_sequence:
         # te
         seqdb_te_diff = np.abs([s.te - self.te for s in seqdb_match])
         imin_te_diff = np.argmin(seqdb_te_diff)
-        print("   TE match: need %.2fms, found %.2fms" % (self.te, seqdb_match[imin_te_diff].te))
+        log.info("TE match: need %.2fms, found %.2fms" % (self.te, seqdb_match[imin_te_diff].te))
         if(seqdb_te_diff[imin_te_diff] > te_tol and self.meta_bs.non_coupled_only):
-            print("   TE match: This might seem a lot but I see you want to generate only singulet's metabolites so that is really not a big deal ;)")
+            log.info("TE match: This might seem a lot but I see you want to generate only singulet's metabolites so that is really not a big deal ;)")
 
         # optimal sequence and clean memory
         optim_seq = seqdb_match[imin_te_diff]
         seqdb_match = []
 
         # display
-        print(" > Comparing what you asked/what you got...")
-        print("   Parameter\t\tRequested\t\tObtained")
+        log.info("comparing what you asked/what you got...")
+        log.info("parameter\t\tRequested\t\tObtained")
         for this_key in list(self.__dict__.keys()):
             my_val = self.__dict__[this_key]
             if(len(my_val) == 1):
                 found_val = optim_seq.__dict__[this_key]
-                print("   " + this_key + "\t" + str(my_val) + "\t" + str(found_val))
+                log.info("   " + this_key + "\t" + str(my_val) + "\t" + str(found_val))
 
         # ok well done. Now we maybe have to fix a few issues: number of samples, sampling frequency, amplification factor, this can be done with some signal processing stuff
 
         # resampling
         if(self.fs != optim_seq.fs or self.npts != optim_seq.npts):
-            print(" > Resampling the metabolite signals to match your sampling...")
+            log.info("resampling the metabolite signals to match your sampling...")
             old_dt = 1 / optim_seq.fs
             old_t = np.arange(0, optim_seq.npts * old_dt, old_dt)
             new_dt = 1 / self.fs
@@ -1046,7 +1019,7 @@ class mrs_sequence:
             if(this_key not in keys_not_to_copy):
                 self.__dict__[this_key] = optim_seq.__dict__[this_key]
 
-        print(" > Successfully imported metabolite signal basis set! :)")
+        log.info("successfully imported metabolite signal basis set! :)")
 
     def initialize(self, meta_bs=None):
         """
@@ -1057,9 +1030,6 @@ class mrs_sequence:
         meta_bs : metabolite_basis_set
             Metabolite database to use for simulation. If none specified, use default metabolite_basis_set object.
         """
-        # hello
-        cprint(">> mrs.sim.mrs_sequence.initialize:", 'green', attrs=['bold'])
-
         # want to use a custom metabolite db?
         if(meta_bs is not None):
             self._meta_bs = meta_bs
@@ -1070,14 +1040,14 @@ class mrs_sequence:
 
         # wait, was the GAMMA library imported ok?
         if(GAMMA_LIB_LOADED):
-            print(" > initializing sequence using pyGAMMA...")
+            log.info("initializing sequence using pyGAMMA...")
             # oh ok, so let's run the simulations and stuff
             self._init_pulses()
             self._compute_metabolite_signals()
             dt = 1 / self.fs
             self._t = np.arange(0, self.npts * dt, dt)
         else:
-            print(" > loading sequence from disk...")
+            log.info("loading sequence from disk...")
             # ops, so let's try to load the simulations from a pkl file
             self._load_from_seqdb_file()
 
@@ -1099,7 +1069,7 @@ class mrs_sequence:
         """
         # ready or not, here I come
         if(not self.ready):
-            raise Exception("> This mrs_sequence object was not initialized!")
+            log.error("this mrs_sequence object was not initialized!")
 
         # time MRS model
         s_MRSData = suspect.MRSData(np.zeros([self.npts, ]), 1 / self.fs, self.f0)
@@ -1125,7 +1095,7 @@ class mrs_sequence:
         """
         # ready or not, here I come
         if(not self.ready):
-            raise Exception("> This mrs_sequence object was not initialized!")
+            log.error("this mrs_sequence object was not initialized!")
 
         # for each metabolite, caculate derivative for each parameter
         j = np.full((len(self._meta_signals), 4, self.npts), 0.0, dtype=np.complex128)
@@ -1144,7 +1114,7 @@ class mrs_sequence:
 
         return(j)
 
-    def simulate_signal(self, p, sigma_noise=0.0):
+    def simulate_signal(self, p, sigma_noise=0.0, lbl="simulated MRS signal"):
         """
         Print out the parameter values and returns the modeled signal using above member function.
 
@@ -1152,36 +1122,36 @@ class mrs_sequence:
         ----------
         p : params object
             Array of simulation parameters
+        sigma_noise : float
+            Noise level
+        lbl : string
+            Label describing simulated data
 
         Returns
         -------
         s : MRSData2 numpy array [timepoints]
             Simulated MRS data signal stored in a MRSData2 object
         """
-        # hello
-        cprint(">> mrs.sim.mrs_sequence.simulate_signal:",
-               'green', attrs=['bold'])
-
         # ready or not, here I come
         if(not self.ready):
-            raise Exception("> This mrs_sequence object was not initialized!")
+            log.error("this mrs_sequence object was not initialized!")
 
         # checking if LL is not broken
         if(not p.check()):
-            raise Exception(" > mrs.sim.mrs_sequence.simulate_signal the link-lock vector of this params object looks broken!")
+            log.error("the link-lock vector of this params object looks broken!")
 
-        print(" > simulating signal")
+        log.info("simulating signal...")
         s = self._model(p)
 
         if(sigma_noise > 0.0):
-            print(" > adding complex gaussian noise, std. deviation = " + str(sigma_noise))
+            log.info("adding complex gaussian noise, std. deviation = " + str(sigma_noise))
             s = s + np.random.normal(0.0, sigma_noise, s.shape[0] * 2).view(np.complex128)
 
         # adding a few attributes
         s._te = self.te
         s._sequence = self
-        _, _, nl = s.analyse_snr(None, None, "", True, False, False)
-        s._noise_level = nl
+        s._noise_level = s.analyze_noise_1d()
+        s.set_display_label(lbl)
         return(s)
 
 
@@ -1246,13 +1216,9 @@ class mrs_seq_press(mrs_sequence):
         s_MRSData2 : MRSData2 object
             Containing the MRS signal simulated for this metabolite
         """
-        # hello
-        # cprint(">>> mrs.sim.mrs_seq_laser._run_sequence:", 'green', attrs=['bold'])
-
+        log.debug("acquiring PRESS sequence: (90)-(180)-(180)...")
         # create spin system
         sys, amp_factor_spins = self._prepare_spin_system(metabolite)
-
-        print("  > acquiring.", end="", flush=True)
 
         # amplitude normalization
         afactor = self.scaling_factor / sys.HS()
@@ -1293,14 +1259,11 @@ class mrs_seq_press(mrs_sequence):
         for d, p in zip(evol_delays_s, flip_angles_deg):
             sigma1 = pg.Iypuls(sys, sigma0, self.nuclei, p)
             te_real += 0.0
-            print("." + str(p) + ".", end="", flush=True)
             # evolution
             sigma0 = pg.evolve(sigma1, pg.prop(H, d))
             te_real += d
-            print(".", end="", flush=True)
 
         data = pg.FID(sigma0, pg.gen_op(D), H, dt, self.npts)  # acquisition
-        print(".", end="", flush=True)
 
         # extract complex time data points
         s = np.full([self.npts, ], np.nan, dtype=np.complex)
@@ -1311,7 +1274,7 @@ class mrs_seq_press(mrs_sequence):
         s_MRSData = suspect.MRSData(s, dt, self.f0)
         s_MRSData2 = s_MRSData.view(reco.MRSData2)
 
-        print("done. (real TE=%.2fms)" % (te_real * 1000.0))
+        log.debug("done. (real TE=%.2fms)" % (te_real * 1000.0))
 
         return(s_MRSData2)
 
@@ -1369,13 +1332,9 @@ class mrs_seq_steam(mrs_sequence):
         s_MRSData2 : MRSData2 object
             Containing the MRS signal simulated for this metabolite
         """
-        # hello
-        # cprint(">>> mrs.sim.mrs_seq_laser._run_sequence:", 'green', attrs=['bold'])
-
+        log.debug("acquiring PRESS sequence: (90)-(90)-(90)...")
         # create spin system
         sys, amp_factor_spins = self._prepare_spin_system(metabolite)
-
-        print("  > acquiring.", end="", flush=True)
 
         # amplitude normalization
         afactor = self.scaling_factor / sys.HS()
@@ -1404,11 +1363,9 @@ class mrs_seq_steam(mrs_sequence):
         # 1st 90 pulse
         sigma1 = pg.Iypuls(sys, sigma0, self.nuclei, 90.0)
         te_real += 0.0
-        print(".90.", end="", flush=True)
         # evolution
         sigma0 = pg.evolve(sigma1, pg.prop(H, evol_delays_s[0]))
         te_real += evol_delays_s[0]
-        print(".", end="", flush=True)
 
         # the following code is from Vespa's pulse_sequences.xml file
         # STEAM Ideal version 2 from Brian Soher
@@ -1447,14 +1404,11 @@ class mrs_seq_steam(mrs_sequence):
             else:
                 sigma_res += sigma_mult[i]
 
-        print(".90...90.", end="", flush=True)
         # last TE/2 nutation
         sigma0 = pg.evolve(sigma_res, pg.prop(H, evol_delays_s[2]))
         te_real += evol_delays_s[2]
-        print(".", end="", flush=True)
 
         data = pg.FID(sigma0, pg.gen_op(D), H, dt, self.npts)  # acquisition
-        print(".", end="", flush=True)
 
         # extract complex time data points
         s = np.full([self.npts, ], np.nan, dtype=np.complex)
@@ -1465,7 +1419,7 @@ class mrs_seq_steam(mrs_sequence):
         s_MRSData = suspect.MRSData(s, dt, self.f0)
         s_MRSData2 = s_MRSData.view(reco.MRSData2)
 
-        print("done. (real TE=%.2fms)" % (te_real * 1000.0))
+        log.debug("done. (real TE=%.2fms)" % (te_real * 1000.0))
 
         return(s_MRSData2)
 
@@ -1633,9 +1587,6 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
 
     def _init_pulses(self):
         """Calculate HSn pulse profiles for later use during simulation. This could look like a detail but the semi-LASER behaves in particular way regarding effective TE and J-coupling BECAUSE of those pulses and their long durations. Depending on TE and pulse properties, MR peak lineshapes can be severly affected."""
-        # hello
-        cprint(">>> mrs.sim.mrs_seq_laser._init_pulses:", 'green', attrs=['bold'])
-
         if(self.pulse_rfc_real_shape_enable):
             # pulse bandwidth
             pulse_bw_hz = self.pulse_rfc_r / (self.pulse_rfc_duration / 1000.0)
@@ -1651,20 +1602,19 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
                 pulse_n = self.pulse_rfc_npts
 
             # call HSn generation
-            print("  > generating a %.1f-ms HS%d pulse: R=%.0f (BW=%.1fkHz) using %d points..." % (self.pulse_rfc_duration, self.pulse_rfc_n, self.pulse_rfc_r, pulse_bw_hz / 1000.0, pulse_n), end="", flush=True)
+            log.debug("generating a %.1f-ms HS%d pulse: R=%.0f (BW=%.1fkHz) using %d points..." % (self.pulse_rfc_duration, self.pulse_rfc_n, self.pulse_rfc_r, pulse_bw_hz / 1000.0, pulse_n))
             pulse_amp, pulse_phi = self._rf_pulse_hsn(pulse_n, self.pulse_rfc_n, self.pulse_rfc_r, self.pulse_rfc_duration)
 
             # store
             self.pulses_rfc_shape_amp_norm = pulse_amp
             self.pulses_rfc_shape_phi_deg = pulse_phi
-            print("done.")
 
             if(self.pulse_rfc_optim_power_enable):
                 self._pulse_rfc_w1max = self._get_rfc_pulse_w1max_by_optim()
             else:
                 self._pulse_rfc_w1max = self._get_rfc_pulse_w1max_using_ref_pulse_voltage()
         else:
-            print("  > not using real shaped pulses so nothing to here!")
+            log.debug("not using real shaped pulses so nothing to do here!")
 
     def _get_rfc_pulse_w1max_using_ref_pulse_voltage(self):
         """
@@ -1675,11 +1625,8 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
         w1_rfc_pulse_hz  : float
             RF power or w1 max for HSn pulse (Hz)
         """
-        # hello
-        cprint(">>> mrs.sim.mrs_seq_laser._get_rfc_pulse_w1max_using_ref_pulse_voltage:", 'green', attrs=['bold'])
-
         # optimize RF power
-        print("  > setting HSn pulse RF power using reference voltage...")
+        log.debug("setting HSn pulse RF power using reference voltage...")
 
         # pulse area
         pulse_t = np.linspace(0.0, 1.0 / 1000.0, len(self.pulses_rfc_shape_amp_norm))
@@ -1690,10 +1637,10 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
         w1_rfc_pulse_degs = self.pulse_rfc_voltage * w1_ref_pulse_degs / self.pulse_ref_voltage  # deg/s
         w1_rfc_pulse_hz = w1_rfc_pulse_degs / (360.0 * pulse_rfc_area)
 
-        print("  > HSn pulse voltage is set to %.2fV" % self.pulse_rfc_voltage)
-        print("  > HSn pulse flip angle is set to %.2fdeg" % self.pulse_rfc_flipangle)
-        print("  > Reference voltage is %.2fV" % self.pulse_ref_voltage)
-        print("  > This means the HSn pulse w1max is %.2fHz" % w1_rfc_pulse_hz)
+        log.debug("HSn pulse voltage is set to %.2fV" % self.pulse_rfc_voltage)
+        log.debug("HSn pulse flip angle is set to %.2fdeg" % self.pulse_rfc_flipangle)
+        log.debug("reference voltage is %.2fV" % self.pulse_ref_voltage)
+        log.debug("this means the HSn pulse w1max is %.2fHz" % w1_rfc_pulse_hz)
 
         return(w1_rfc_pulse_hz)
 
@@ -1706,11 +1653,8 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
         w1_rfc_pulse_hz_optim : float
             RF power or w1 max for HSn pulse (Hz)
         """
-        # hello
-        cprint(">>> mrs.sim.mrs_seq_laser._get_rfc_pulse_w1max_by_optim:", 'green', attrs=['bold'])
-
         # optimize RF power
-        print("  > optimizing RF power...", end="", flush=True)
+        log.debug("optimizing RF power...")
 
         # pulse area
         pulse_t = np.linspace(0.0, 1.0 / 1000.0, len(self.pulses_rfc_shape_amp_norm))
@@ -1747,7 +1691,7 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
                 s = self._run_sequence(meta_dict_entry, True)
                 s = s._correct_apodization(10.0)  # silent apodization
                 acquired_signals.append(s)
-                # analyse
+                # analyze
                 sf = s.spectrum()
                 if(kw == 0):
                     # first power, let's peak pick
@@ -1755,8 +1699,6 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
                 # store peak intensities
                 peak_intensity_abs[km, kw] = np.abs(sf[peak_max_ppm_index[km]])
                 peak_intensity_real[km, kw] = np.real(sf[peak_max_ppm_index[km]])
-
-            print(".", end="", flush=True)
 
         # find optimal power
         # first, find plateau value by taking
@@ -1789,6 +1731,7 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
         fig.clf()
         axs = fig.subplots(1, 2)
         fig.canvas.set_window_title("mrs.sim.mrs_seq_eja_svs_slaser._get_rfc_pulse_w1max_by_optim")
+        fig.suptitle("RF power optimization results for sLASER")
 
         afactor = (w1_range_Hz[2] - w1_range_Hz[1]) / np.max(peak_intensity_abs)
         i = 0
@@ -1832,20 +1775,18 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
         ax2.set_ylabel('Pulse voltage (V)')
         ax2.set_ylim(np.min(w1_range_V), np.max(w1_range_V))
 
-        print("done.")
-
-        print("  > HSn pulse voltage is set to %.2fV" % self.pulse_rfc_voltage)
-        print("  > HSn pulse flip angle is set to %.2fdeg" % self.pulse_rfc_flipangle)
-        print("  > Reference voltage is %.2fV" % self.pulse_ref_voltage)
-        print("  > Which is equivalent to a w1max of %.2fHz" % w1_rfc_pulse_hz)
-        print("  > The optimization process gave however something different...")
-        print("  > The optimal w1max found is %.2fHz" % w1_range_Hz_optim)
-        print("  > Which corresponds to a voltage of %.2fV" % self.pulse_rfc_optim_power_voltage)
-        print("  > Or a flip angle of %.2fdeg" % self.pulse_rfc_optim_power_flipangle)
+        log.debug("HSn pulse voltage is set to %.2fV" % self.pulse_rfc_voltage)
+        log.debug("HSn pulse flip angle is set to %.2fdeg" % self.pulse_rfc_flipangle)
+        log.debug("reference voltage is %.2fV" % self.pulse_ref_voltage)
+        log.debug("which is equivalent to a w1max of %.2fHz" % w1_rfc_pulse_hz)
+        log.debug("the optimization process gave however something different...")
+        log.debug("the optimal w1max found is %.2fHz" % w1_range_Hz_optim)
+        log.debug("which corresponds to a voltage of %.2fV" % self.pulse_rfc_optim_power_voltage)
+        log.debug("or a flip angle of %.2fdeg" % self.pulse_rfc_optim_power_flipangle)
 
         return(w1_range_Hz_optim)
 
-    def _run_sequence(self, metabolite, bSilent=False):
+    def _run_sequence(self, metabolite):
         """
         Simulate the NMR signal acquired using a sLASER sequence using the GAMMA library via the pyGAMMA python wrapper for one metabolite (=one spin system).
 
@@ -1853,23 +1794,16 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
         ----------
         metabolite : dict
             metabolite_basis_set entry for one single metabolite
-        beSilent : boolean
-            No output in console (True)
 
         Returns
         -------
         s_MRSData2 : MRSData2 object
             Containing the MRS signal simulated for this metabolite
         """
-        # hello
-        if(not bSilent):
-            cprint(">>> mrs.sim.mrs_seq_laser._run_sequence:", 'green', attrs=['bold'])
+        log.debug("acquiring sLASER sequence: (90)-(180)-(180)-(180)-(180)...")
 
         # create spin system
-        sys, amp_factor_spins = self._prepare_spin_system(metabolite, bSilent)
-
-        if(not bSilent):
-            print("  > acquiring.", end="", flush=True)
+        sys, amp_factor_spins = self._prepare_spin_system(metabolite)
 
         if(self.pulse_rfc_real_shape_enable):
             # convert pulse amplitude currently normalized (0-1) to Hz (compatible with GAMMA)
@@ -1912,7 +1846,7 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
         te_fill = self.te - te_min
         # check for impossible TE
         if(te_fill < 0.0):
-            raise Exception("  > mrs.sim.mrs_seq_eja_svs_slaser._run_sequence: your echo time is too short!")
+            log.error("your echo time is too short!")
         gh = self.pulse_rfc_duration + 2.0 * self.spoiler_duration + te_fill
         # final SE timing
         g = gh / 2.0
@@ -1959,13 +1893,9 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
         # excitation: hard 90 pulse to simulate asymmetric sinc pulse
         sigma1 = pg.Iypuls(sys, sigma0, self.nuclei, 90.0)
         te_real += 0.0  # fake pulse
-        if(not bSilent):
-            print(".90.", end="", flush=True)
         # evolution
         sigma0 = pg.evolve(sigma1, pg.prop(H, evol_delays_s[0]))
         te_real += evol_delays_s[0]
-        if(not bSilent):
-            print(".", end="", flush=True)
 
         # LASER: 2 x (pair of 180 HSn pulses)
         for d in evol_delays_s[1:]:
@@ -1976,19 +1906,11 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
                 sigma1 = pg.Iypuls(sys, sigma0, self.nuclei, 180.0)
                 te_real += 0.0  # fake pulse
 
-            if(not bSilent):
-                print(".180.", end="", flush=True)
-
             # evolution
             sigma0 = pg.evolve(sigma1, pg.prop(H, d))
             te_real += d
-            if(not bSilent):
-                print(".", end="", flush=True)
 
         data = pg.FID(sigma0, pg.gen_op(D), H, dt, self.npts)  # acquisition
-
-        if(not bSilent):
-            print(".", end="", flush=True)
 
         # extract complex time data points
         s = np.full([self.npts, ], np.nan, dtype=np.complex)
@@ -1999,8 +1921,7 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
         s_MRSData = suspect.MRSData(s, dt, self.f0)
         s_MRSData2 = s_MRSData.view(reco.MRSData2)
 
-        if(not bSilent):
-            print("done. (real TE=%.2fms)" % (te_real * 1000.0))
+        log.debug("done. (real TE=%.2fms)" % (te_real * 1000.0))
 
         return(s_MRSData2)
 
@@ -2177,9 +2098,9 @@ class metabolite_basis_set(dict):
         """Construct a metabolite object."""
         super(metabolite_basis_set, self).__init__()
         # xls file that contains metabolites properties (you should not change that)
-        self._database_xls_file = "./mrs/metabolites_db.xls"
+        self._database_xls_file = default_paths.DEFAULT_META_DB_FILE
         # xls file that contains your metabolite basis set
-        self.basis_set_xls_file = "./metabolite_basis_sets/human_brain_7T.xls"
+        self.basis_set_xls_file = default_paths.DEFAULT_META_BASIS_SET_FILE
         # include peaks only in this range of chemical shifts
         self.ppm_range = [0, 6]
         # include only non-coupled peaks
@@ -2204,20 +2125,16 @@ class metabolite_basis_set(dict):
 
     def _read_xls_file(self):
         """Read the xls file specified by "self.xls_file" and stores all the information (chemical shifts, nuclei, J couplings)."""
-        # hello
         # TODO: need to work with gitable xls format, FODS!
-        cprint(">> mrs.sim.metabolite_basis_set._read_xls_file:", 'green', attrs=['bold'])
-
         # remove annoying warning
         warnings.simplefilter(action='ignore', category=FutureWarning)
 
         # first, read xls metabolite basis set file and parse it
-        print(" > reading metabolite basis set from XLS file...")
+        log.info("reading metabolite basis set from XLS file...")
         book_db = open_workbook(self._database_xls_file)
         book = open_workbook(self.basis_set_xls_file)
 
         # get sheets from database file
-        all_sheets = book.sheet_names()
         sheet_names = book_db.sheet_by_name('Metabolites')
         sheet_ppm = book_db.sheet_by_name('PPM')
         sheet_iso = book_db.sheet_by_name('Nuclei')
@@ -2282,8 +2199,8 @@ class metabolite_basis_set(dict):
 
                     # J couplings
                     # check if there is a sheet for this metabolite
-                    if(this_meta_name in all_sheets):
-                        this_sheet_Jcouplings = book.sheet_by_name(this_meta_name)
+                    if(this_meta_name in book_db.sheet_names()):
+                        this_sheet_Jcouplings = book_db.sheet_by_name(this_meta_name)
                         this_j_list = np.full([len(this_ppm_list), len(this_ppm_list)], np.nan)
                         for irowJ in range(len(this_ppm_list)):
                             # ppm
@@ -2304,35 +2221,39 @@ class metabolite_basis_set(dict):
                         this_ppm_list[this_j_list_summed_mask] = 100.0
 
                     # append metabolite entry for this metabolite group
-                    this_metagroup_entry["metabolites"].update({this_meta_name: {"ppm": this_ppm_list, "iso": this_iso_list, "J": this_j_list}})
+                    this_metagroup_entry["metabolites"][this_meta_name] = {"ppm": this_ppm_list, "iso": this_iso_list, "J": this_j_list}
 
             # add extra infos to metabolite group
             # is it a MM?
             this_MM_bool = (this_metagroup_name in MM_list)
-            this_metagroup_entry.update({"Macromecule": this_MM_bool})
+            this_metagroup_entry["Macromecule"] = this_MM_bool
             # omg, is it the reference MM?
             this_ref_MM_bool = (this_metagroup_name == ref_MM_name)
-            this_metagroup_entry.update({"Reference macromolecule": this_ref_MM_bool})
+            this_metagroup_entry["Reference macromolecule"] = this_ref_MM_bool
             # oh maybe, is it the reference metabolite?
             this_ref_meta_bool = (this_metagroup_name == ref_meta_name)
-            this_metagroup_entry.update({"Reference metabolite": this_ref_meta_bool})
+            this_metagroup_entry["Reference metabolite"] = this_ref_meta_bool
             # min/max concentration
-            this_metagroup_entry.update({"Concentration min": c_min[this_metagroup_ind]})
-            this_metagroup_entry.update({"Concentration max": c_max[this_metagroup_ind]})
+            this_metagroup_entry["Concentration min"] = c_min[this_metagroup_ind]
+            this_metagroup_entry["Concentration max"] = c_max[this_metagroup_ind]
             # T1s/T2s
-            this_metagroup_entry.update({"T1": T1s[this_metagroup_ind]})
-            this_metagroup_entry.update({"T2": T2s[this_metagroup_ind]})
+            this_metagroup_entry["T1"] = T1s[this_metagroup_ind]
+            this_metagroup_entry["T2"] = T2s[this_metagroup_ind]
 
             # and add the group to the dict
-            self.update({this_metagroup_name: this_metagroup_entry})
+            self[this_metagroup_name] = this_metagroup_entry
 
     def _write_header_file(self):
         """Interesting method here... It generates a python .py and writes very usefull aliases to access quickly to a specific metabolite or parameter. Since metabolite indexes depend on the metabolite database, this python header file is regenerated each time the metabolite basis set is initialized."""
-        # hello
-        cprint(">> mrs.sim.metabolite_basis_set._write_header_file:", 'green', attrs=['bold'])
-        print(" > generating metabolite and parameter aliases...")
+        log.debug("generating metabolite and parameter aliases...")
 
-        with open("./mrs/aliases.py", 'w') as f:
+        # find location of package
+        # this file needs to be specifically in the package folder!
+        # because we will later import it
+        # (I know it is a bit ugly but so practical)
+        pkg_folder = pathlib.Path(__file__).parent.absolute()
+
+        with open(pkg_folder + "/aliases.py", 'w') as f:
             f.write("#!/usr/bin/env python3")
             f.write("# -*- coding: utf-8 -*-\n")
             f.write('\n')
@@ -2366,7 +2287,7 @@ class metabolite_basis_set(dict):
 
             # ref metabolite alias
             if(ind_ref_meta is None):
-                raise Exception(" > weird, could not find reference metabolite!?")
+                log.error("weird, could not find reference metabolite!?")
             else:
                 f.write("m_Ref_MB = %d\n" % ind_ref_meta)
             f.write("\n")
@@ -2395,48 +2316,44 @@ class metabolite_basis_set(dict):
             f.write("n_MMs = " + str(n_MM) + "\n")
             f.write("\n")
 
-    def print_out(self):
+    def print(self):
         """Print the metabolite database with all the information (chemical shifts, nuclei, J couplings)."""
-        # hello
-        cprint(">> mrs.sim.metabolite_basis_set.print_out:", 'green', attrs=['bold'])
+        cell_nchar = 8
 
         # and now browse though the database and display everything
         for this_metagroup_key, this_metagroup_entry in self.items():
-            print("")
-
-            print(" > metabolite [", end="", flush=True)
-            cprint(this_metagroup_key, 'green', attrs=['bold'], end="", flush=True)
-            print("/", end="", flush=True)
-
             for this_meta_key, this_meta_entry in self[this_metagroup_key]["metabolites"].items():
-                cprint(this_meta_key, 'green', attrs=['bold'], end="", flush=True)
+                print("")
+
+                print("> metabolite [", end="")
+                cprint(this_metagroup_key, 'green', attrs=['bold'], end="")
+                print("/", end="")
+                cprint(this_meta_key, 'green', attrs=['bold'], end="")
                 print("]")
 
                 # first nuclei line
-                print("nuclei  \t", end="", flush=True)
+                print("nuclei".ljust(cell_nchar) + "".ljust(cell_nchar), end="")
                 for this_iso in this_meta_entry["iso"]:
-                    print("\t(%2d)" % this_iso, end="", flush=True)
+                    print(("(%2d)" % this_iso).ljust(cell_nchar), end="")
                 print()
 
-                print("\t     ppm", end="", flush=True)
+                print("".ljust(cell_nchar) + "ppm".ljust(cell_nchar), end="")
                 for this_ppm in this_meta_entry["ppm"]:
-                    print("\t%4.1f" % this_ppm, end="", flush=True)
+                    print(("%.1f" % this_ppm).ljust(cell_nchar), end="")
                 print()
 
                 for (this_iso, this_ppm, irowJ) in zip(this_meta_entry["iso"], this_meta_entry["ppm"], range(len(this_meta_entry["ppm"]))):
                     # recall nuclei and chemical shift for 1st and 2nd col
-                    print("(%2d)" % this_iso, end="", flush=True)
-                    print("\t%4.1f" % this_ppm, end="", flush=True)
+                    print(("(%2d)" % this_iso).ljust(cell_nchar), end="")
+                    print(("%.1f" % this_ppm).ljust(cell_nchar), end="")
 
                     for icolJ in range(len(this_meta_entry["J"])):
-                        print("\t%4.1f" % this_meta_entry["J"][irowJ][icolJ], end="", flush=True)
-                    print()
+                        print(("%.1f" % this_meta_entry["J"][irowJ][icolJ]).ljust(cell_nchar), end="")
+                    print("", flush=True)
 
     def initialize(self):
         """Initialize metabolite database: run the two previous methods."""
-        # hello
-        cprint(">> mrs.sim.metabolite_basis_set.initialize:", 'green', attrs=['bold'])
-        print(" > initializing metabolite database...")
+        log.info("initializing metabolite database...")
         self.clear()
         self._read_xls_file()
         self._write_header_file()
@@ -2507,7 +2424,7 @@ def disp_bargraph(ax, params_val_list, params_std_list, params_leg_list, colored
 
     # check that we still have something to display
     if(np.all(meta_mask == False)):
-        raise Exception("  > mrs.sim.disp_bargraph: nothing to display! Please check disp_bargraph parameters like pIndex, mIndex_list, bWater and bMM!")
+        log.error("nothing to display! Please check disp_bargraph parameters like pIndex, mIndex_list, bWater and bMM!")
 
     # filter data now
     params_val_list = [p[meta_mask] for p in params_val_list]
@@ -2689,4 +2606,3 @@ def disp_fit(ax, data, params, seq, LL_exluding=True, LL_merging=False, mIndex_l
     ax.set_xlabel('chemical shift (ppm)')
     ax.grid('on')
     ax.legend(loc="upper right")
-    plt.tight_layout()

@@ -9,52 +9,63 @@ A user script used to store calls for the reconstruction of 31P in vitro data.
 from IPython import get_ipython
 import matplotlib.pylab as plt
 import mrs.reco as reco
+import mrs.log as log
 get_ipython().magic("clear")
 plt.close("all")
+log.setLevel(log.DEBUG)
 
 # %% 08/08/2019 - phosphates_mix_001 - levure/lessive/javel/serum
 get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChannels = 1
+p.data_coil_nChanneldata_list =1
 p.ppm0 = 0.0
-p.data_filepaths = """
+p.data_filepathdata_list ="""
 /home/tangir/crmbm/acq/phosphates_mix_001/phosphates-mix/20190808/01_0006_fid/original-primary_e09_0001.dcm
 /home/tangir/crmbm/acq/phosphates_mix_001/phosphates-mix/20190808/01_0007_fid/original-primary_e09_0001.dcm
 /home/tangir/crmbm/acq/phosphates_mix_001/phosphates-mix/20190808/01_0008_fid/original-primary_e09_0001.dcm
 """
 
-p.display_legends = """
+p.display_legenddata_list ="""
 un peu de lessive
 beaucoup
 beaucoup beaucoup
 """
 
-p.phase_enable = True
-p.phase_POI_range_ppm = [-5, 5]
+p.job_list = [  p.jobs["phasing"],
+                # p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.zerofill_enable = False
-p.calibrate_enable = False
-p.analyse_snr_enable = False
-p.analyse_linewidth_enable = False
-p.remove_water_enable = False
+p.jobs["phasing"]["POI_range_ppm"] = [-5, 5]
+p.jobs["apodizing"]["damping_hz"] = 60.0
+p.jobs["displaying"]["magnitude_mode"] = True
+p.jobs["displaying"]["range_ppm"] = [-25, 25]
 
-p.apodize_enable = True
-p.apodize_damping_hz = 60
-
-p.display_magnitude_mode = True
-p.display_range_ppm = [-25, 25]
-s = p.run_pipeline_std()
+p.analyze_enable = False
+data_list =p.run()
 
 # %% 08/08/2019 - phosphates_mix_002 - levure/lessive/javel/serum
 get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChannels = 1
+p.data_coil_nChanneldata_list =1
 p.ppm0 = 0.0
-p.data_filepaths = """
+p.data_filepathdata_list ="""
 /home/tangir/crmbm/acq/phosphates_mix_002/phosphates-mix/20190809/01_0004_fid/original-primary_e09_0001.dcm
 /home/tangir/crmbm/acq/phosphates_mix_002/phosphates-mix/20190809/01_0006_svs-st-vapor-643-optim/original-primary_e09_0001.dcm
 /home/tangir/crmbm/acq/phosphates_mix_002/phosphates-mix/20190809/01_0006_svs-st-vapor-643-optim/original-primary_e09_0002.dcm
@@ -68,7 +79,7 @@ p.data_filepaths = """
 /home/tangir/crmbm/acq/phosphates_mix_002/phosphates-mix/20190809/01_0006_svs-st-vapor-643-optim/original-primary_e09_0010.dcm
 """
 
-p.display_legends = """
+p.display_legenddata_list ="""
 non-localized
 FA test
 FA test
@@ -82,117 +93,143 @@ FA test
 FA test
 """
 
-p.phase_enable = True
-p.phase_POI_range_ppm = [-5, 5]
+p.job_list = [  p.jobs["phasing"],
+                # p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.zerofill_enable = False
-p.calibrate_enable = False
-p.analyse_snr_enable = False
-p.analyse_linewidth_enable = False
-p.remove_water_enable = False
+p.jobs["phasing"]["POI_range_ppm"] = [-5, 5]
+p.jobs["apodizing"]["damping_hz"] = 60
+p.jobs["displaying"]["magnitude_mode"] = True
+p.jobs["displaying"]["range_ppm"] = [-25, 25]
 
-p.apodize_enable = True
-p.apodize_damping_hz = 60
-
-p.display_magnitude_mode = True
-p.display_range_ppm = [-25, 25]
-s = p.run_pipeline_std()
+p.analyze_enable = False
+data_list =p.run()
 
 # %% 08/08/2019 - phosphates_mix_002 - levure/lessive/javel/serum, tests STEAM, sLASER, ISIS
 get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChannels = 1
+p.data_coil_nChanneldata_list =1
 p.ppm0 = 0.0
-p.data_filepaths = """
+p.data_filepathdata_list ="""
 /home/tangir/crmbm/acq/phosphates_mix_002/phosphates-mix/20190809/01_0010_slaser-r-n/original-primary_e09_0001.dcm
 /home/tangir/crmbm/acq/phosphates_mix_002/phosphates-mix/20190809/01_0012_bow-isis-15/original-primary_e09_0001.dcm
 """
 
-p.display_legends = """
+p.display_legenddata_list ="""
 sLASER
 ISIS
 """
 
-p.phase_enable = True
-p.phase_POI_range_ppm = [-5, 5]
+p.job_list = [  p.jobs["phasing"],
+                # p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.zerofill_enable = False
-p.calibrate_enable = False
-p.analyse_snr_enable = False
-p.analyse_linewidth_enable = False
-p.remove_water_enable = False
+p.jobs["phasing"]["POI_range_ppm"] = [-5, 5]
+p.jobs["apodizing"]["damping_hz"] = 110
+p.jobs["displaying"]["magnitude_mode"] = True
+p.jobs["displaying"]["range_ppm"] = [-25, 25]
 
-p.apodize_enable = True
-p.apodize_damping_hz = 110
-
-p.display_magnitude_mode = True
-p.display_range_ppm = [-25, 25]
-s = p.run_pipeline_std()
+p.analyze_enable = False
+data_list =p.run()
 
 # %% 08/08/2019 - phosphates_mix_002 - test raw data ISIS
 get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChannels = 1
+p.data_coil_nChanneldata_list =1
 p.ppm0 = 0.0
-p.data_filepaths = """
+p.data_filepathdata_list ="""
 /home/tangir/crmbm/acq/phosphates_mix_002/phosphates-mix/20190809/01_0012_bow-isis-15/original-primary_e09_0001.dcm
 /home/tangir/crmbm/acq_twix/phosphates_mix_002/meas_MID110_bow_isis_15_FID37704.dat
 """
 
-p.data_ref_filepaths = """
-"""
-
-p.display_legends = """
+p.display_legenddata_list ="""
 dcm ISIS
 raw ISIS
 """
 
-p.display_amp_factor_list = [3, 1e8]
+p.job_list = [  p.jobs["phasing"],
+                # p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.phase_enable = False
-p.phase_display = False
-p.phase_POI_range_ppm = [-5, 5]
-p.phase_POI_range_ppm = [-2, +2]
+p.analyze_job_list = [  p.jobs["channel-combining"],
+                        # p.jobs["zero-filling"],
+                        # p.jobs["realigning"],
+                        p.jobs["averaging"],
+                        # p.jobs["calibrating"]
+                        ]
+
+p.jobs["phasing"]["POI_range_ppm"] = [-5, 5]
+p.jobs["phasing"]["POI_range_ppm"] = [-2, +2]
 
 # remove 1h channel from data
-p.recombine_phasing = False
-p.recombine_weights = [False, True]
+p.jobs["channel-combining"]["phasing"] = False
+p.jobs["channel-combining"]["weights"] = [False, True]
 
-p.realign_enable = False
-p.zerofill_enable = False
-p.calibrate_enable = False
-p.remove_water_enable = False
+p.analyze_enable = True
+p.jobs["analyzing-snr"]["s_range_ppm"] = [-1, +1]
+p.jobs["analyzing-snr"]["n_range_ppm"] = [-20, -10]
+p.jobs["analyzing-snr"]["magnitude_mode"] = True
+p.jobs["analyzing-lw"]["range_ppm"] = [-1, 1]
+p.jobs["analyzing-lw"]["magnitude_mode"] = True
 
-p.analyse_snr_enable = True
-p.analyse_snr_s_range_ppm = [-1, +1]
-p.analyse_snr_n_range_ppm = [-20, -10]
-p.analyse_snr_area_integrate = False
-p.analyse_snr_magnitude_mode = True
+p.jobs["apodizing"]["damping_hz"] = 110
 
-p.analyse_linewidth_enable = True
-p.analyse_linewidth_range_ppm = [-1, +1]
-p.analyse_linewidth_magnitude_mode = True
-p.analyse_linewidth_display = True
+p.jobs["displaying"]["magnitude_mode"] = False
+p.jobs["displaying"]["range_ppm"] = [-25, 25]
 
-p.apodize_enable = True
-p.apodize_damping_hz = 110
-
-p.display_magnitude_mode = False
-p.display_range_ppm = [-25, 25]
-s = p.run_pipeline_std()
+data_list =p.run()
 
 # %% 13/08/2019 - phosphates_mix_003, optim exc pulse BW
 get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChannels = 1
+p.data_coil_nChanneldata_list =1
 p.ppm0 = 0.0
-p.data_filepaths = """
+p.data_filepathdata_list ="""
 /home/tangir/crmbm/acq/phosphates_mix_003/phosphates-mix/20190813/01_0016_bow-isis-15/original-primary_e09_0001.dcm
 /home/tangir/crmbm/acq/phosphates_mix_003/phosphates-mix/20190813/01_0017_bow-isis-15/original-primary_e09_0001.dcm
 /home/tangir/crmbm/acq/phosphates_mix_003/phosphates-mix/20190813/01_0018_bow-isis-15/original-primary_e09_0001.dcm
@@ -205,10 +242,7 @@ p.data_filepaths = """
 /home/tangir/crmbm/acq/phosphates_mix_003/phosphates-mix/20190813/01_0025_bow-isis-15/original-primary_e09_0001.dcm
 """
 
-p.data_ref_filepaths = """
-"""
-
-p.display_legends = """
+p.display_legenddata_list ="""
 1 kHz
 2 kHz
 3 kHz
@@ -221,46 +255,58 @@ p.display_legends = """
 10 kHz
 """
 
-p.display_amp_factor_list = []
+p.job_list = [  p.jobs["phasing"],
+                # p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.phase_enable = False
-p.phase_display = False
-p.phase_POI_range_ppm = [-5, 5]
-p.phase_POI_range_ppm = [-2, +2]
+p.analyze_job_list = [  p.jobs["channel-combining"],
+                        # p.jobs["zero-filling"],
+                        # p.jobs["realigning"],
+                        p.jobs["averaging"],
+                        # p.jobs["calibrating"]
+                        ]
+
+p.jobs["phasing"]["POI_range_ppm"] = [-5, 5]
+p.jobs["phasing"]["POI_range_ppm"] = [-2, +2]
 
 # remove 1h channel from data
-p.recombine_enable = True
-p.recombine_phasing = False
-p.recombine_weights = [False, True]
+p.jobs["channel-combining"]["phasing"] = False
+p.jobs["channel-combining"]["weights"] = [False, True]
 
-p.realign_enable = False
-p.zerofill_enable = False
-p.calibrate_enable = False
-p.remove_water_enable = False
+p.analyze_enable = True
+p.jobs["analyzing-snr"]["s_range_ppm"] = [13, 15]
+p.jobs["analyzing-snr"]["n_range_ppm"] = [-20, -10]
+p.jobs["analyzing-snr"]["magnitude_mode"] = True
+p.jobs["analyzing-lw"]["range_ppm"] = [-1, 1]
+p.jobs["analyzing-lw"]["magnitude_mode"] = True
 
-p.analyse_snr_enable = True
-p.analyse_snr_s_range_ppm = [13, 15]
-p.analyse_snr_n_range_ppm = [-20, -10]
-p.analyse_snr_area_integrate = False
-p.analyse_snr_magnitude_mode = True
+p.jobs["apodizing"]["damping_hz"] = 110
 
-p.analyse_linewidth_enable = False
-
-p.apodize_enable = True
-p.apodize_damping_hz = 110
-
-p.display_magnitude_mode = True
-p.display_range_ppm = [-25, 25]
-s = p.run_pipeline_std()
+p.jobs["displaying"]["magnitude_mode"] = True
+p.jobs["displaying"]["range_ppm"] = [-25, 25]
+data_list =p.run()
 
 # %% 13/08/2019 - phosphates_mix_003, optim exc pulse B1
 get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChannels = 1
+p.data_coil_nChanneldata_list =1
 p.ppm0 = 0.0
-p.data_filepaths = """
+p.data_filepathdata_list ="""
 /home/tangir/crmbm/acq/phosphates_mix_003/phosphates-mix/20190813/01_0026_bow-isis-15/original-primary_e09_0001.dcm
 /home/tangir/crmbm/acq/phosphates_mix_003/phosphates-mix/20190813/01_0027_bow-isis-15/original-primary_e09_0001.dcm
 /home/tangir/crmbm/acq/phosphates_mix_003/phosphates-mix/20190813/01_0028_bow-isis-15/original-primary_e09_0001.dcm
@@ -270,7 +316,7 @@ p.data_filepaths = """
 /home/tangir/crmbm/acq/phosphates_mix_003/phosphates-mix/20190813/01_0032_bow-isis-15/original-primary_e09_0001.dcm
 """
 
-p.display_legends = """
+p.display_legenddata_list ="""
 50V
 100V
 150V
@@ -280,46 +326,58 @@ p.display_legends = """
 320V
 """
 
-p.display_amp_factor_list = []
+p.job_list = [  p.jobs["phasing"],
+                # p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.phase_enable = False
-p.phase_display = False
-p.phase_POI_range_ppm = [-5, 5]
-p.phase_POI_range_ppm = [-2, +2]
+p.analyze_job_list = [  p.jobs["channel-combining"],
+                        # p.jobs["zero-filling"],
+                        # p.jobs["realigning"],
+                        p.jobs["averaging"],
+                        # p.jobs["calibrating"]
+                        ]
+
+p.jobs["phasing"]["POI_range_ppm"] = [-5, 5]
+p.jobs["phasing"]["POI_range_ppm"] = [-2, +2]
 
 # remove 1h channel from data
-p.recombine_enable = True
-p.recombine_phasing = False
-p.recombine_weights = [False, True]
+p.jobs["channel-combining"]["phasing"] = False
+p.jobs["channel-combining"]["weights"] = [False, True]
 
-p.realign_enable = False
-p.zerofill_enable = False
-p.calibrate_enable = False
-p.remove_water_enable = False
+p.analyze_enable = True
+p.jobs["analyzing-snr"]["s_range_ppm"] = [13, 15]
+p.jobs["analyzing-snr"]["n_range_ppm"] = [-20, -10]
+p.jobs["analyzing-snr"]["magnitude_mode"] = True
+p.jobs["analyzing-lw"]["range_ppm"] = [-1, 1]
+p.jobs["analyzing-lw"]["magnitude_mode"] = True
 
-p.analyse_snr_enable = True
-p.analyse_snr_s_range_ppm = [13, 15]
-p.analyse_snr_n_range_ppm = [-20, -10]
-p.analyse_snr_area_integrate = False
-p.analyse_snr_magnitude_mode = True
+p.jobs["apodizing"]["damping_hz"] = 110
 
-p.analyse_linewidth_enable = False
-
-p.apodize_enable = True
-p.apodize_damping_hz = 110
-
-p.display_magnitude_mode = True
-p.display_range_ppm = [-25, 25]
-s = p.run_pipeline_std()
+p.jobs["displaying"]["magnitude_mode"] = True
+p.jobs["displaying"]["range_ppm"] = [-25, 25]
+data_list =p.run()
 
 # %% 21/01/2020 - phantom_31p, optim B1 on levure tube
 get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChannels = 1
+p.data_coil_nChanneldata_list =1
 p.ppm0 = 0.0
-p.data_filepaths = """
+p.data_filepathdata_list ="""
 /home/tangir/crmbm/acq_twix/phantom_31p/meas_MID179_svs_st_vapor_643_optim_FID50085.dat
 /home/tangir/crmbm/acq_twix/phantom_31p/meas_MID180_svs_st_vapor_643_optim_FID50086.dat
 /home/tangir/crmbm/acq_twix/phantom_31p/meas_MID181_svs_st_vapor_643_optim_FID50087.dat
@@ -334,7 +392,7 @@ p.data_filepaths = """
 /home/tangir/crmbm/acq_twix/phantom_31p/meas_MID191_svs_st_vapor_643_optim_FID50097.dat
 """
 
-p.display_legends = """
+p.display_legenddata_list ="""
 300
 275
 250
@@ -349,47 +407,57 @@ p.display_legends = """
 25
 """
 
-p.data_process_only_this_data_index = [2, 12]
+p.job_list = [  p.jobs["phasing"],
+                # p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.display_amp_factor_list = []
+p.analyze_job_list = [  p.jobs["channel-combining"],
+                        # p.jobs["zero-filling"],
+                        # p.jobs["realigning"],
+                        p.jobs["averaging"],
+                        # p.jobs["calibrating"]
+                        ]
 
-p.phase_enable = True
-p.phase_display = False
-p.phase_POI_range_ppm = [-1, 1]
+p.jobs["phasing"]["POI_range_ppm"] = [-1, 1]
 
 # remove 1h channel from data
-p.recombine_enable = True
-p.recombine_phasing = False
-p.recombine_weights = [False, True]
+p.jobs["channel-combining"]["phasing"] = False
+p.jobs["channel-combining"]["weights"] = [False, True]
 
-p.realign_enable = False
-p.zerofill_enable = False
-p.calibrate_enable = False
-p.remove_water_enable = False
+p.analyze_enable = True
+p.jobs["analyzing-snr"]["s_range_ppm"] = [-1, 1]
+p.jobs["analyzing-snr"]["n_range_ppm"] = [-20, -10]
+p.jobs["analyzing-snr"]["magnitude_mode"] = False
+p.jobs["analyzing-lw"]["range_ppm"] = [-1, 1]
+p.jobs["analyzing-lw"]["magnitude_mode"] = True
 
-p.analyse_snr_enable = True
-p.analyse_snr_s_range_ppm = [-1, 1]
-p.analyse_snr_n_range_ppm = [-20, -10]
-p.analyse_snr_area_integrate = True
-p.analyse_snr_magnitude_mode = False
+p.jobs["apodizing"]["damping_hz"] = 500
 
-p.analyse_linewidth_enable = False
-
-p.apodize_enable = True
-p.apodize_damping_hz = 500
-
-p.display_magnitude_mode = True
-p.display_range_ppm = [-25, 25]
-s = p.run_pipeline_std()
+p.jobs["displaying"]["magnitude_mode"] = True
+p.jobs["displaying"]["range_ppm"] = [-25, 25]
+data_list =p.run()
 
 # %% 21/01/2020 - phantom_31p, optim B1 on lessive
 get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChannels = 1
+p.data_coil_nChanneldata_list =1
 p.ppm0 = 0.0
-p.data_filepaths = """
+p.data_filepathdata_list ="""
 /home/tangir/crmbm/acq_twix/phantom_31p/meas_MID209_svs_st_vapor_643_optim_FID50115.dat
 /home/tangir/crmbm/acq_twix/phantom_31p/meas_MID210_svs_st_vapor_643_optim_FID50116.dat
 /home/tangir/crmbm/acq_twix/phantom_31p/meas_MID211_svs_st_vapor_643_optim_FID50117.dat
@@ -397,7 +465,7 @@ p.data_filepaths = """
 /home/tangir/crmbm/acq_twix/phantom_31p/meas_MID213_svs_st_vapor_643_optim_FID50119.dat
 """
 
-p.display_legends = """
+p.display_legenddata_list ="""
 250
 200
 150
@@ -405,35 +473,45 @@ p.display_legends = """
 50
 """
 
-p.data_process_only_this_data_index = []
+p.job_list = [  p.jobs["phasing"],
+                # p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.display_amp_factor_list = []
+p.analyze_job_list = [  p.jobs["channel-combining"],
+                        # p.jobs["zero-filling"],
+                        # p.jobs["realigning"],
+                        p.jobs["averaging"],
+                        # p.jobs["calibrating"]
+                        ]
 
-p.phase_enable = True
-p.phase_display = False
-p.phase_POI_range_ppm = [-1, 1]
+p.jobs["phasing"]["POI_range_ppm"] = [-1, 1]
 
 # remove 1h channel from data
-p.recombine_enable = True
-p.recombine_phasing = False
-p.recombine_weights = [False, True]
+p.jobs["channel-combining"]["phasing"] = False
+p.jobs["channel-combining"]["weights"] = [False, True]
 
-p.realign_enable = False
-p.zerofill_enable = False
-p.calibrate_enable = False
-p.remove_water_enable = False
+p.analyze_enable = True
+p.jobs["analyzing-snr"]["s_range_ppm"] = [-1, 1]
+p.jobs["analyzing-snr"]["n_range_ppm"] = [-20, -10]
+p.jobs["analyzing-snr"]["magnitude_mode"] = False
+p.jobs["analyzing-lw"]["range_ppm"] = [-1, 1]
+p.jobs["analyzing-lw"]["magnitude_mode"] = True
 
-p.analyse_snr_enable = True
-p.analyse_snr_s_range_ppm = [-1, 1]
-p.analyse_snr_n_range_ppm = [-20, -10]
-p.analyse_snr_area_integrate = True
-p.analyse_snr_magnitude_mode = False
+p.jobs["apodizing"]["damping_hz"] = 100
 
-p.analyse_linewidth_enable = False
-
-p.apodize_enable = True
-p.apodize_damping_hz = 100
-
-p.display_magnitude_mode = True
-p.display_range_ppm = [-25, 25]
-s = p.run_pipeline_std()
+p.jobs["displaying"]["magnitude_mode"] = True
+p.jobs["displaying"]["range_ppm"] = [-25, 25]
+data_list =p.run()

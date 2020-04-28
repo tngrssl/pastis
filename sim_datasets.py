@@ -10,7 +10,9 @@ A user script related to simulation.
 from IPython import get_ipython
 import matplotlib.pylab as plt
 import mrs.aliases as xxx
+import mrs.reco as reco
 import mrs.sim as sim
+import mrs.log as log
 import numpy as np
 from datetime import datetime
 import time
@@ -18,6 +20,7 @@ import os
 import pickle
 get_ipython().magic("clear")
 plt.close("all")
+log.setLevel(log.DEBUG)
 
 # %% generate sequence database
 
@@ -111,6 +114,6 @@ ax = fig.subplots()
 fig.canvas.set_window_title("sim_datasets")
 ax.set_title("GAMMA simulation of average normal brain MR spectrum (Cf. de Graaf's book) | " + seq.name + " | TE=" + str(seq.te) + "ms")
 sim.disp_fit(ax, ss_mod, p_human, seq, True, True)
-plt.tight_layout()
+fig.subplots_adjust()
 
-ss_mod.display_spectrum(200, seq.name, [1, 5], 1.0, 0.0, False)
+ss_mod.display_spectrum_1d(200, [1, 5])
