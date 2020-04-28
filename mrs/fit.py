@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-A fit_pipeline class that deals with the quantification of MRS data based on the scipy's least_squares optimisation function.
+A fit_tool class that deals with the quantification of MRS data based on the scipy's least_squares optimisation function.
 
 @author: Tangi Roussel
 """
 
 import numpy as np
 import mrs.sim as sim
+import mrs.log as log
 import mrs.aliases as xxx
 import matplotlib.pylab as plt
 import scipy.optimize as optimize
-from termcolor import cprint
 from enum import Enum
 import time
 
@@ -30,8 +30,8 @@ class fit_plot_type(Enum):
     TIME_DOMAIN = 7
 
 
-class prefit_pipeline:
-    """The prefit_pipeline class is used to perfom area integration of peaks in the spectrum."""
+class prefit_tool:
+    """The prefit_tool class is used to perfom area integration of peaks in the spectrum."""
 
     # frozen stuff: a technique to prevent creating new attributes
     # (https://stackoverflow.com/questions/3603502/prevent-creating-new-attributes-outside-init)
@@ -45,7 +45,7 @@ class prefit_pipeline:
 
     def __init__(self, data, seq=None):
         """
-        Construct a prefit_pipeline object.
+        Construct a prefit_tool object.
 
         Parameters
         ----------
@@ -74,12 +74,11 @@ class prefit_pipeline:
         self.area_integration_peaks = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
         # ppm range to look for peak maximum
         self.area_integration_peak_search_range = 0.4  # ppm
-        # hz peak widewidth
-        self.area_integration_peakwidth = 50.0  # Hz
         # internal parameters
         self._peak_names = []
         self._peak_ppms = []
         self._peak_nprots = []
+        self._peak_base_width = []
         self._peak_areas = []
         self._peak_areas_norm = []
 
@@ -88,8 +87,23 @@ class prefit_pipeline:
         self.display_fig_index = 1000
         self.display_range_ppm = [1, 6]  # ppm
 
+        # to know if the object is initialized
+        self._ready = False
+
         # freeze
         self.__isfrozen = True
+
+    @property
+    def ready(self):
+        """
+        Property get function for _ready.
+
+        Returns
+        -------
+        self._ready : bool
+            to tell if the object if initialized or not
+        """
+        return(self._ready)
 
     @property
     def seq(self):
@@ -115,35 +129,58 @@ class prefit_pipeline:
         """
         return(self._meta_bs)
 
-    def run(self):
-        """Run the area integration pipeline."""
-        # hello
-        print("")
-        print("------------------------------------------------------------------")
-        print("mrs.prefit_pipeline.run:")
-        print("------------------------------------------------------------------")
+    def initialize(self):
+        """Initialize the prefit procedure."""
+        log.info("initializing...")
 
-        # first find chemical shifts for those peaks
+        # clear all
         self._peak_names = []
         self._peak_ppms = []
+        self._peak_nprots = []
+        self._peak_base_width = []
+
+        # first find chemical shifts for those peaks
         meta_keys = list(self.meta_bs.keys())
         integration_metagroup_keys = [meta_keys[ind] for ind in self.area_integration_peaks]
         for this_metagroup_key in integration_metagroup_keys:
             meta_found_singulet = None
             for this_meta in list(self.meta_bs[this_metagroup_key]["metabolites"].items()):
                 # find first meta in this metagroup
-                this_meta_properties = this_meta[1]
+                this_meta_name = this_meta[0]
+                this_meta_ppm = this_meta[1]["ppm"][0]
+                this_meta_nprots = float(len(this_meta[1]["ppm"]))
+                this_meta_j = this_meta[1]["J"]
+
                 # check that it is a singlet: only one meta, all Js are zeroes and only one unique ppm
-                if(np.all(this_meta_properties["J"] == 0.0) and len(set(this_meta_properties["ppm"])) == 1):
+                if(np.all(this_meta_j == 0.0) and len(set(this_meta[1]["ppm"])) == 1):
                     meta_found_singulet = this_meta
 
             if(meta_found_singulet is None):
                 raise Exception("> one of the metabolites you chose for peak integration does not have a singlet, aborting area integration...")
             else:
+                # measure linewidth of the peak
+                aipsr = self.area_integration_peak_search_range / 2.0
+                this_lw = self.data.analyze_linewidth([this_meta_ppm - aipsr / 2.0, this_meta_ppm + aipsr / 2.0], this_meta_name, False, True)
                 # store
-                self._peak_names.append(this_meta[0])
-                self._peak_ppms.append(this_meta[1]["ppm"][0])
-                self._peak_nprots.append(float(len(this_meta[1]["ppm"])))
+                self._peak_names.append(this_meta_name)
+                self._peak_ppms.append(this_meta_ppm)
+                self._peak_nprots.append(this_meta_nprots)
+                # according to https://doi.org/10.1002/nbm.4257
+                # peak integration area should be 2 * peak linewidth
+                self._peak_base_width.append(this_lw * 2.0)
+
+        # I am ready now
+        self._ready = True
+
+    def run(self):
+        """Run the area integration pipeline."""
+        log.info_line________________________()
+        log.info("running peak integration...")
+        log.info_line________________________()
+
+        # ready or not, here I come
+        if(not self.ready):
+            log.error("this prefit_tool object was not initialized!")
 
         # init
         s = self.data.copy()
@@ -158,7 +195,7 @@ class prefit_pipeline:
             fig = plt.figure(self.display_fig_index)
             fig.clf()
             axs = fig.subplots()
-            fig.canvas.set_window_title("mrs.fit.prefit_pipeline.run")
+            fig.canvas.set_window_title("mrs.fit.prefit_tool.run")
             axs.plot(self.data.frequency_axis_ppm(), self.data.spectrum().real, "k-", label="data")
 
         # now for each peak, integrate the area
@@ -167,18 +204,19 @@ class prefit_pipeline:
         p = sim.params(self.meta_bs)
         p[:] = 0.0
 
-        print("> Integrate peak for...")
-        for (this_peak_index, this_peak_name, this_peak_ppm, this_peak_np) in zip(self.area_integration_peaks, self._peak_names, self._peak_ppms, self._peak_nprots):
-            print("> [" + this_peak_name + "] theoretically at %.2fppm in theory" % this_peak_ppm)
+        log.info("integrating peak for...")
+        log.info_line________________________()
+        for (this_peak_index, this_peak_name, this_peak_ppm, this_peak_np, this_peak_basewidth) in zip(self.area_integration_peaks, self._peak_names, self._peak_ppms, self._peak_nprots, self._peak_base_width):
+            log.info("[%s] theoretically at %.2fppm in theory" % (this_peak_name, this_peak_ppm))
             # first find closest peak in range
-            peakwidth_ppm = self.area_integration_peakwidth / self.data.f0
+            peakwidth_ppm = this_peak_basewidth / self.data.f0
             ippm_peak_range = ((this_peak_ppm - self.area_integration_peak_search_range) > ppm) | (ppm > (this_peak_ppm + self.area_integration_peak_search_range))
             sf_masked = sf_abs.copy()
             sf_masked[ippm_peak_range] = 0
             ippm_peak = np.argmax(sf_masked)
             if(ippm_peak == 0):
-                raise Exception(" > no peak found in specified ppm range or badly phased data!")
-            print("  found it in the spectrum at %.2fppm" % ppm[ippm_peak])
+                log.error("no peak found in specified ppm range or badly phased data!")
+            log.debug("found it in the spectrum at %.2fppm" % ppm[ippm_peak])
 
             # integrate area
             ippm_peak_range = (ppm > (ppm[ippm_peak] - peakwidth_ppm / 2)) & (ppm < (ppm[ippm_peak] + peakwidth_ppm / 2))
@@ -187,8 +225,9 @@ class prefit_pipeline:
             sf_to_integrate = sf_to_integrate[::-1]
             ppm_to_integrate = ppm_to_integrate[::-1]
             this_peak_area = np.trapz(sf_to_integrate, ppm_to_integrate)
-            print("  and got a peak area of %f" % this_peak_area)
-            print("  and that is %f when normalized to number of 1H (%.0f)" % (this_peak_area / this_peak_np, this_peak_np))
+            log.info("got a peak area of %f" % this_peak_area)
+            log.info("and that is %f when normalized to number of 1H (%.0f)" % (this_peak_area / this_peak_np, this_peak_np))
+            log.info_line________________________()
 
             # store
             self._peak_areas.append(this_peak_area)
@@ -212,8 +251,8 @@ class prefit_pipeline:
         return(p)
 
 
-class fit_pipeline:
-    """The fit_pipeline class is used to adjust the MRS model implemented in the mrs.sim.metabolite_database class on some experimentally acquired data."""
+class fit_tool:
+    """The fit_tool class is used to adjust the MRS model implemented in the mrs.sim.metabolite_database class on some experimentally acquired data."""
 
     # frozen stuff: a technique to prevent creating new attributes
     # (https://stackoverflow.com/questions/3603502/prevent-creating-new-attributes-outside-init)
@@ -227,7 +266,7 @@ class fit_pipeline:
 
     def __init__(self, data, seq=None):
         """
-        Construct a prefit_pipeline object.
+        Construct a prefit_tool object.
 
         Parameters
         ----------
@@ -490,13 +529,12 @@ class fit_pipeline:
                 ax.set_title("Fit terminated! %ds elapsed | iteration #%d | residue = %.2E" % (current_fit_time, self._model_call_count, current_err))
             else:
                 ax.set_title("Running fit... %ds elapsed | iteration #%d | residue = %.2E" % (current_fit_time, self._model_call_count, current_err))
-            fig.tight_layout()
-            plt.pause(0.5)
+            fig.subplots_adjust()
 
             # save PNG
             # plt.savefig("%0.4d.png" % self._model_call_count)
 
-            print("> mrs.fit.lsqfit._minimizeThis: " + str(self._model_call_count) + "th model call!")
+            log.debug(str(self._model_call_count) + "th model call!")
             params.print(True, True)
 
         # fix for complex numbers
@@ -508,9 +546,7 @@ class fit_pipeline:
 
     def initialize(self):
         """Initialize the fit procedure."""
-        # hello
-        cprint(">> mrs.fit.fit_pipeline.initialize:", 'green', attrs=['bold'])
-        print("> Initialization...")
+        log.info("initializing...")
 
         # do we need to adapt our ppm range?
         if(self.optim_ppm_range != self.seq.meta_bs.ppm_range):
@@ -521,7 +557,7 @@ class fit_pipeline:
             self.seq.initialize()
 
         # ckeck consistency lower<>init<>upper bounds
-        print("> Checking consistency with parameter bounds...")
+        log.info("checking consistency with parameter bounds...")
         for l in range(self.params_init.shape[0]):
             for c in range(self.params_init.shape[1]):
                 # min vs max
@@ -530,11 +566,11 @@ class fit_pipeline:
                         self.params_min[l, c], self.params_max[l, c], self.params_init.get_meta_names()[l], l, c))
                 # min vs init
                 if(self.params_min[l, c] >= self.params_init[l, c] and self.params_init.linklock[l, c] != 1):
-                    raise Exception(" One initial value (%f) is equal/lower than the the lower bound value (%f) for [%s] at index (%d,%d)!" % (
+                    raise Exception(" One initial value (%f) is equal/lower than the lower bound value (%f) for [%s] at index (%d,%d)!" % (
                         self.params_init[l, c], self.params_min[l, c], self.params_init.get_meta_names()[l], l, c))
                 # max vs init
                 if(self.params_max[l, c] <= self.params_init[l, c] and self.params_init.linklock[l, c] != 1):
-                    raise Exception(" One initial value (%f) is equal/greater than the the upper bound value (%f) for [%s] at index (%d,%d)!" % (
+                    raise Exception(" One initial value (%f) is equal/greater than the upper bound value (%f) for [%s] at index (%d,%d)!" % (
                         self.params_init[l, c], self.params_max[l, c], self.params_init.get_meta_names()[l], l, c))
 
         # checking if LL is not broken
@@ -545,7 +581,7 @@ class fit_pipeline:
         where_LL = np.where(self.params_init.linklock[:, 0] == 0)
         self._water_only = (len(where_LL[0]) == 1 and where_LL[0][0] == xxx.m_Water)
         if(self._water_only):
-            print("> Mmmmh, looks like you are fitting a water reference scan!")
+            log.info("mmmh, looks like you are fitting a water reference scan!")
 
         # I am ready now
         self._ready = True
@@ -565,15 +601,13 @@ class fit_pipeline:
         optim_result : 'OptimizeResult' object returned by scipy.optimize.least_squares
             Numerical optimization parameters
         """
-        # hello
-        print("")
-        print("------------------------------------------------------------------")
-        print("mrs.fit_pipeline.run:")
-        print("------------------------------------------------------------------")
+        log.info_line________________________()
+        log.info("running fit...")
+        log.info_line________________________()
 
         # ready or not, here I come
         if(not self.ready):
-            raise Exception("> This fit_pipeline object was not initialized!")
+            raise Exception("> This fit_tool object was not initialized!")
 
         # dummy full>free>full>free conversion to apply master/slave rules
         params_free = self.params_init.toFreeParams()
@@ -591,7 +625,7 @@ class fit_pipeline:
         self._cost_function = []
 
         # run it
-        print("> Yalla, fit is running...")
+        log.info("calling least-square optimizer...")
         if(self.optim_jacobian):
             optim_result = optimize.least_squares(self._minimizeThis, params_free, bounds=(params_min_free, params_max_free), jac=self._jac, xtol=self.optim_xtol, gtol=self.optim_gtol, ftol=self.optim_ftol)
         else:
@@ -602,7 +636,7 @@ class fit_pipeline:
         self._fit_time = time.time() - self._fit_time
 
         # results
-        print("> Fit terminated!")
+        log.info("optimization terminated!")
         # final pars
         params_fit = self.params_init.copy()
         params_fit = params_fit.toFullParams(optim_result.x)
@@ -704,7 +738,7 @@ class fit_pipeline:
                     cor_labels.append(m + "|" + p)
 
         if(np.all(mat_linklock_mask==False)):
-            raise Exception(">> mrs.fit_pipeline.disp_CorrMat: nothing to display, please adjust the mIndex_list/pIndex_list parameters!")
+            raise Exception(">> mrs.fit_tool.disp_CorrMat: nothing to display, please adjust the mIndex_list/pIndex_list parameters!")
 
         # reducing it to free params
         j_free = j_full[mat_linklock_mask, :]

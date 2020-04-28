@@ -9,10 +9,14 @@ A user script used to store calls for the reconstruction of in vitro data.
 from IPython import get_ipython
 import matplotlib.pylab as plt
 import mrs.aliases as xxx
-import numpy as np
 import mrs.reco as reco
-get_ipython().magic("clear")
-plt.close("all")
+import mrs.log as log
+import numpy as np
+
+get_ipython().magic("matplotlib auto")
+plt.rcParams['figure.dpi'] = 100
+plt.rcParams['figure.max_open_warning'] = 1000
+log.setLevel(log.DEBUG)
 
 # %% 27/02/2019 - spinal cord phantom - nice WS STEAM, testing TWIX reco
 get_ipython().magic("clear")
@@ -34,10 +38,32 @@ TWIX
 DICOM
 """
 
-p.display_amp_factor_list = [57412 / 0.000692, 1]
-p.phase_display = False
-p.remove_water_enable = False
-p.run_pipeline_std()
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.analyze_enable = False
+
+p.data_process_only_this_data_index = [0]
+p.jobs["scaling"]["scaling_factor"] = 57412 / 0.000692
+p.run()
+
+p.data_process_only_this_data_index = [1]
+p.jobs["scaling"]["scaling_factor"] = 1
+p.run()
 
 # %% 27/02/2019 - spinal cord phantom - OVS optim
 get_ipython().magic("clear")
@@ -56,9 +82,25 @@ OVS duration 1000µs
 OVS duration 5000µs
 """
 
-p.phase_display = False
-p.remove_water_enable = False
-p.run_pipeline_std()
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.analyze_enable = False
+p.run()
 
 # %% 27/02/2019 - spinal cord phantom - spoiler optim
 get_ipython().magic("clear")
@@ -83,9 +125,25 @@ spoiler 5mT/m for 500µs
 spoiler 0mT/m for 500µs
 """
 
-p.phase_display = False
-p.remove_water_enable = False
-p.run_pipeline_std()
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.analyze_enable = False
+p.run()
 
 # %% 27/02/2019 - spinal cord phantom - various optim
 get_ipython().magic("clear")
@@ -106,9 +164,25 @@ asym->sym pulses
 0->200µs acq win shift
 """
 
-p.phase_display = False
-p.remove_water_enable = False
-p.run_pipeline_std()
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.analyze_enable = False
+p.run()
 
 # %% 27/02/2019 - spinal cord phantom - TM optim
 get_ipython().magic("clear")
@@ -135,9 +209,25 @@ TM=90ms
 TM=100ms
 """
 
-p.phase_display = False
-p.remove_water_enable = False
-p.run_pipeline_std()
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.analyze_enable = False
+p.run()
 
 # %% 27/02/2019 - spinal cord phantom - compare svs-st-vapor-643, eja-svs-steam and eja_svs_slaser
 get_ipython().magic("clear")
@@ -156,9 +246,25 @@ eja-svs-steam
 eja-svs-slaser
 """
 
-p.phase_display = False
-p.remove_water_enable = False
-p.run_pipeline_std()
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.analyze_enable = False
+p.run()
 
 # %% 12/03/2019 - spinal cord phantom - TR optim
 get_ipython().magic("clear")
@@ -187,9 +293,25 @@ TR=4500ms
 TR=5000ms
 """
 
-p.phase_display = False
-p.remove_water_enable = False
-p.run_pipeline_std()
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.analyze_enable = False
+p.run()
 
 # %% 20/03/2019 - fatty_braino_002, bad B1/B0 conditions - STEAM
 get_ipython().magic("clear")
@@ -216,9 +338,25 @@ mini spoiler
 OVS on
 """
 
-p.phase_display = False
-p.remove_water_enable = False
-p.run_pipeline_std()
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.analyze_enable = False
+p.run()
 
 # %% 20/03/2019 - fatty_braino_002, bad B1/B0 conditions - STEAM - VOI traces
 get_ipython().magic("clear")
@@ -245,7 +383,7 @@ mini spoiler
 OVS on
 """
 
-p.run_pipeline_std()
+p.run()
 
 # %% 20/03/2019 - fatty_braino_002, bad B1/B0 conditions - sLASER
 get_ipython().magic("clear")
@@ -272,9 +410,25 @@ reducing R 20->10
 increasing R 20->25
 """
 
-p.phase_display = False
-p.remove_water_enable = False
-p.run_pipeline_std()
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.analyze_enable = False
+p.run()
 
 # %% 20/03/2019 - fatty_braino_002, bad B1/B0 conditions - STEAM versus sLASER
 get_ipython().magic("clear")
@@ -291,9 +445,25 @@ initial STEAM
 initial sLASER
 """
 
-p.phase_display = False
-p.remove_water_enable = False
-p.run_pipeline_std()
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.analyze_enable = False
+p.run()
 
 # %% 20/03/2019 - fatty_braino_002 - sLASER optim invitro in invivo B1/B0 conditions - VOI 1/2 profiles
 get_ipython().magic("clear")
@@ -320,7 +490,7 @@ reducing R 20->10
 increasing R 20->25
 """
 
-p.run_pipeline_std()
+p.run()
 
 # %% 20/03/2019 - fatty_braino_002 - sLASER optim invitro in invivo B1/B0 conditions, R factor - VOI 1/2 profiles
 get_ipython().magic("clear")
@@ -347,7 +517,7 @@ increasing R=30
 increasing R=40
 """
 
-p.run_pipeline_std()
+p.run()
 
 # %%20/03/2019 - fatty_braino_002, bad B1/B0 conditions - STEAM - testing TWIX reco (1/2)
 get_ipython().magic("clear")
@@ -367,18 +537,31 @@ p.display_legends = """
 twix - ref 0th order phasing
 """
 
-p.display_amp_factor_list = [1 / 0.00005 * 1 / 1.2]
-p.phase_display = False
-p.phase_high_snr_mode = False
-p.phase_weak_ws_mode = False
-p.phase_order = 0
-p.remove_water_enable = False
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.run_pipeline_std()
+p.jobs["scaling"]["scaling_factor"] = 1 / 0.00005 * 1 / 1.2
+p.jobs["phasing"]["order"] = 0
+
+p.analyze_enable = False
+p.run()
 
 # %%20/03/2019 - fatty_braino_002, bad B1/B0 conditions - STEAM - compare previous TWIX with DICOM (2/2)
 get_ipython().magic("clear")
-plt.close("all")
 
 p = reco.pipeline()
 
@@ -394,14 +577,28 @@ p.display_legends = """
 DICOM - 0th order phasing with REF
 """
 
-p.display_amp_factor_list = [1 / 6650]
-p.phase_display = False
-p.phase_high_snr_mode = False
-p.phase_weak_ws_mode = False
-p.phase_order = 0
-p.remove_water_enable = False
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.run_pipeline_std()
+p.jobs["scaling"]["scaling_factor"] = 1 / 6650
+p.jobs["phasing"]["order"] = 0
+
+p.analyze_enable = False
+p.run()
 
 # %% 03/05/2019 - fatty_braino_003, bad B1/B0 conditions - sym vs asym STEAM
 get_ipython().magic("clear")
@@ -423,10 +620,25 @@ asym STEAM
 sym STEAM
 """
 
-p.phase_display = False
-p.remove_water_enable = False
+p.job_list = [  p.jobs["phasing"],
+                # p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.run_pipeline_std()
+p.analyze_enable = False
+p.run()
 
 # %% 03/05/2019 - fatty_braino_003, bad B1/B0 conditions - sym vs asym STEAM - VOI profiles
 get_ipython().magic("clear")
@@ -444,7 +656,7 @@ asym sSTEAM
 """
 
 p.analyze_selectivity_range_list = [[-2000, 1600], [-12500, -9000], [-3800, 2600]]
-p.run_pipeline_std()
+p.run()
 
 # %% 03/05/2019 - fatty_braino_003, bad B1/B0 conditions - settling time in STEAM
 get_ipython().magic("clear")
@@ -468,9 +680,25 @@ STEAM 500us settling
 STEAM 300us settling
 STEAM 10us settling"""
 
-p.phase_display = False
-p.remove_water_enable = False
-p.run_pipeline_std()
+p.job_list = [  p.jobs["phasing"],
+                # p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.analyze_enable = False
+p.run()
 
 # %% 03/05/2019 - fatty_braino_003, bad B1/B0 conditions - settling time in STEAM - VOI profiles
 get_ipython().magic("clear")
@@ -489,7 +717,7 @@ STEAM 300us settling
 STEAM 500us settling
 """
 
-p.run_pipeline_std()
+p.run()
 
 # %% 07/05/2019 - fatty_braino_004, bad B1/B0 conditions - OVS in STEAM
 get_ipython().magic("clear")
@@ -511,9 +739,25 @@ STEAM no OVS
 STEAM OVS 45deg (SAR limit)
 """
 
-p.phase_display = False
-p.remove_water_enable = False
-p.run_pipeline_std()
+p.job_list = [  p.jobs["phasing"],
+                # p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.analyze_enable = False
+p.run()
 
 # %% 03/05/2019 - fatty_braino_003, bad B1/B0 conditions - OVS in STEAM - VOI profiles
 get_ipython().magic("clear")
@@ -530,7 +774,7 @@ no OVS
 OVS 45deg
 """
 
-p.run_pipeline_std()
+p.run()
 
 # %% 07/05/2019 - fatty_braino_004, bad B1/B0 conditions - ramp time in STEAM
 get_ipython().magic("clear")
@@ -555,9 +799,25 @@ p.display_legends = """
 300us ramp
 """
 
-p.phase_display = False
-p.remove_water_enable = False
-p.run_pipeline_std()
+p.job_list = [  p.jobs["phasing"],
+                # p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.analyze_enable = False
+p.run()
 
 # %% 03/05/2019 - fatty_braino_003, bad B1/B0 conditions - OVS in STEAM - VOI profiles
 get_ipython().magic("clear")
@@ -578,7 +838,7 @@ p.display_legends = """
 100 us ramp FOV 500
 """
 
-p.run_pipeline_std()
+p.run()
 
 # %% 07/05/2019 - fatty_braino_004, bad B1/B0 conditions - spoilers in STEAM
 get_ipython().magic("clear")
@@ -603,9 +863,25 @@ p.display_legends = """
 20mT/m - 100ms
 """
 
-p.phase_display = False
-p.remove_water_enable = False
-p.run_pipeline_std()
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.analyze_enable = False
+p.run()
 
 # %% 03/05/2019 - fatty_braino_003, bad B1/B0 conditions - spoilers in STEAM - VOI profiles
 get_ipython().magic("clear")
@@ -624,7 +900,7 @@ p.display_legends = """
 20mT/m - 100ms
 """
 
-p.run_pipeline_std()
+p.run()
 
 # %% 07/05/2019 - fatty_braino_004, bad B1/B0 conditions - VAPOR BW in STEAM
 get_ipython().magic("clear")
@@ -652,9 +928,25 @@ p.display_legends = """
 optim
 """
 
-p.phase_display = False
-p.remove_water_enable = False
-p.run_pipeline_std()
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.analyze_enable = False
+p.run()
 
 # %% 07/05/2019 - fatty_braino_004, bad B1/B0 conditions - testing 30/30/60 OVS in STEAM - VOI profiles
 get_ipython().magic("clear")
@@ -671,7 +963,7 @@ p.display_legends = """
 no OVS
 """
 
-p.run_pipeline_std()
+p.run()
 
 # %% 07/05/2019 - fatty_braino_004, bad B1/B0 conditions - R/pulse length in sLASER - VOI profiles
 get_ipython().magic("clear")
@@ -694,7 +986,7 @@ OVS 90
 + 40mT/m spoiler
 """
 
-p.run_pipeline_std()
+p.run()
 
 # %% 07/05/2019 - fatty_braino_004, bad B1/B0 conditions - R/N pulses in sLASER - VOI profiles
 get_ipython().magic("clear")
@@ -719,26 +1011,25 @@ p.data_filepaths = """
 """
 
 p.display_legends = """
-                N=1,R=5
-                N=1,R=10
-                N=1,R=15
-                N=1,R=20
-                N=1,R=25
-                N=1,R=30
-                N=2,R=5
-                N=2,R=10
-                N=2,R=15
-                N=3,R=5
-                N=3,R=10
-                N=4,R=5
-                N=4,R=10
-                N=5,R=5
-                """
+N=1,R=5
+N=1,R=10
+N=1,R=15
+N=1,R=20
+N=1,R=25
+N=1,R=30
+N=2,R=5
+N=2,R=10
+N=2,R=15
+N=3,R=5
+N=3,R=10
+N=4,R=5
+N=4,R=10
+N=5,R=5
+"""
 
-p.analyze_selectivity_range_list = [
-    [800, 3550], [-10600, -7800], [-3650, 1450]]
+p.analyze_selectivity_range_list = [[800, 3550], [-10600, -7800], [-3650, 1450]]
 
-p.run_pipeline_std()
+p.run()
 
 # more info
 n_r = np.array([[1, 5],
@@ -976,34 +1267,52 @@ p.data_ref_filepaths = """
 """
 
 p.display_legends = """
-                N=1,R=5
-                N=1,R=10
-                N=1,R=15
-                N=1,R=20
-                N=1,R=25
-                N=1,R=30
-                N=2,R=5
-                N=2,R=10
-                N=2,R=15
-                N=3,R=5
-                N=3,R=10
-                N=4,R=5
-                N=4,R=10
-                N=5,R=5
-                """
+N=1,R=5
+N=1,R=10
+N=1,R=15
+N=1,R=20
+N=1,R=25
+N=1,R=30
+N=2,R=5
+N=2,R=10
+N=2,R=15
+N=3,R=5
+N=3,R=10
+N=4,R=5
+N=4,R=10
+N=5,R=5
+"""
+
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.analyze_job_list = [  p.jobs["channel-combining"],
+                        # p.jobs["zero-filling"],
+                        # p.jobs["realigning"],
+                        p.jobs["averaging"],
+                        # p.jobs["calibrating"]
+                        ]
+
+p.jobs["phasing"]["order"] = 0
+p.jobs["analyzing-snr"]["s_range_ppm"] = [1.9, 2.1]
+p.jobs["displaying"]["range_ppm"] = [1, 6]
 
 p.display_offset = 30000
-p.phase_enable = True
-p.phase_display = False
-p.phase_order = 0
-
-p.analyze_snr_s_range_ppm = [1.9, 2.1]
-p.analyze_snr_area_integrate = True
-
-p.display_range_ppm = [1, 6]
-
-p.remove_water_enable = False
-p.run_pipeline_std()
+p.run()
 
 # more info
 n_r = np.array([[1, 5],
@@ -1022,7 +1331,10 @@ n_r = np.array([[1, 5],
                 [5, 5]])
 
 # this is shaped [14]: 14 scans
-snr_results = p.analyze_snr_list
+snr_results = []
+for d in list(p._analyze_results_dict.keys()):
+    last_job_key = list(p._analyze_results_dict[d]["snr"].keys())[-1]
+    snr_results.append(p._analyze_results_dict[d]["snr"][last_job_key])
 
 # reshaping to [5,7]: 5 possible Ns, 7 possible Rs
 snr_results_2d = np.full([5, 7], np.nan)
@@ -1090,34 +1402,52 @@ p.data_ref_filepaths = """
 """
 
 p.display_legends = """
-                N=1,R=5
-                N=1,R=10
-                N=1,R=15
-                N=1,R=20
-                N=1,R=25
-                N=1,R=30
-                N=2,R=5
-                N=2,R=10
-                N=2,R=15
-                N=3,R=5
-                N=3,R=10
-                N=4,R=5
-                N=4,R=10
-                N=5,R=5
-                """
+N=1,R=5
+N=1,R=10
+N=1,R=15
+N=1,R=20
+N=1,R=25
+N=1,R=30
+N=2,R=5
+N=2,R=10
+N=2,R=15
+N=3,R=5
+N=3,R=10
+N=4,R=5
+N=4,R=10
+N=5,R=5
+"""
+
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.analyze_job_list = [  p.jobs["channel-combining"],
+                        # p.jobs["zero-filling"],
+                        # p.jobs["realigning"],
+                        p.jobs["averaging"],
+                        # p.jobs["calibrating"]
+                        ]
+
+p.jobs["phasing"]["order"] = 0
+p.jobs["analyzing-snr"]["s_range_ppm"] = [1.9, 2.1]
+p.jobs["displaying"]["range_ppm"] = [1, 6]
 
 p.display_offset = 30000
-p.phase_enable = True
-p.phase_display = False
-p.phase_order = 0
-
-p.analyze_snr_s_range_ppm = [1.9, 2.1]
-p.analyze_snr_area_integrate = True
-
-p.display_range_ppm = [1, 6]
-
-p.remove_water_enable = False
-p.run_pipeline_std()
+p.run()
 
 # more info
 n_r = np.array([[1, 5],
@@ -1136,7 +1466,10 @@ n_r = np.array([[1, 5],
                 [5, 5]])
 
 # this is shaped [14]: 14 scans
-snr_results = p.analyze_snr_list
+snr_results = []
+for d in list(p._analyze_results_dict.keys()):
+    last_job_key = list(p._analyze_results_dict[d]["snr"].keys())[-1]
+    snr_results.append(p._analyze_results_dict[d]["snr"][last_job_key])
 
 # reshaping to [5,7]: 5 possible Ns, 7 possible Rs
 snr_results_2d = np.full([5, 7], np.nan)
@@ -1184,20 +1517,39 @@ p.display_legends = """
 twix 0th
 dcm 0th
 """
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.phase_display = True
-p.phase_enable = True
-p.phase_ref_signal_too = True
-p.phase_high_snr_mode = False
-p.phase_weak_ws_mode = False
-p.phase_order = 0
+p.analyze_job_list = [  p.jobs["channel-combining"],
+                        # p.jobs["zero-filling"],
+                        # p.jobs["realigning"],
+                        p.jobs["averaging"],
+                        # p.jobs["calibrating"]
+                        ]
 
-p.realign_enable = False
-p.analyze_snr_enable = True
-p.display_amp_factor_list = [80000000, 1]
+p.jobs["phasing"]["order"] = 0
+p.analyze_enable = True
+p.jobs["scaling"]["scaling_factor"] = 80000000
+p.data_process_only_this_data_index = [0]
+p.run()
 
-p.remove_water_enable = False
-p.run_pipeline_std()
+p.jobs["scaling"]["scaling_factor"] = 1
+p.data_process_only_this_data_index = [1]
+p.run()
 
 # %% 21/05/2019 - fatty_braino_007, bad B1/B0 conditions - R/N pulses in sLASER TE minimal
 get_ipython().magic("clear")
@@ -1221,25 +1573,37 @@ p.data_ref_filepaths = """
 """
 
 p.display_legends = """
-                steam
-                N=1,R=5
-                N=1,R=20
-                N=2,R=10
-                N=5,R=5
-                """
+steam
+N=1,R=5
+N=1,R=20
+N=2,R=10
+N=5,R=5
+"""
+
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.jobs["phasing"]["order"] = 0
+p.jobs["analyzing-snr"]["s_range_ppm"] = [1.9, 2.1]
+p.jobs["displaying"]["range_ppm"] = [1, 6]
 
 p.display_offset = 30000
-p.phase_enable = True
-p.phase_display = False
-p.phase_order = 0
-
-p.analyze_snr_s_range_ppm = [1.9, 2.1]
-p.analyze_snr_area_integrate = True
-
-p.display_range_ppm = [1, 6]
-
-p.remove_water_enable = False
-p.run_pipeline_std()
+p.analyze_enable = False
+p.run()
 
 # %% 21/05/2019 - fatty_braino_007, better B1/B0 conditions - R/N pulses in sLASER TE minimal
 get_ipython().magic("clear")
@@ -1263,25 +1627,37 @@ p.data_ref_filepaths = """
 """
 
 p.display_legends = """
-                steam
-                N=1,R=5
-                N=1,R=20
-                N=2,R=10
-                N=5,R=5
-                """
+steam
+N=1,R=5
+N=1,R=20
+N=2,R=10
+N=5,R=5
+"""
+
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.jobs["phasing"]["order"] = 0
+p.jobs["analyzing-snr"]["s_range_ppm"] = [1.9, 2.1]
+p.jobs["displaying"]["range_ppm"] = [1, 6]
 
 p.display_offset = 30000
-p.phase_enable = True
-p.phase_display = False
-p.phase_order = 0
-
-p.analyze_snr_s_range_ppm = [1.9, 2.1]
-p.analyze_snr_area_integrate = True
-
-p.display_range_ppm = [1, 6]
-
-p.remove_water_enable = False
-p.run_pipeline_std()
+p.analyze_enable = False
+p.run()
 
 # %% 21/05/2019 - fatty_braino_007, better B1/B0 conditions, stronger spoilers - R/N pulses in sLASER TE minimal
 get_ipython().magic("clear")
@@ -1318,18 +1694,30 @@ N=1,R=20, big spoil
 N=5,R=5, big spoil
 """
 
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.jobs["phasing"]["order"] = 0
+p.jobs["analyzing-snr"]["s_range_ppm"] = [1.9, 2.1]
+p.jobs["displaying"]["range_ppm"] = [1, 6]
+
 p.display_offset = 30000
-p.phase_enable = True
-p.phase_display = False
-p.phase_order = 0
-
-p.analyze_snr_s_range_ppm = [1.9, 2.1]
-p.analyze_snr_area_integrate = True
-
-p.display_range_ppm = [1, 6]
-
-p.remove_water_enable = False
-p.run_pipeline_std()
+p.analyze_enable = False
+p.run()
 
 # %% 21/05/2019 - fatty_braino_007, better B1/B0 conditions, even more stronger spoilers - R/N pulses in sLASER TE minimal
 get_ipython().magic("clear")
@@ -1353,25 +1741,37 @@ p.data_ref_filepaths = """
 """
 
 p.display_legends = """
-                N=1,R=5
-                N=1,R=20
-                N=2,R=10
-                N=5,R=5
-                steam
-                """
+N=1,R=5
+N=1,R=20
+N=2,R=10
+N=5,R=5
+steam
+"""
+
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.jobs["phasing"]["order"] = 0
+p.jobs["analyzing-snr"]["s_range_ppm"] = [1.9, 2.1]
+p.jobs["displaying"]["range_ppm"] = [1, 6]
 
 p.display_offset = 30000
-p.phase_enable = True
-p.phase_display = False
-p.phase_order = 0
-
-p.analyze_snr_s_range_ppm = [1.9, 2.1]
-p.analyze_snr_area_integrate = True
-
-p.display_range_ppm = [1, 6]
-
-p.remove_water_enable = False
-p.run_pipeline_std()
+p.analyze_enable = False
+p.run()
 
 # %% 03/06/2019 - fatty_braino_head_coil_002, test non-WS steam
 get_ipython().magic("clear")
@@ -1389,22 +1789,33 @@ p.data_ref_filepaths = """
 """
 
 p.display_legends = """
-                steam
-                steam nonWS
-                """
+steam
+steam nonWS
+"""
+
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.jobs["phasing"]["order"] = 0
+p.jobs["displaying"]["range_ppm"] = [1, 6]
 
 p.display_offset = 30000
-p.phase_enable = True
-p.phase_display = False
-p.phase_order = 0
-
-p.analyze_snr_s_range_ppm = [1.9, 2.1]
-p.analyze_snr_area_integrate = True
-
-p.display_range_ppm = [1, 6]
-
-p.remove_water_enable = True
-p.run_pipeline_std()
+p.analyze_enable = False
+p.run()
 
 # %% 05/06/2019 - fatty_braino_head_coil_002, bad B1/B0 conditions with head coil - VOI profiles
 get_ipython().magic("clear")
@@ -1434,31 +1845,29 @@ p.data_filepaths = """
 """
 
 p.display_legends = """
-                N=1,R=5
-                N=1,R=10
-                N=1,R=15
-                N=1,R=20
-                N=1,R=25
-                N=1,R=30
-                N=1,R=35
-                N=1,R=40
-                N=2,R=5
-                N=2,R=10
-                N=2,R=15
-                N=3,R=5
-                N=3,R=10
-                N=4,R=5
-                N=4,R=10
-                N=5,R=5
-                N=6,R=5
-                N=7,R=5
-                N=8,R=5
-                """
+N=1,R=5
+N=1,R=10
+N=1,R=15
+N=1,R=20
+N=1,R=25
+N=1,R=30
+N=1,R=35
+N=1,R=40
+N=2,R=5
+N=2,R=10
+N=2,R=15
+N=3,R=5
+N=3,R=10
+N=4,R=5
+N=4,R=10
+N=5,R=5
+N=6,R=5
+N=7,R=5
+N=8,R=5
+"""
 
-p.analyze_selectivity_range_list = [
-    [-6000, -2000], [-9000, -5000], [-5000, -2000]]
-
-p.run_pipeline_std()
+p.analyze_selectivity_range_list = [[-6000, -2000], [-9000, -5000], [-5000, -2000]]
+p.run()
 
 # more info
 n_r = np.array([[1, 5],
@@ -1480,7 +1889,6 @@ n_r = np.array([[1, 5],
                 [6, 5],
                 [7, 5],
                 [8, 5]])
-
 
 min_TE = p.get_te_list()
 
@@ -1698,39 +2106,57 @@ p.data_ref_filepaths = """
 """
 
 p.display_legends = """
-                N=1,R=5
-                N=1,R=10
-                N=1,R=15
-                N=1,R=20
-                N=1,R=25
-                N=1,R=30
-                N=1,R=35
-                N=1,R=40
-                N=2,R=5
-                N=2,R=10
-                N=2,R=15
-                N=3,R=5
-                N=3,R=10
-                N=4,R=5
-                N=4,R=10
-                N=5,R=5
-                N=5,R=6
-                N=5,R=7
-                N=5,R=8
-                """
+N=1,R=5
+N=1,R=10
+N=1,R=15
+N=1,R=20
+N=1,R=25
+N=1,R=30
+N=1,R=35
+N=1,R=40
+N=2,R=5
+N=2,R=10
+N=2,R=15
+N=3,R=5
+N=3,R=10
+N=4,R=5
+N=4,R=10
+N=5,R=5
+N=5,R=6
+N=5,R=7
+N=5,R=8
+"""
+
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.analyze_job_list = [  p.jobs["channel-combining"],
+                        p.jobs["zero-filling"],
+                        # p.jobs["realigning"],
+                        p.jobs["averaging"],
+                        p.jobs["calibrating"]
+                        ]
+
+p.jobs["phasing"]["order"] = 0
+p.jobs["analyzing-snr"]["s_range_ppm"] = [1.9, 2.1]
+p.jobs["displaying"]["range_ppm"] = [1, 6]
 
 p.display_offset = 30000
-p.phase_enable = True
-p.phase_display = False
-p.phase_order = 0
-
-p.analyze_snr_s_range_ppm = [1.9, 2.1]
-p.analyze_snr_area_integrate = False
-
-p.display_range_ppm = [1, 6]
-
-p.remove_water_enable = False
-p.run_pipeline_std()
+p.run()
 
 # more info
 n_r = np.array([[1, 5],
@@ -1754,7 +2180,10 @@ n_r = np.array([[1, 5],
                 [8, 5]])
 
 # this is shaped [14]: 14 scans
-snr_results = p.analyze_snr_list
+snr_results = []
+for d in list(p._analyze_results_dict.keys()):
+    last_job_key = list(p._analyze_results_dict[d]["snr"].keys())[-1]
+    snr_results.append(p._analyze_results_dict[d]["snr"][last_job_key])
 
 # reshaping to [8,8]: 8 possible Ns, 8 possible Rs
 snr_results_2d = np.full([8, 8], np.nan)
@@ -1796,24 +2225,40 @@ p.data_ref_filepaths = """
 """
 
 p.display_legends = """
-                steam WS
-                """
+steam WS
+"""
 
-p.phase_enable = True
-p.phase_display = False
-p.phase_order = 0
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.analyze_snr_s_range_ppm = [1.9, 2.1]
-p.analyze_snr_area_integrate = False
 
-p.display_range_ppm = [1, 6]
+p.analyze_job_list = [  p.jobs["channel-combining"],
+                        p.jobs["zero-filling"],
+                        # p.jobs["realigning"],
+                        p.jobs["averaging"],
+                        p.jobs["calibrating"]
+                        ]
 
-p.remove_water_enable = False
-p.remove_water_hsvd_components = 1
-p.remove_water_hsvd_pars = [70, 100]
-p.analyze_snr_enable = False
-p.calibrate_enable = False
-p.run_pipeline_std()
+p.jobs["phasing"]["order"] = 0
+p.jobs["analyzing-snr"]["s_range_ppm"] = [1.9, 2.1]
+p.jobs["displaying"]["range_ppm"] = [1, 6]
+
+p.analyze_enable = True
+p.run()
 
 # %% 12/06/2019 - fatty_braino_head_coil_002, bad B1/B0 conditions with head coil - testing non WS STEAM spectra
 get_ipython().magic("clear")
@@ -1826,29 +2271,34 @@ p.data_filepaths = """
 /home/tangir/crmbm/acq/braino_alcoholic_002/braino-with-alcohol-belt/20190612/01_0013_steam-shortte-snr
 """
 
-p.data_ref_filepaths = """
+p.display_legends = """
+steam ws 90
+steam ws 30deg
+steam ws 1deg
 """
 
-p.display_legends = """
-                steam ws 90
-                steam ws 30deg
-                steam ws 1deg
-                """
+p.job_list = [  # p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.phase_enable = False
+p.analyze_enable = False
 
-p.analyze_snr_enable = True
-p.analyze_snr_s_range_ppm = [1.5, 2]
-p.analyze_snr_area_integrate = False
-
-p.display_range_ppm = [1, 6]
-
-p.remove_water_enable = True
-p.remove_water_hsvd_components = 3
-p.remove_water_hsvd_range = [4.6, 4.8]
-
-p.calibrate_enable = False
-p.run_pipeline_std()
+p.jobs["analyzing-snr"]["s_range_ppm"] = [1.5, 2]
+p.jobs["displaying"]["range_ppm"] = [1, 6]
+p.run()
 
 # %% 12/06/2019 - fatty_braino_head_coil_002, bad B1/B0 conditions with head coil - testing DCM reco with right ref scans...
 get_ipython().magic("clear")
@@ -1865,16 +2315,31 @@ p.data_ref_filepaths = """
 """
 
 p.display_legends = """
-                steam dcm not phased
-                """
+steam dcm not phased
+"""
 
-p.phase_enable = False
-p.phase_order = 0
+p.job_list = [  # p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.display_range_ppm = [1, 6]
-p.remove_water_enable = False
+p.analyze_enable = False
 
-p.run_pipeline_std()
+p.jobs["phasing"]["order"] = 0
+p.jobs["displaying"]["range_ppm"] = [1, 6]
+p.run()
 
 # %% 12/06/2019 - fatty_braino_head_coil_002, bad B1/B0 conditions with head coil - testing TWIX reco with right ref scans...
 get_ipython().magic("clear")
@@ -1897,15 +2362,33 @@ dcm phased
 twix phased
 """
 
-p.display_amp_factor_list = [1, 1e8 * 50800 / 26300]
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.phase_enable = True
-p.phase_display = True
+p.analyze_enable = False
 
-p.apodize_enable = True
-p.apodize_damping_hz = 20
+p.jobs["apodizing"]["damping_hz"] = 20
+p.jobs["scaling"]["scaling_factor"] = 1
+p.data_process_only_this_data_index = [0]
+p.run()
 
-p.run_pipeline_std()
+p.jobs["scaling"]["scaling_factor"] = 1e8 * 50800 / 26300
+p.data_process_only_this_data_index = [1]
+p.run()
 
 # %% 12/06/2019 - fatty_braino_head_coil_002, bad B1/B0 conditions with head coil - testing TWIX reco and non WS STEAM
 get_ipython().magic("clear")
@@ -1918,29 +2401,34 @@ p.data_filepaths = """
 /home/tangir/crmbm/acq_twix/braino_alcoholic_002/meas_MID92_steam_shortTE_SNR+_FID33708.dat
 """
 
-p.data_ref_filepaths = """
+p.display_legends = """
+VAPOR FA=30deg
+VAPOR FA=1deg
 """
 
-p.display_legends = """
-                VAPOR FA=30deg
-                VAPOR FA=1deg
-                """
-p.display_amp_factor_list = [1, 1]
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.phase_enable = True
-p.phase_display = False
-p.phase_weak_ws_mode = False
-p.phase_POI_range_ppm = [4, 5]
-p.phase_order = 1
+p.jobs["phasing"]["POI_range_ppm"] = [4, 5]
+p.jobs["phasing"]["order"] = 1
+p.jobs["apodizing"]["damping_hz"] = 20
 
-p.recombine_phasing = True
-p.apodize_enable = True
-p.apodize_damping_hz = 20
-
-p.display_range_ppm = [1, 6]
-p.remove_water_enable = True
-
-p.run_pipeline_std()
+p.analyze_enable = False
+p.run()
 
 # %%16/05/2019 - fatty_braino_007, bad B1/B0 conditions - STEAM - testing TWIX reco
 get_ipython().magic("clear")
@@ -1950,32 +2438,38 @@ for chan_to_turn_off in range(0, 9):
 
     print("chan_to_turn_off=" + str(chan_to_turn_off))
     p = reco.pipeline()
-    p.data_ref_filepaths = """
-    /home/tangir/crmbm/acq_twix/fatty_braino_007/meas_MID31_eja_svs_slaser_optim_FID32220.dat
-    """
+    p.data_ref_filepaths = ["/home/tangir/crmbm/acq_twix/fatty_braino_007/meas_MID31_eja_svs_slaser_optim_FID32220.dat"]
 
-    p.data_filepaths = """
-    /home/tangir/crmbm/acq_twix/fatty_braino_007/meas_MID30_eja_svs_slaser_optim_FID32219.dat
-    """
+    p.data_filepaths = ["/home/tangir/crmbm/acq_twix/fatty_braino_007/meas_MID30_eja_svs_slaser_optim_FID32219.dat"]
 
-    p.display_legends = "off channel = " + str(chan_to_turn_off)
-    p.display_amp_factor_list = [1]
+    p.display_legends = ["off channel = " + str(chan_to_turn_off)]
 
-    p.phase_enable = True
-    p.phase_display = False
-    p.phase_order = 1
+    p.job_list = [  p.jobs["phasing"],
+                    p.jobs["scaling"],
+                    # p.jobs["FID modulus"],
+                    p.jobs["channel-combining"],
+                    # p.jobs["concatenate"],
+                    # p.jobs["zero-filling"],
+                    # p.jobs["physio-analysis"],
+                    # p.jobs["data-rejecting"],
+                    p.jobs["realigning"],
+                    p.jobs["averaging"],
+                    p.jobs["noise-estimation"],
+                    p.jobs["apodizing"],
+                    # p.jobs["cropping"],
+                    # p.jobs["water-removal"],
+                    p.jobs["calibrating"],
+                    p.jobs["displaying"]]
 
-    p.recombine_phasing = False
-    p.apodize_enable = False
+    p.jobs["phasing"]["order"] = 1
+    p.jobs["channel-combining"]["phasing"] = False
 
-    p.display_range_ppm = [1, 6]
-    p.remove_water_enable = False
-
-    p.recombine_weights = np.full([8, ], True)
+    combine_weights = np.full([8, ], True)
     if(chan_to_turn_off < 8):
-        p.recombine_weights[chan_to_turn_off] = False
+        combine_weights[chan_to_turn_off] = False
+    p.jobs["channel-combining"]["weights"] = combine_weights
 
-    p.run_pipeline_std()
+    p.run()
 
 # %%27/11/2019 - phantom_test_inv, sLASER - inv test
 get_ipython().magic("clear")
@@ -2001,7 +2495,25 @@ WS TI=770ms
 WS double inv TI=770ms
 """
 
-p.run_pipeline_std()
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.analyze_enable = False
+p.run()
 
 # %%20/12/2019 - test_IR_sLASER - inv tests
 get_ipython().magic("clear")
@@ -2097,12 +2609,25 @@ p.display_legends = """
 405
 """
 
-p.phase_enable = False
-p.analyse_snr_enable = False
-p.analyse_linewidth_enable = False
-p.calibrate_enable = False
+p.job_list = [  # p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.run_pipeline_std()
+p.analyze_enable = False
+p.run()
 
 # %%20/12/2019 - test_IR_sLASER - head coil - WS/noWS/FID modulus tests
 plt.close('all')
@@ -2124,12 +2649,45 @@ WS
 noWS
 """
 
-p.remove_water_enable = False
-# p.remove_water_hsvd_components
-p.fid_modulus = False
-p.data_process_only_this_data_index = [0]
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.run_pipeline_std()
+p.data_process_only_this_data_index = [0]
+p.run()
+
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.data_process_only_this_data_index = [1]
+p.run()
 
 # %% 22/01/2020 - test_IR_sLASER - head coil - WS tests
 plt.close('all')
@@ -2150,42 +2708,37 @@ p.display_legends = ["110",
                      "10",
                      "0"]
 
-p.analyse_snr_s_range_ppm = [2.8, 3.2]
-p.analyse_linewidth_range_ppm = [2.8, 3.2]
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.calibrate_POI_range_ppm = [4, 5]
-p.calibrate_POI_true_ppm = 4.7
+p.analyze_job_list = [  p.jobs["channel-combining"],
+                        p.jobs["zero-filling"],
+                        p.jobs["realigning"],
+                        p.jobs["averaging"],
+                        p.jobs["calibrating"]
+                        ]
 
-p.remove_water_enable = True
-p.remove_water_hsvd_range = [4.5, 5]
+p.jobs["analyzing-snr"]["s_range_ppm"] = [2.8, 3.2]
+p.jobs["analyzing-lw"]["range_ppm"] = [2.8, 3.2]
+p.jobs["calibrating"]["POI_range_ppm"] = [4, 5]
+p.jobs["calibrating"]["POI_true_ppm"] = 4.7
 
-# p.remove_water_hsvd_components
-p.fid_modulus = True
 p.data_process_only_this_data_index = []
-
-p.run_pipeline_std()
-
-# %% 03/03/2020 - Jojo's data about with several concentration of creatine
-plt.close('all')
-
-p = reco.pipeline()
-p.data_coil_nChannels = 32
-p.data_filepaths = ["/home/tangir/desktop/200228_phantoms/meas_MID30_slaser_[10]_WSAT_FID53582.dat",
-                    "/home/tangir/desktop/200228_phantoms/meas_MID35_steam_[10]_WSAT_FID53587.dat",
-                    "/home/tangir/desktop/200228_phantoms/meas_MID54_steam_[25]_WSAT_FID53606.dat",
-                    "/home/tangir/desktop/200228_phantoms/meas_MID59_slaser_[25]_WSAT_FID53611.dat"]
-
-p.data_ref_filepaths = ["/home/tangir/desktop/200228_phantoms/meas_MID31_slaser_[10]_NOWSAT_FID53583.dat",
-                        "/home/tangir/desktop/200228_phantoms/meas_MID36_steam_[10]_NOWSAT_FID53588.dat",
-                        "/home/tangir/desktop/200228_phantoms/meas_MID55_steam_[25]_NOWSAT_FID53607.dat",
-                        "/home/tangir/desktop/200228_phantoms/meas_MID60_slaser_[25]_NOWSAT_FID53612.dat"]
-
-p.display_legends = ["a",
-                     "b",
-                     "c",
-                     "d"]
-
-p.run_pipeline_std()
+p.run()
 
 # %% 09/03/2020 - Comparing sLASER w/o offset exc
 plt.close('all')
@@ -2205,19 +2758,31 @@ offset = -1.7ppm
 offset = -1.7ppm for WS, 0 for REF
 """
 
-p.phase_enable = True
-p.phase_order = 1
-p.zerofill_npts = 4096 * 6
-p.realign_enable = False
-p.analyse_snr_evol_enable = False
-p.analyse_linewidth_evol_enable = False
-p.apodize_enable = True
-p.apodize_npts = 4096 * 4
-p.apodize_damping_hz = 1
-p.calibrate_enable = False
-p.display_offset = 0.0
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-s, s_ref = p.run_pipeline_std()
+
+p.jobs["phasing"]["order"] = 1
+p.jobs["zero-filling"]["npts"] = 4096 * 6
+p.jobs["apodizing"]["damping_hz"] = 1
+
+p.display_offset = 0.0
+p.analyze_enable = False
+p.run()
 
 # %% 11/03/2020 - Jojo's creatine phantom : Comparing different concentrations at 7T
 plt.close('all')
@@ -2246,32 +2811,45 @@ STEAM on 50mM Cre
 sLASER on 50mM Cre
 """
 
-p.phase_order = 1
-p.phase_offset = 0.0  # np.pi
-p.recombine_phasing = False
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.realign_enable = False
+p.analyze_job_list = [  p.jobs["channel-combining"],
+                        p.jobs["zero-filling"],
+                        p.jobs["realigning"],
+                        p.jobs["averaging"],
+                        p.jobs["calibrating"]
+                        ]
 
-p.zerofill_enable = False
+p.jobs["phasing"]["order"] = 1
+p.jobs["phasing"]["offset"] = 0.0  # np.pi
+p.jobs["channel-combining"]["phasing"] = False
 
-p.apodize_enable = False
+p.jobs["calibrating"]["POI_range_ppm"] = [2.5, 3.5]
+p.jobs["calibrating"]["POI_true_ppm"] = 3.03
 
-p.calibrate_POI_range_ppm = [2.5, 3.5]
-p.calibrate_POI_true_ppm = 3.03
-
-p.display_offset = 0.0
-p.analyse_linewidth_enable = False
-p.analyse_snr_s_range_ppm = [2.5, 3.5]
-p.analyse_linewidth_range_ppm = [4.6, 6]
-
-p.remove_water_enable = True
-p.remove_water_hsvd_range = [4.5, 6]
-p.remove_water_hsvd_components = 20
+p.jobs["analyzing-snr"]["s_range_ppm"] = [2.5, 3.5]
+p.jobs["analyzing-lw"]["range_ppm"] = [2.5, 3.5]
 
 p.data_process_only_this_data_index = [2]
-s, s_ref = p.run_pipeline_std()
+data_list = p.run()
 
 # turn off realistic simulations because of non adiabatic pulses here
+s = data_list[0]
 s.sequence.pulse_rfc_real_shape_enable = False
 
 fit_metabolites = [xxx.m_Cr_CH3, xxx.m_Cr_CH2]

@@ -11,17 +11,19 @@ Three classes' definition in here.
 """
 
 import suspect
+import suspect.io.twix as sit
 import numpy as np
 from scipy import signal
 import scipy.io as sio
 import matplotlib.pylab as plt
 import os
-import datetime
+from shutil import copyfile
+from datetime import datetime
 import struct
-import warnings
-from termcolor import cprint
-import suspect.io.twix as sit
+import pickle
 import mrs.sim as sim
+import mrs.log as log
+import mrs.paths as default_paths
 
 import pdb
 
@@ -29,7 +31,7 @@ import pdb
 class MRSData2(suspect.mrsobjects.MRSData):
     """A class based on suspect's MRSData to store MRS data."""
 
-    def __new__(cls, data_filepath, coil_nChannels, physio_log_file, obj=[], dt=[], f0=[], te=[], ppm0=[], voxel_dimensions=[], transform=[], metadata=[], tr=[], timestamp=[], patient_birthyear=[], patient_sex=[], patient_name=[], patient_weight=[], patient_height=[], vref=[], shims=[], sequence_obj=[], noise_level=[]):
+    def __new__(cls, data_filepath, coil_nChannels, physio_log_file, obj=[], dt=[], f0=[], te=[], ppm0=[], voxel_dimensions=[], transform=[], metadata=[], data_ref=None, label=[], offset_display=0.0, tr=[], timestamp=[], patient_name=[], patient_birthday=[], patient_sex=[], patient_weight=[], patient_height=[], vref=[], shims=[], sequence_obj=[], noise_level=[]):
         """
         Construct a MRSData2 object that inherits of Suspect's MRSData class. In short, the MRSData2 class is a copy of MRSData + my custom methods for post-processing. To create a MRSData2 object, you need give a path that points to a SIEMENS DICOM or a SIEMENS TWIX file.
 
@@ -43,16 +45,22 @@ class MRSData2(suspect.mrsobjects.MRSData):
             Full absolute file path pointing to a IDEA VB17 respiratory log file
         obj,dt,f0,te,ppm0,voxel_dimensions,transform,metadata
             Please check suspect's MRSData class for those arguments
+        data_ref : MRSData2 object
+            Reference data acquired for this signal
+        label : string
+            Label for this signal
+        offset_display : float
+            Y-axis offset display
         tr : float
             TR in ms
         timestamp : float
             timestamp in ms
-        patient_birthyear : int
+        patient_name : string
+            patient name
+        patient_birthday : int
             birthyear of patient
         patient_sex : int
             sex of patient (0:M 1:F)
-        patient_name : string
-            patient name
         patient_weight : float
             patient weight in kgs
         patient_height : float
@@ -75,11 +83,14 @@ class MRSData2(suspect.mrsobjects.MRSData):
             # calling the parent class' constructor
             obj = super(suspect.mrsobjects.MRSData, cls).__new__(cls, obj, dt, f0, te, ppm0, voxel_dimensions, transform, metadata)
             # adding attributes
+            obj.data_ref = data_ref
+            obj._display_label = label
+            obj._display_offset = offset_display
             obj._tr = tr
             obj._timestamp = timestamp
-            obj._patient_birthyear = patient_birthyear
-            obj._patient_sex = patient_sex
             obj._patient_name = patient_name
+            obj._patient_birthday = patient_birthday
+            obj._patient_sex = patient_sex
             obj._patient_weight = patient_weight
             obj._patient_height = patient_height
             obj._vref = vref
@@ -90,13 +101,14 @@ class MRSData2(suspect.mrsobjects.MRSData):
             return(obj)
 
         # hello
-        cprint(">> mrs.reco.MRSData2.__new__:", 'green')
+        log.debug("creating object...")
 
         # init
         TR_ms = None
         year_int = None
-        sex_int = None
         patient_name_str = None
+        patient_birthday_datetime = None
+        patient_sex_int = None
         patient_weight_kgs = None
         patient_height_m = None
         vref_v = None
@@ -107,7 +119,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         sequence_name = None
 
-        print(" > checking data file path...")
+        log.debug("checking data file path...")
         data_filename, data_file_extension = os.path.splitext(data_filepath)
         if(len(data_file_extension) == 0):
             # if empty extension, assuming the filename is not present in the path
@@ -122,8 +134,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
         data_filename, data_file_extension = os.path.splitext(data_fullfilepath)
         if(data_file_extension.lower() == '.dat'):
             # twix!
-            print(" > reading DAT / TWIX file...")
-            print(data_fullfilepath)
+            log.info("reading DAT / TWIX file...")
+            log.info(data_fullfilepath)
 
             # try and read this TWIX file
             try:
@@ -144,24 +156,24 @@ class MRSData2(suspect.mrsobjects.MRSData):
             TR_str_us = twix_txtdata[(a + 2):b]
             if(TR_str_us.strip()):
                 TR_ms = float(TR_str_us) / 1000.0
-                print(" > extracted TR value (%.0fms)" % TR_ms)
+                log.debug("extracted TR value (%.0fms)" % TR_ms)
 
             # find patient birthyear
             a = twix_txtdata.find("PatientBirthDay")
             a = twix_txtdata.find("{", a)
             a = twix_txtdata.find("\"", a)
-            year_str = twix_txtdata[(a + 1):(a + 5)]
-            if(year_str.strip()):
-                year_int = int(year_str)
-                print(" > extracted patient birthyear (%d)" % year_int)
+            birthday_str = twix_txtdata[(a + 1):(a + 9)]
+            if(birthday_str.strip()):
+                patient_birthday_datetime = datetime.strptime(birthday_str, '%Y%m%d')
+                log.debug("extracted patient birthyear (" + str(patient_birthday_datetime) + ")")
 
             # find patient sex
             a = twix_txtdata.find("PatientSex")
             a = twix_txtdata.find("{", a)
             sex_str = twix_txtdata[(a + 2):(a + 3)]
             if(sex_str.strip()):
-                sex_int = int(sex_str)
-                print(" > extracted patient sex (%d)" % sex_int)
+                patient_sex_int = int(sex_str)
+                log.debug("extracted patient sex (%d)" % patient_sex_int)
 
             # find patient name
             a = twix_txtdata.find("tPatientName")
@@ -170,7 +182,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             b = twix_txtdata.find("\"", a + 1)
             patient_name_str = twix_txtdata[(a + 1):b]
             if(patient_name_str.strip()):
-                print(" > extracted patient name (%s)" % patient_name_str)
+                log.debug("extracted patient name (%s)" % patient_name_str)
 
             # find patient weight
             a = twix_txtdata.find("flUsedPatientWeight")
@@ -180,7 +192,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             patient_weight_str = twix_txtdata[(a + 5):(b - 2)]
             if(patient_weight_str.strip()):
                 patient_weight_kgs = float(patient_weight_str)
-                print(" > extracted patient weight (%.2fkg)" % patient_weight_kgs)
+                log.debug("extracted patient weight (%.2fkg)" % patient_weight_kgs)
 
             # find patient height
             a = twix_txtdata.find("flPatientHeight")
@@ -191,7 +203,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             patient_height_str = twix_txtdata[(a + 6):(b - 3)]
             if(patient_height_str.strip()):
                 patient_height_m = float(patient_height_str) / 1000.0
-                print(" > extracted patient height (%.2fm)" % patient_height_m)
+                log.debug("extracted patient height (%.2fm)" % patient_height_m)
 
             # find reference voltage
             a = twix_txtdata.find("TransmitterReferenceAmplitude")
@@ -201,7 +213,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             vref_str = twix_txtdata[(a + 6):(b - 14)]
             if(vref_str.strip()):
                 vref_v = float(vref_str)
-                print(" > extracted reference voltage (%.2fV)" % vref_v)
+                log.debug("extracted reference voltage (%.2fV)" % vref_v)
 
             # find 1st order shim X
             a = twix_txtdata.find("lOffsetX")
@@ -210,7 +222,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             shim_1st_X_str = twix_txtdata[(a + 4):b]
             if(shim_1st_X_str.strip()):
                 shim_1st_X = float(shim_1st_X_str)
-                print(" > extracted 1st order shim value for X (%.2f)" % shim_1st_X)
+                log.debug("extracted 1st order shim value for X (%.2f)" % shim_1st_X)
             else:
                 shim_1st_X = np.nan
 
@@ -221,7 +233,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             shim_1st_Y_str = twix_txtdata[(a + 4):b]
             if(shim_1st_Y_str.strip()):
                 shim_1st_Y = float(shim_1st_Y_str)
-                print(" > extracted 1st order shim value for Y (%.2f)" % shim_1st_Y)
+                log.debug("extracted 1st order shim value for Y (%.2f)" % shim_1st_Y)
             else:
                 shim_1st_Y = np.nan
 
@@ -232,7 +244,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             shim_1st_Z_str = twix_txtdata[(a + 4):b]
             if(shim_1st_Z_str.strip()):
                 shim_1st_Z = float(shim_1st_Z_str)
-                print(" > extracted 1st order shim value for Z (%.2f)" % shim_1st_Z)
+                log.debug("extracted 1st order shim value for Z (%.2f)" % shim_1st_Z)
             else:
                 shim_1st_Z = np.nan
 
@@ -244,7 +256,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             if(shims_2nd_3rd_str.strip()):
                 shims_2nd_3rd_str = shims_2nd_3rd_str.split(" ")
                 shims_2nd_3rd_list = [float(s) for s in shims_2nd_3rd_str]
-                print(" > extracted 2nd / 3rd shims (" + str(shims_2nd_3rd_list) + ")")
+                log.debug("extracted 2nd / 3rd shims (" + str(shims_2nd_3rd_list) + ")")
             else:
                 shims_2nd_3rd_list = np.nan
 
@@ -256,7 +268,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             a = twix_txtdata.find('\\', a)
             b = twix_txtdata.find('\n', a + 1)
             sequence_name = twix_txtdata[(a + 1):(b - 2)]
-            print(" > extracted sequence name (%s)" % sequence_name)
+            log.debug("extracted sequence name (%s)" % sequence_name)
 
             # nucleus (used for sequence object)
             a = twix_txtdata.find("Nucleus")
@@ -265,7 +277,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             b = twix_txtdata.find('"', a + 1)
             nucleus_str = twix_txtdata[(a + 1):b]
             nucleus = nucleus_str.strip()
-            print(" > extracted nuclei (%s)" % nucleus)
+            log.debug("extracted nuclei (%s)" % nucleus)
 
             # find numer of points
             a = twix_txtdata.find("lVectorSize")
@@ -274,7 +286,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             npts_str = twix_txtdata[(a + 4):b]
             if(npts_str.strip()):
                 npts = int(npts_str)
-                print(" > extracted number of points (%d)" % npts)
+                log.debug("extracted number of points (%d)" % npts)
             else:
                 npts = np.nan
 
@@ -286,10 +298,10 @@ class MRSData2(suspect.mrsobjects.MRSData):
             # and extract timestamp
             ulTimeStamp = sMDH[3]
             ulTimeStamp_ms = float(ulTimeStamp * 2.5)
-            print(" > extracted timestamp (%.0fms)" % ulTimeStamp_ms)
+            log.debug("extracted timestamp (%.0fms)" % ulTimeStamp_ms)
 
             if(sequence_name == "eja_svs_slaser"):
-                print(" > This a semi-LASER acquisition, let's extract some specific parameters!")
+                log.debug("this a semi-LASER acquisition, let's extract some specific parameters!")
 
                 # find afp pulse (fake) flip angle
                 a = twix_txtdata.find("FlipAngleDeg2")
@@ -299,7 +311,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 pulse_laser_rfc_fa_str = twix_txtdata[(a + 4):b]
                 if(pulse_laser_rfc_fa_str.strip()):
                     pulse_laser_rfc_fa = float(pulse_laser_rfc_fa_str)
-                    print(" > extracted LASER AFP refocussing pulse flip angle (%.2f)" % pulse_laser_rfc_fa)
+                    log.debug("extracted LASER AFP refocussing pulse flip angle (%.2f)" % pulse_laser_rfc_fa)
 
                 # find afp pulse length
                 a = twix_txtdata.find("sWiPMemBlock.alFree[1]")
@@ -308,7 +320,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 pulse_laser_rfc_length_str = twix_txtdata[(a + 2):b]
                 if(pulse_laser_rfc_length_str.strip()):
                     pulse_laser_rfc_length = float(pulse_laser_rfc_length_str)
-                    print(" > extracted LASER AFP refocussing pulse duration (%.2f)" % pulse_laser_rfc_length)
+                    log.debug("extracted LASER AFP refocussing pulse duration (%.2f)" % pulse_laser_rfc_length)
 
                 # find afp pulse R
                 a = twix_txtdata.find("sWiPMemBlock.alFree[49]")
@@ -317,7 +329,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 pulse_laser_rfc_r_str = twix_txtdata[(a + 2):b]
                 if(pulse_laser_rfc_r_str.strip()):
                     pulse_laser_rfc_r = float(pulse_laser_rfc_r_str)
-                    print(" > extracted LASER AFP refocussing pulse R (%.2f)" % pulse_laser_rfc_r)
+                    log.debug("extracted LASER AFP refocussing pulse R (%.2f)" % pulse_laser_rfc_r)
 
                 # find afp pulse N
                 a = twix_txtdata.find("sWiPMemBlock.alFree[48]")
@@ -326,7 +338,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 pulse_laser_rfc_n_str = twix_txtdata[(a + 2):b]
                 if(pulse_laser_rfc_n_str.strip()):
                     pulse_laser_rfc_n = float(pulse_laser_rfc_n_str)
-                    print(" > extracted LASER AFP refocussing pulse N (%.2f)" % pulse_laser_rfc_n)
+                    log.debug("extracted LASER AFP refocussing pulse N (%.2f)" % pulse_laser_rfc_n)
 
                 # find afp pulse voltage
                 a = twix_txtdata.find("aRFPULSE[1].flAmplitude")
@@ -335,7 +347,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 pulse_laser_rfc_voltage_str = twix_txtdata[(a + 2):b]
                 if(pulse_laser_rfc_voltage_str.strip()):
                     pulse_laser_rfc_voltage = float(pulse_laser_rfc_voltage_str)
-                    print(" > extracted LASER AFP refocussing pulse voltage (%.2f)" % pulse_laser_rfc_voltage)
+                    log.debug("extracted LASER AFP refocussing pulse voltage (%.2f)" % pulse_laser_rfc_voltage)
 
                 # find exc pulse duration
                 a = twix_txtdata.find("sWiPMemBlock.alFree[24]")
@@ -344,7 +356,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 pulse_laser_exc_length_str = twix_txtdata[(a + 2):b]
                 if(pulse_laser_exc_length_str.strip()):
                     pulse_laser_exc_length = float(pulse_laser_exc_length_str)
-                    print(" > extracted LASER exc. pulse length (%.2f)" % pulse_laser_exc_length)
+                    log.debug("extracted LASER exc. pulse length (%.2f)" % pulse_laser_exc_length)
 
                 # find exc pulse voltage
                 a = twix_txtdata.find("aRFPULSE[0].flAmplitude")
@@ -353,7 +365,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 pulse_laser_exc_voltage_str = twix_txtdata[(a + 2):b]
                 if(pulse_laser_exc_voltage_str.strip()):
                     pulse_laser_exc_voltage = float(pulse_laser_exc_voltage_str)
-                    print(" > extracted LASER excitation pulse voltage (%.2f)" % pulse_laser_exc_voltage)
+                    log.debug("extracted LASER excitation pulse voltage (%.2f)" % pulse_laser_exc_voltage)
 
                 # find spoiler length
                 a = twix_txtdata.find("sWiPMemBlock.alFree[12]")
@@ -362,10 +374,10 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 spoiler_length_str = twix_txtdata[(a + 2):b]
                 if(spoiler_length_str.strip()):
                     spoiler_length = float(spoiler_length_str)
-                    print(" > extracted spoiler length (%.2f)" % spoiler_length)
+                    log.debug("extracted spoiler length (%.2f)" % spoiler_length)
 
             elif(sequence_name == "svs_st_vapor_643"):
-                print(" > This CMRR's STEAM sequence, let's extract some specific parameters!")
+                log.debug("this is CMRR's STEAM sequence, let's extract some specific parameters!")
 
                 # find TR value
                 a = twix_txtdata.find("alTD[0]")
@@ -374,12 +386,12 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 TM_str_us = twix_txtdata[(a + 2):b]
                 if(TM_str_us.strip()):
                     TM_ms = float(TM_str_us) / 1000.0
-                    print(" > extracted TM value (%.0fms)" % TM_ms)
+                    log.debug("extracted TM value (%.0fms)" % TM_ms)
 
         elif(data_file_extension.lower() == '.dcm' or data_file_extension.lower() == '.ima'):
             # dicom!
-            print(" > reading DICOM file...")
-            print(data_fullfilepath)
+            log.info("reading DICOM file...")
+            log.info(data_fullfilepath)
             MRSData_obj = suspect.io.load_siemens_dicom(data_fullfilepath)
         else:
             # unknown!
@@ -399,7 +411,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
             if(coil_nChannels == MRSData_obj.shape[0]):
                 # beware, same number of averages / coil elements, which is which?
-                print(" > WARNING: ambiguous data dimensions: " + str(MRSData_obj.shape) + "-> Assuming (" + str(MRSData_obj.shape[0]) + ") to be the coil channels!")
+                log.warning("ambiguous data dimensions: " + str(MRSData_obj.shape) + "-> Assuming (" + str(MRSData_obj.shape[0]) + ") to be the coil channels!")
                 MRSData_obj = MRSData_obj.reshape((1,) + MRSData_obj.shape)
             elif(coil_nChannels == 1):
                 # ok the user said it is a single channel coil, so the 2nd dimension here is the number of averages!
@@ -411,7 +423,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 # adding 1 dimension for averages
                 MRSData_obj = MRSData_obj.reshape((1,) + MRSData_obj.shape)
 
-        print(" > read a " + str(MRSData_obj.shape) + " vector")
+        log.info("read a " + str(MRSData_obj.shape) + " vector")
 
         # calling the parent class' constructor
         obj = super(suspect.mrsobjects.MRSData, cls).__new__(cls, MRSData_obj, MRSData_obj.dt, MRSData_obj.f0, MRSData_obj.te, MRSData_obj.ppm0, MRSData_obj.voxel_dimensions, MRSData_obj.transform, MRSData_obj.metadata)
@@ -429,17 +441,21 @@ class MRSData2(suspect.mrsobjects.MRSData):
             sequence_obj = sim.mrs_seq_svs_st(obj.te, obj.tr, nucleus, npts, 1.0 / obj.dt, obj.f0, 1.0)
         elif(sequence_name == "svs_st_vapor_643"):
             sequence_obj = sim.mrs_seq_svs_st_vapor_643(obj.te, obj.tr, nucleus, npts, 1.0 / obj.dt, obj.f0, 1.0, TM_ms)
+        elif(sequence_name == "bow_isis_15"):
+            # TODO : create a sequence implementation for ISIS?
+            sequence_obj = sim.mrs_seq_fid(obj.te, obj.tr, nucleus, npts, 1.0 / obj.dt, obj.f0, 1.0)
         elif(sequence_name is None):
             sequence_obj = None
         else:
             # unknown!
-            raise Exception(' > ouch unknown sequence!')
+            log.error("ouch unknown sequence!")
 
         # adding attributes
+        obj.data_ref = data_ref
         obj._tr = TR_ms
-        obj._patient_birthyear = year_int
-        obj._patient_sex = sex_int
         obj._patient_name = patient_name_str
+        obj._patient_birthday = patient_birthday_datetime
+        obj._patient_sex = patient_sex_int
         obj._patient_weight = patient_weight_kgs
         obj._patient_height = patient_height_m
         obj._vref = vref_v
@@ -447,6 +463,9 @@ class MRSData2(suspect.mrsobjects.MRSData):
         obj._sequence = sequence_obj
         obj._noise_level = 0.0
         obj._timestamp = ulTimeStamp_ms
+        # those need to be called now, because they the attributes above
+        obj.set_display_label()
+        obj.set_display_offset()
 
         # respiratory trace if any
         if(physio_log_file is None):
@@ -478,8 +497,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         resp_data : numpy array [n]
             Respiratory trace
         """
-        # hello
-        cprint(">>> mrs.MRSData2._read_physio_file:", 'green')
+        log.debug("reading physio data...")
 
         # check file extension
         resp_log_filename_short, resp_log_file_extension = os.path.splitext(
@@ -488,7 +506,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             # resp trace are sampled with a 50Hz frequency
             fs = 50.0  # Hz
         else:
-            raise Exception(" > no data scan files specified!")
+            log.error("no data scan files specified!")
 
         # open the log file and the read the trace
         resp_file = open(physio_filepath, 'r')
@@ -583,8 +601,11 @@ class MRSData2(suspect.mrsobjects.MRSData):
         obj : MRSData2 numpy array [1,channels,timepoints]
         """
         super().__array_finalize__(obj)
+        self.data_ref = getattr(obj, 'data_ref', None)
         self._tr = getattr(obj, 'tr', None)
-        self._patient_birthyear = getattr(obj, 'patient_birthyear', None)
+        self._display_label = getattr(obj, 'display_label', None)
+        self._display_offset = getattr(obj, 'display_offset', 0.0)
+        self._patient_birthday = getattr(obj, 'patient_birthday', None)
         self._patient_sex = getattr(obj, 'patient_sex', None)
         self._resp_trace = getattr(obj, 'resp_trace', None)
         self._patient_name = getattr(obj, 'patient_name', None)
@@ -594,7 +615,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         self._shims = getattr(obj, 'shims', None)
         self._timestamp = getattr(obj, 'timestamp', None)
         self._sequence = getattr(obj, 'sequence', None)
-        self._noise_level = getattr(obj, 'noise_level', None)
+        self._noise_level = getattr(obj, 'noise_level', 0.0)
 
     def inherit(self, obj):
         """
@@ -606,8 +627,11 @@ class MRSData2(suspect.mrsobjects.MRSData):
             Multi-channel reference signal
         """
         obj2 = super().inherit(obj)
+        obj2.data_ref = getattr(self, 'data_ref', None)
         obj2._tr = getattr(self, 'tr', None)
-        obj2._patient_birthyear = getattr(self, 'patient_birthyear', None)
+        obj2._display_label = getattr(self, 'display_label', None)
+        obj2._display_offset = getattr(self, 'display_offset', 0.0)
+        obj2._patient_birthday = getattr(self, 'patient_birthday', None)
         obj2._patient_sex = getattr(self, 'patient_sex', None)
         obj2._resp_trace = getattr(self, 'resp_trace', None)
         obj2._patient_name = getattr(self, 'patient_name', None)
@@ -617,8 +641,63 @@ class MRSData2(suspect.mrsobjects.MRSData):
         obj2._shims = getattr(self, 'shims', None)
         obj2._timestamp = getattr(self, 'timestamp', None)
         obj2._sequence = getattr(self, 'sequence', None)
-        obj2._noise_level = getattr(self, 'noise_level', None)
+        obj2._noise_level = getattr(self, 'noise_level', 0.0)
         return(obj2)
+
+    @property
+    def display_label(self):
+        """
+        Property get function for display_label.
+
+        Returns
+        -------
+        self._display_label : string
+            Display label used in display_spectrum method
+        """
+        return(self._display_label)
+
+    def set_display_label(self, lbl=""):
+        """
+        Set the display label.
+
+        Parameters
+        ----------
+        lbl: string
+            New display label for this signal
+        """
+        if((lbl == "" or lbl == []) and self.patient_name is not None and self.sequence.name is not None):
+            # create a usefull label based on patient name, sequence and object id
+            new_lbl = ""
+            if(self.patient_name is not None):
+                new_lbl = new_lbl + self.patient_name + " | "
+            if(self.sequence is not None):
+                new_lbl = new_lbl + self.sequence.name + " | "
+            new_lbl = new_lbl + str(id(self))
+        else:
+            self._display_label = lbl
+
+    @property
+    def display_offset(self):
+        """
+        Property get function for display_offset.
+
+        Returns
+        -------
+        self._display_offset : float
+            Display offset used in display_spectrum method
+        """
+        return(self._display_offset)
+
+    def set_display_offset(self, ofs=0.0):
+        """
+        Set the display offset.
+
+        Parameters
+        ----------
+        ofs: float
+            New display offset for this signal
+        """
+        self._display_offset = ofs
 
     @property
     def tr(self):
@@ -633,16 +712,28 @@ class MRSData2(suspect.mrsobjects.MRSData):
         return(self._tr)
 
     @property
-    def patient_birthyear(self):
+    def patient_name(self):
         """
-        Property get function for patient_birthyear.
+        Property get function for patient_name.
 
         Returns
         -------
-        self._patient_birthyear : int
-            Birthyear of patient
+        self._patient_name : string
+            Name of patient
         """
-        return(self._patient_birthyear)
+        return(self._patient_name)
+
+    @property
+    def patient_birthday(self):
+        """
+        Property get function for patient_birthday.
+
+        Returns
+        -------
+        self._patient_birthday : int
+            Birthday of patient
+        """
+        return(self._patient_birthday)
 
     @property
     def patient_sex(self):
@@ -655,18 +746,6 @@ class MRSData2(suspect.mrsobjects.MRSData):
             Sex of patient (0:M 1:F)
         """
         return(self._patient_sex)
-
-    @property
-    def patient_name(self):
-        """
-        Property get function for patient_name.
-
-        Returns
-        -------
-        self._patient_name : string
-            Name of patient
-        """
-        return(self._patient_name)
 
     @property
     def patient_weight(self):
@@ -764,42 +843,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         """
         return(self._resp_trace)
 
-    def _print_progress_bar(self, current_step, number_steps=None):
-        """
-        Print a small and pretty ASCII progress bar in the terminal. There is maybe some n / n + 1 bug but I don't care.
-
-        Parameters
-        ----------
-        current_step : int
-            Integer describing current status or number of achieved steps
-        number_steps : int
-            Integer describing maximum number of steps to achieve task
-        """
-        max_counter = 30
-        if(current_step == 0 and number_steps is not None):
-            # initialization
-            self._progress_bar_counter = 0
-            self._progress_bar_counter_max = number_steps
-            bar_str = ""
-            for i in range(max_counter):
-                bar_str = bar_str + '░'
-            print(bar_str, end="", flush=True)
-        else:
-            # growing bar?
-            current_bar_counter = int(np.ceil(current_step / self._progress_bar_counter_max * max_counter))
-            if(current_bar_counter > self._progress_bar_counter):
-                bar_str = ""
-                for i in range(max_counter):
-                    bar_str = bar_str + '\b'
-                for i in range(current_bar_counter):
-                    bar_str = bar_str + '█'
-                for i in range(max_counter - current_bar_counter):
-                    bar_str = bar_str + '░'
-
-                print(bar_str, end="", flush=True)
-                self._progress_bar_counter = current_bar_counter
-
-    def cs_displacement(self):
+    def analyze_cs_displacement(self):
         """
         Calculate chemical shift displacement in three directions.
 
@@ -808,28 +852,26 @@ class MRSData2(suspect.mrsobjects.MRSData):
         csd : numpy array of floats
             Estimated CS displacement in %/ppm
         """
-        # hello
-        cprint(">> mrs.reco.MRSData2.cs_displacement:", 'green')
-
         # init
+        log.debug("estimating chemical shift displacement error for [%s]..." % self.display_label)
         csd = [None, None, None]
         df_abs_Hz = self.f0  # yes, 1ppm==f0[MHz]/1e6=297Hz at 7T
 
         if(type(self.sequence) == sim.mrs_seq_eja_svs_slaser):
             # assuming X-Y-Z is done with 90-180-180
-            print(" > estimating CS displacement for semiLASER: assuming (90x)-(180y)-(180z)!...")
+            log.info("estimating CS displacement for semiLASER: assuming (90x)-(180y)-(180z)!...")
 
             # X selection done with asymmetric 90° pulse
             # we do not know much about this pulse. We can only say it is 3.4kHz large if the duration is 2ms
-            print(" > estimating CS displacement for (90x): this pulse is the weird asymmetric one, we have no idea what it is exactly!")
+            log.debug("estimating CS displacement for (90x): this pulse is the weird asymmetric one, we have no idea what it is exactly!")
             if(self.pulse_laser_exc_length == 2000.0):
-                print(" > since its duration is 2ms here, we assume, according to Oz & Tkac, MRM 65:901-910 (2011), that its bandwidth is 3.4kHz.")
+                log.debug("since its duration is 2ms here, we assume, according to Oz & Tkac, MRM 65:901-910 (2011), that its bandwidth is 3.4kHz.")
                 bw_x_Hz = 3400.0
                 grad_x_Hz_m = bw_x_Hz / (self.voxel_size[0] * 0.001)
                 d_x_m = 1000.0 * df_abs_Hz / grad_x_Hz_m
                 d_x_prct = d_x_m / self.voxel_size[0] * 100.0
             else:
-                print(" > since its duration is not 2ms here, we do not know its bandwith. Therefore, no way to calculate the CS displacement for this axis, sorry ;)")
+                log.debug("since its duration is not 2ms here, we do not know its bandwith. Therefore, no way to calculate the CS displacement for this axis, sorry ;)")
                 d_x_m = None
 
             # Y selection done with 180°
@@ -846,13 +888,15 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
             csd = np.array([d_x_prct, d_y_prct, d_z_prct])
         else:
-            print(" > no idea how to calculate CS displacement for this sequence...")
+            log.warning("no idea how to calculate CS displacement for this sequence...")
 
         return(csd)
 
-    def correct_amplify(self, scaling_factor=1e8):
+    def correct_intensity_scaling_nd(self, scaling_factor=1e8):
         """
-        Amplify the FID signals. Sounds useless but can actually help during quantification! Yes, it is not a good idea to fit signals which have intensities around 1e-6 or lower because of various fit tolerances and also digital problems (epsilon)...
+        Amplify the FID signals. Sounds useless but can actually help during quantification! Yes, it is not a good idea to fit signals which have intensities around 1e-6 or lower because of various fit tolerances and also digital problems (epsilon).
+
+        * Works with multi-dimensional signals.
 
         Parameters
         ----------
@@ -864,34 +908,104 @@ class MRSData2(suspect.mrsobjects.MRSData):
         s : MRSData2 numpy array [whatever dimensions]
             Resulting amplified MRSData2 object
         """
-        # hello
-        cprint(">> mrs.reco.MRSData2.correct_amplify:", 'green')
-        print(" > multiplying time-domain signals by %E..." % scaling_factor)
+        log.debug("intensity scaling [%s]..." % self.display_label)
+        log.debug("multiplying time-domain signals by %E..." % scaling_factor)
         # make this louder
         s = self.copy() * scaling_factor
         s = s.inherit(s)
         return(s)
 
-    def correct_fidmodulus(self):
+    def correct_fidmodulus_nd(self):
         """
-        Calculate absolute mode of FID signals.
+        Calculate absolute mode of FID signals. I am not sure I am doing this correctly but it is a first attempt.
+
+        * Works with multi-dimensional signals.
 
         Returns
         -------
-        s : MRSData2 numpy array [averages,channels,timepoints]
+        s : MRSData2 numpy array [whatever dimensions]
             Resulting FID modulus data stored in a MRSData2 object
         """
-        # hello
-        cprint(">> mrs.reco.MRSData2.correct_fidmodulus:", 'green')
-
         # init
+        log.debug("fid modulus [%s]..." % self.display_label)
+        log.debug("calculation magnitude of signal...")
         s = self.copy()
 
         # return magnitude
         s = s.inherit(np.abs(s))
         return(s)
 
-    def correct_phase(self, s_ref, peak_range, weak_ws, high_snr, phase_order, phase_offset=0.0, display=False, display_range=[1, 6]):
+    def correct_zerofill_nd(self, nPoints_final=16384, display=False, display_range=[1, 6]):
+        """
+        Zero-fill MRS data signals along the time axis.
+
+        Parameters
+        ----------
+        nPoints_final : int
+            Final number of points
+        display : boolean
+            Display correction process (True) or not (False)
+        display_range : list [2]
+            Range in ppm used for display
+
+        * Works with multi-dimensional signals.
+
+        Returns
+        -------
+        s_zf : MRSData2 numpy array [whatever,...,timepoints]
+            Resulting zero-filled data stored in a MRSData2 object
+        """
+        # init
+        log.debug("zero-filling [%s]..." % self.display_label)
+        s = self.copy()
+        nZeros = nPoints_final - s.np
+        s_new_shape = list(s.shape)
+        s_new_shape[-1] = nZeros
+        s_zf = s.inherit(np.concatenate((s, np.zeros(s_new_shape)), axis=s.ndim - 1))
+        log.debug("%d-pts signal + %d zeros = %d-pts zero-filled signal..." % (s.np, nZeros, nPoints_final))
+
+        if(display):
+            s_disp = s.copy()
+            s_zf_disp = s_zf.copy()
+            while(s_disp.ndim > 1):
+                s_disp = np.mean(s_disp, axis=0)
+                s_zf_disp = np.mean(s_zf_disp, axis=0)
+
+            fig = plt.figure(110)
+            fig.clf()
+            axs = fig.subplots(2, 2, sharex='row', sharey='row')
+            fig.canvas.set_window_title("mrs.reco.MRSData2.correct_zerofill_nd")
+            fig.suptitle("zero-filling [%s]" % self.display_label, fontsize=11)
+
+            # no time axis, we want to see the number of points
+            axs[0, 0].plot(np.real(s_disp), 'k-', linewidth=1)
+            axs[0, 0].set_xlabel('number of points')
+            axs[0, 0].set_ylabel('original')
+            axs[0, 0].grid('on')
+
+            axs[0, 1].plot(np.real(s_zf_disp), 'b-', linewidth=1)
+            axs[0, 1].set_xlabel('number of points')
+            axs[0, 1].set_ylabel('zero-filled')
+            axs[0, 1].grid('on')
+
+            axs[1, 0].plot(s_disp.frequency_axis_ppm(), s_disp.spectrum().real, 'k-', linewidth=1)
+            axs[1, 0].set_xlabel('chemical shift (ppm)')
+            axs[1, 0].set_ylabel('original')
+            axs[1, 0].set_xlim(display_range[1], display_range[0])
+            axs[1, 0].grid('on')
+
+            axs[1, 1].plot(s_zf_disp.frequency_axis_ppm(), s_zf_disp.spectrum().real, 'b-', linewidth=1)
+            axs[1, 1].set_xlabel("chemical shift (ppm)")
+            axs[1, 1].set_ylabel('zero-filled')
+            axs[1, 1].set_xlim(display_range[1], display_range[0])
+            axs[1, 1].grid('on')
+
+            fig.subplots_adjust()
+            fig.show()
+
+        return(self.inherit(s_zf))
+
+    def correct_phase_3d(self, use_ref_data=True, peak_range=[4.5, 5], weak_ws=False, high_snr=False, phase_order=0, phase_offset=0.0, display=False, display_range=[1, 6]):
         """
         Well, that's a big one but basically it rephases the signal of interest.
 
@@ -900,10 +1014,13 @@ class MRSData2(suspect.mrsobjects.MRSData):
         >If strong water suppression was performed, 0th order phase correction will be done using the phase of a peak in the spectrum; the chemical shift range to find this peak is specified by the user.
         >>Note that those last two approaches can be performed for each average in the case of high SNR (rare) or by averaging all the scans for each channel in the case of lower SNR.
 
+        * Works only with a 3D [averages,channels,timepoints] signal.
+        * Returns a 3D [averages,channels,timepoints] signal.
+
         Parameters
         ----------
-        s_ref : MRSData2 numpy array [1,channels,timepoints]
-            Multi-channel reference signal used to estimate the phase variation in time
+        use_ref_data : boolean
+            Use reference data (usually non water suppressed) for channel combining
         peak_range : list [2]
             Range in ppm used to peak-pick and estimate a phase
         weak_ws : boolean
@@ -921,11 +1038,21 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         Returns
         -------
-        s : MRSData2 numpy array [averages,channels,timepoints]
+        s_phased : MRSData2 numpy array [averages,channels,timepoints]
             Resulting phased data stored in a MRSData2 object
         """
-        # hello
-        cprint(">> mrs.reco.MRSData2.correct_phase:", 'green')
+        log.debug("phasing [%s]..." % self.display_label)
+        # dimensions check
+        if(self.ndim != 3):
+            log.error("this method only works for 3D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
+
+        # check if any ref data
+        if(self.data_ref is None and use_ref_data):
+            log.warning("you want to phase data based on ref. data but no such data is available!")
+            use_ref_data = False
+        # dimensions check for reference data
+        if(use_ref_data and self.data_ref.ndim != 3):
+            log.error("this method only works for 3D signals! You are feeding it with %d-dimensional reference data. :s" % self.ndim)
 
         # init
         s = self.copy()
@@ -944,7 +1071,11 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         # choose which method is adequate
         only_0th_order = (phase_order == 0)
-        if(s_ref is None):
+        if(use_ref_data):
+            # we have a ref scan, so method #0 or #1
+            phase_method = 0 + only_0th_order
+            t_ref = self.data_ref.time_axis()
+        else:
             # we do not have a ref scan, so method #2, #3, #4, #5
             # that depends on water intensity and water suppression
             if(weak_ws):
@@ -955,35 +1086,30 @@ class MRSData2(suspect.mrsobjects.MRSData):
             # and on SNR
             if(high_snr):
                 phase_method -= 1
-        else:
-            # we have a ref scan, so method #0 or #1
-            phase_method = 0 + only_0th_order
-            t_ref = s_ref.time_axis()
-
-        # display chosen method
-        print(" > " + list_phase_method[phase_method])
-        print(" > phasing... ", end="", flush=True)
 
         if(display):
             # prepare subplots
             fig = plt.figure(100)
             fig.clf()
             axs = fig.subplots(2, 3, sharex='col')
-            fig.canvas.set_window_title("mrs.reco.MRSData2.correct_phase")
+            fig.canvas.set_window_title("mrs.reco.MRSData2.correct_phase_3d")
+            fig.suptitle("phasing [%s]" % self.display_label, fontsize=11)
+
+        # display chosen method
+        log.debug("phasing using method: " + list_phase_method[phase_method])
 
         # for each channel
-        self._print_progress_bar(0, s.shape[1] * s.shape[0])
         for c in range(0, s.shape[1]):
 
             if(phase_method == 0 or phase_method == 1):
                 # time-domain phase of reference signal for this channel
-                sp_ref = np.angle(s_ref[0, c, :])
+                sp_ref = np.angle(self.data_ref[0, c, :])
 
                 if(display):
                     # display reference FID
                     axs[0, 0].cla()
-                    axs[0, 0].plot(t_ref, np.real(s_ref[0, c, :]), linewidth=1, label='real part')
-                    axs[0, 0].plot(t_ref, np.imag(s_ref[0, c, :]), linewidth=1, label='imag part')
+                    axs[0, 0].plot(t_ref, np.real(self.data_ref[0, c, :]), linewidth=1, label='real part')
+                    axs[0, 0].plot(t_ref, np.imag(self.data_ref[0, c, :]), linewidth=1, label='imag part')
                     axs[0, 0].set_xlabel('time (s)')
                     axs[0, 0].set_ylabel('intensity (u.a)')
                     axs[0, 0].grid('on')
@@ -1016,9 +1142,13 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 ppm_peak = ppm[ippm_peak]
                 phase_peak_avg = np.angle(sf_avg[ippm_peak])
                 if(ippm_peak == 0):
-                    raise Exception(" > no peak found in specified ppm range or badly phased data!")
+                    log.error("no peak found in specified ppm range or badly phased data!")
                 if(c == 0):
-                    print(" > measuring phase at %0.2fppm on 1st channel!" % ppm_peak)
+                    log.debug("measuring phase at %0.2fppm on 1st channel!" % ppm_peak)
+
+            # late init progress bar
+            if(c == 0):
+                pbar = log.progressbar("phasing", s.shape[1] * s.shape[0])
 
             # now, for each average in meta signal acquired with this channel
             for a in range(0, s.shape[0]):
@@ -1075,8 +1205,10 @@ class MRSData2(suspect.mrsobjects.MRSData):
                         s[a, c, :].spectrum()), linewidth=1, label='real part')
                     if(phase_method == 3):
                         axs[0, 2].plot(ppm[ippm_peak], np.real(sf[ippm_peak]), 'ro')
+                        axs[0, 2].axvline(x=ppm[ippm_peak], color='r', linestyle='--')
                     if(phase_method == 4):
                         axs[0, 2].plot(ppm[ippm_peak], np.real(sf[ippm_peak]), 'ro')
+                        axs[0, 2].axvline(x=ppm[ippm_peak], color='r', linestyle='--')
                     axs[0, 2].set_xlim(display_range[1], display_range[0])
                     axs[0, 2].set_xlabel('time (s)')
                     axs[0, 2].set_ylabel('original')
@@ -1086,7 +1218,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
                     # display corrected meta FID
                     axs[1, 1].cla()
-                    axs[1, 1].plot(t, np.real(s_phased[a, c, :]), linewidth=1, label='real part')
+                    axs[1, 1].plot(t, np.real(s_phased[a, c, :]), 'b-', linewidth=1, label='real part')
                     axs[1, 1].set_xlabel('time (s)')
                     axs[1, 1].set_ylabel('corrected')
                     axs[1, 1].grid('on')
@@ -1094,70 +1226,85 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
                     # display corrected meta spectrum
                     axs[1, 2].cla()
-                    axs[1, 2].plot(ppm, s_phased[a, c, :].spectrum().real, linewidth=1, label='real part')
+                    axs[1, 2].plot(ppm, s_phased[a, c, :].spectrum().real, 'b-', linewidth=1, label='real part')
                     axs[1, 2].set_xlim(display_range[1], display_range[0])
                     axs[1, 2].set_xlabel('frequency (ppm)')
                     axs[1, 2].set_ylabel('corrected')
                     axs[1, 2].grid('on')
                     axs[1, 2].legend()
 
-                    fig.tight_layout()
-                    plt.pause(0.1)
+                    fig.subplots_adjust()
+                    fig.show()
 
-                self._print_progress_bar(c * s.shape[0] + a + 1)
+                pbar.update(c * s.shape[0] + a + 1)
 
-        print(" done.")
+        pbar.finish("done")
 
-        return(self.inherit(s_phased))
+        # convert back to MRSData2
+        s_phased = self.inherit(s_phased)
 
-    def correct_combine_channels(self, s_ref, phasing=True, channels_onoff=[True]):
+        # if any ref data available, we phase it too (silently)
+        if(s_phased.data_ref is not None):
+            s_phased.data_ref = s_phased.data_ref.correct_phase_3d(True)
+
+        return(s_phased)
+
+    def correct_combine_channels_3d(self, use_ref_data=True, phasing=True, channels_onoff=[True]):
         """
         Recombine Rx channels using SVD stuff. If no reference signal is specified, the recombination weights will be calculated from the signal of interest (not optimal).
 
+        * Works only with a 3D [averages,channels,timepoints] signal.
+        * Returns a 2D [averages,timepoints] signal.
+
         Parameters
         ----------
-        s_ref : MRSData2 numpy array [averages,channels,timepoints]
-            Multi-channel reference data (usually non water suppressed) stored in a MRSData2 object
+        use_ref_data : boolean
+            Use reference data (usually non water suppressed) for channel combining
         phasing : boolean
-            Allow 0th order phasing during channel recombine or not
+            Allow 0th order phasing during channel combine or not
         channels_onoff : boolean list [nChannels]
-            Binary weights to apply to each channel forexample to turn off some of them
-
+            Binary weights to apply to each channel for example to turn off some of them
         Returns
         -------
         s_combined : MRSData2 numpy array [averages,timepoints]
             Resulting channel combined data stored in a MRSData2 object
         """
-        # hello
-        cprint(">> mrs.reco.MRSData2.correct_combine_channels:", 'green')
+        log.debug("channel combining [%s]..." % self.display_label)
+        # dimensions check
+        if(self.ndim != 3):
+            log.error("this method only works for 3D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
+
+        # check if any ref data
+        if(self.data_ref is None and use_ref_data):
+            log.warning("you want to channel-combine data based on ref. data but no such data is available!")
+            use_ref_data = False
+        # dimensions check for reference data
+        if(use_ref_data and self.data_ref.ndim != 3):
+            log.error("this method only works for 3D signals! You are feeding it with %d-dimensional reference data. :s" % self.ndim)
 
         # init
         s = self.copy()
         if(s.shape[1] == 1):
-            print(" > no need to recombine this!")
+            log.warning("this is a single-channel signal, no need to recombine this!")
             s_combined = np.mean(s, axis=1)
-            print(" > reshaped to " + str(s_combined.shape))
+            log.warning("reshaped to " + str(s_combined.shape))
         else:
             if(phasing):
-                if(s_ref is not None):
-                    print(
-                        " > WITH reference scan & phasing (original suspect code)...", end="", flush=True)
-                    weights = suspect.processing.channel_combination.svd_weighting(s_ref.mean(axis=0))
+                if(use_ref_data):
+                    log.debug("channel recombine WITH reference scan AND phasing (original suspect code)...")
+                    weights = suspect.processing.channel_combination.svd_weighting(self.data_ref.mean(axis=0))
                 else:
-                    print(
-                        " > WITHOUT reference scan & phasing (original suspect code)...", end="", flush=True)
+                    log.debug("channel recombine WITHOUT reference scan AND phasing (original suspect code)...")
                     s_dirty_mean = np.mean(s, axis=0)
                     weights = suspect.processing.channel_combination.svd_weighting(s_dirty_mean)
             else:
-                if(s_ref is not None):
-                    print(" > WITH reference scan & NO phasing...",
-                          end="", flush=True)
-                    p, _, v = np.linalg.svd(s_ref.mean(axis=0), full_matrices=False)
+                if(use_ref_data):
+                    log.debug("channel recombine WITH reference scan & NO phasing...")
+                    p, _, v = np.linalg.svd(self.data_ref.mean(axis=0), full_matrices=False)
                     channel_weights = p[:, 0].conjugate()
                     weights = -channel_weights / np.sum(np.abs(channel_weights))
                 else:
-                    print(" > WITHOUT reference scan & NO phasing...",
-                          end="", flush=True)
+                    log.debug("channel recombine reference scan & NO phasing...")
                     s_dirty_mean = np.mean(s, axis=0)
                     p, _, v = np.linalg.svd(s_dirty_mean, full_matrices=False)
                     channel_weights = p[:, 0].conjugate()
@@ -1167,109 +1314,74 @@ class MRSData2(suspect.mrsobjects.MRSData):
             channels_onoff_np = np.array(channels_onoff)
             if((channels_onoff_np == False).any()):
                 channels_onoff_float = channels_onoff_np.astype(float)
-                print(" > playing with channel weights...")
-                print(channels_onoff_float)
+                log.debug("playing with channel weights...")
+                log.debug(str(channels_onoff_float))
                 weights = weights * channels_onoff_float
 
-            s_combined = suspect.processing.channel_combination.combine_channels(
-                s, weights)
-            print(" done.")
+            s_combined = suspect.processing.channel_combination.combine_channels(s, weights)
 
-        return(self.inherit(s_combined))
+        # convert back to MRSData2
+        s_combined = self.inherit(s_combined)
 
-    def correct_zerofill(self, nPoints_final, display=True, display_range=[1, 6]):
+        # if any ref data available, we combine it too (silently)
+        if(s_combined.data_ref is not None):
+            s_combined.data_ref = s_combined.data_ref.correct_combine_channels_3d(True, True, channels_onoff)
+
+        return(s_combined)
+
+    def concatenate_2d(self, data):
         """
-        Zero-fill MRS data signals.
+        Concatenate current signal with another one along the averages axis.
+
+        * Works only with a 2D [averages,timepoints] signal.
 
         Parameters
         ----------
-        nPoints_final : int
-            Final number of points
-        display : boolean
-            Display correction process (True) or not (False)
-        display_range : list [2]
-            Range in ppm used for display
+        data : MRSData2 numpy array [averages,timepoints]
+            MRS data to concatenate to the current data
 
         Returns
         -------
-        s_zf : MRSData2 numpy array [averages,timepoints]
-            Resulting zero-filled data stored in a MRSData2 object
+        s.inherit(s_concatenated) : MRSData2 numpy array [averages,timepoints]
+            Resulting concatenated signal
         """
-        # hello
-        cprint(">> mrs.reco.MRSData2.correct_zerofill:", 'green')
+        log.debug("concatenating [%s] to [%s]..." % (self.display_label, data.display_label))
+        # dimensions check
+        if(self.ndim != 2 or data.ndim != 2):
+            log.error("this method only works for 2D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
 
         # init
+        log.debug("concatenating dataset shapes " + str(self.shape) + " and " + str(data.shape) + " ...")
         s = self.copy()
-        print(" > zero-filling data...", end="", flush=True)
-        nZeros = nPoints_final - s.np
-        s_new_shape = list(s.shape)
-        s_new_shape[-1] = nZeros
-        s_zf = s.inherit(np.concatenate((s, np.zeros(s_new_shape)), axis=s.ndim - 1))
 
-        if(display):
-            s_disp = s.copy()
-            s_zf_disp = s_zf.copy()
-            while(s_disp.ndim > 1):
-                s_disp = np.mean(s_disp, axis=0)
-                s_zf_disp = np.mean(s_zf_disp, axis=0)
+        s_concatenated = np.concatenate((self, data))
+        s_concatenated = s.inherit(s_concatenated)
+        log.debug("obtained a dataset shape " + str(s_concatenated.shape))
+        return(s_concatenated)
 
-            fig = plt.figure(110)
-            fig.clf()
-            axs = fig.subplots(2, 2, sharex='row', sharey='row')
-            fig.canvas.set_window_title("mrs.reco.MRSData2.correct_zerofill")
-
-            # no time axis, we want to see the number of points
-            axs[0, 0].plot(np.real(s_disp), 'k-', linewidth=1)
-            axs[0, 0].set_xlabel('number of points')
-            axs[0, 0].set_ylabel('original')
-            axs[0, 0].grid('on')
-
-            axs[0, 1].plot(np.real(s_zf_disp), 'k-', linewidth=1)
-            axs[0, 1].set_xlabel('number of points')
-            axs[0, 1].set_ylabel('zero-filled')
-            axs[0, 1].grid('on')
-
-            axs[1, 0].plot(s_disp.frequency_axis_ppm(), s_disp.spectrum().real, 'k-', linewidth=1)
-            axs[1, 0].set_xlabel('chemical shift (ppm)')
-            axs[1, 0].set_ylabel('original')
-            axs[1, 0].set_xlim(display_range[1], display_range[0])
-            axs[1, 0].grid('on')
-
-            axs[1, 1].plot(s_zf_disp.frequency_axis_ppm(), s_zf_disp.spectrum().real, 'k-', linewidth=1)
-            axs[1, 1].set_xlabel("chemical shift (ppm)")
-            axs[1, 1].set_ylabel('zero-filled')
-            axs[1, 1].set_xlim(display_range[1], display_range[0])
-            axs[1, 1].grid('on')
-
-            fig.tight_layout()
-            # plt.pause(0.1)
-
-        print("done.")
-        return(self.inherit(s_zf))
-
-    def _build_moving_average_data(self, nAvgWindow, beSilent=False):
+    def _build_moving_average_data_2d(self, nAvgWindow=5):
         """
-        Build moving average data in the average dimension. Usefull for the analyse_peak and correct_realign functions.
+        Build moving average data in the average dimension. Usefull for the analyze_peak and correct_realign_2d functions.
+
+        * Works only with a 2D [averages,timepoints] signal.
 
         Parameters
         ----------
         nAvgWindow : int
             Size of the moving average window
-        beSilent : boolean
-            No output in console (True)
 
         Returns
         -------
         s_ma : MRSData2 numpy array [averages,timepoints]
             Resulting moving average data stored in a MRSData2 object. The number of averages is the same as the original data BUT each of those average is actually an average of nAvgWindow spectra.
         """
-        # hello
-        if(not beSilent):
-            print(">>> mrs.reco.MRSData2._build_moving_average_data:")
+        log.debug("calculating moving average for [%s]..." % self.display_label)
+        # dimensions check
+        if(self.ndim != 2):
+            log.error("this method only works for 2D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
 
         # init
-        if(not beSilent):
-            print("  > using a moving window of (" + str(nAvgWindow) + ") averages!")
+        log.debug("moving averaging with window of %d samples!" % nAvgWindow)
         s = self.copy()
 
         # number of averages for moving average?
@@ -1286,14 +1398,16 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         return(s_ma)
 
-    def _analyse_peak(self, peak_range):
+    def _analyze_peak_2d(self, peak_range=[4.5, 5]):
         """
-        Analyse a peak in the spectrum by estimating its amplitude, linewidth, frequency shift and phase for each average.
+        Analyze a peak in the spectrum by estimating its amplitude, linewidth, frequency shift and phase for each average.
+
+        * Works only with a 2D [averages,timepoints] signal.
 
         Parameters
         ----------
         peak_range : array [2]
-            Range in ppm used to analyse peak phase when no reference signal is specified
+            Range in ppm used to analyze peak phase when no reference signal is specified
 
         Returns
         -------
@@ -1304,8 +1418,10 @@ class MRSData2(suspect.mrsobjects.MRSData):
         peak_trace_rel2firstpt : numpy array [averages,4]
             Peak relative changes (amplitude, linewidth, frequency and phase) for each average in raw data relative to 1st point
         """
-        # hello
-        print(">>> mrs.reco.MRSData2._analyse_peak:")
+        log.debug("analyzing peak for [%s]..." % self.display_label)
+        # dimensions check
+        if(self.ndim != 2):
+            log.error("this method only works for 2D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
 
         # first, find peak of interest in range
         ppm = self.frequency_axis_ppm()
@@ -1316,47 +1432,47 @@ class MRSData2(suspect.mrsobjects.MRSData):
         sf_masked[ippm_peak_range] = 0
         ippm_peak_avg = np.argmax(sf_masked, axis=0)
         if(ippm_peak_avg == 0):
-            raise Exception(" > no peak found in specified ppm range or badly phased data!")
+            log.error("no peak found in specified ppm range or badly phased data!")
         ppm_peak_avg = ppm[ippm_peak_avg]
-        print("  > found peak of interest at %0.2fppm!" % ppm_peak_avg)
+        log.debug("found peak of interest at %0.2fppm!" % ppm_peak_avg)
 
         # for each average in moving averaged data
-        print("  > analyzing... ", end="", flush=True)
         peak_trace = np.zeros([self.shape[0], 4])
-        self._print_progress_bar(0, self.shape[0])
+        pbar = log.progressbar("analyzing", self.shape[0])
         for a in range(0, self.shape[0]):
 
             # first, measure shift in ppm
-            sf_masked = np.abs(self[a, :].spectrum())
-            sf_masked[ippm_peak_range] = 0
-            ippm_peak = np.argmax(sf_masked)
+            sf_masked_abs = np.abs(self[a, :].spectrum())
+            sf_masked_abs[ippm_peak_range] = 0
+            ippm_peak = np.argmax(sf_masked_abs)
             if(ippm_peak == 0):
-                raise Exception(" > no peak found in specified ppm range or badly phased data!")
+                log.error("no peak found in specified ppm range or badly phased data!")
             ppm_peak = ppm[ippm_peak]
             peak_trace[a, 2] = ppm_peak
 
             # estimate amplitude
-            sf_masked = np.real(self[a, :].spectrum())
-            sf_masked[ippm_peak_range] = 0
-            ippm_peak = np.argmax(sf_masked)
+            sf_masked_real = np.real(self[a, :].spectrum())
+            sf_masked_real[ippm_peak_range] = 0
+            ippm_peak = np.argmax(sf_masked_real)
             if(ippm_peak == 0):
-                raise Exception(" > no peak found in specified ppm range or badly phased data!")
+                log.error("no peak found in specified ppm range or badly phased data!")
             ppm_peak = ppm[ippm_peak]
-            amp_peak = sf_masked[ippm_peak]
+            amp_peak = sf_masked_real[ippm_peak]
             peak_trace[a, 0] = amp_peak
 
             # estimate linewidth in Hz
-            ippm_half_peak = np.where(sf_masked > amp_peak / 2.0)
-            ippm_min = np.min(ippm_half_peak)
-            ippm_max = np.max(ippm_half_peak)
+            sf_real = np.real(self[a, :].spectrum())
+            ippm_max = ippm_peak + np.argmax(sf_real[ippm_peak:] < amp_peak / 2)
+            ippm_min = ippm_peak - np.argmax(sf_real[ippm_peak::-1] < amp_peak / 2)
             dppm = np.abs(ppm[ippm_max] - ppm[ippm_min])
-            peak_trace[a, 1] = dppm * self.f0
+            lw = dppm * self.f0
+            peak_trace[a, 1] = lw
 
             # estimate phase in rad
-            sf_masked = self[a, :].spectrum()
-            peak_trace[a, 3] = np.angle(sf_masked[ippm_peak])
+            sf_cmplx = self[a, :].spectrum()
+            peak_trace[a, 3] = np.angle(sf_cmplx[ippm_peak])
 
-            self._print_progress_bar(a)
+            pbar.update(a)
 
         # normalize stuff
 
@@ -1374,31 +1490,36 @@ class MRSData2(suspect.mrsobjects.MRSData):
         peak_trace_rel2firstpt[:, 2] = peak_trace[:, 2] - peak_trace[0, 2]
         peak_trace_rel2firstpt[:, 3] = peak_trace[:, 3] - peak_trace[0, 3]
 
-        print(" done.")
+        pbar.finish("done")
         return(peak_trace, peak_trace_rel2mean, peak_trace_rel2firstpt)
 
-    def analyse_physio(self, peak_range, delta_time_range, display=True):
+    def analyze_physio_2d(self, peak_range=[4.5, 5], delta_time_range=1000.0, display=False):
         """
-        Analyse the physiological signal and try to correlate it to a peak amplitude, linewidth, frequency shift and phase variations.
+        Analyze the physiological signal and try to correlate it to a peak amplitude, linewidth, frequency shift and phase variations.
+
+        * Works only with a 2D [averages,timepoints] signal.
 
         Parameters
         ----------
         peak_range : array [2]
-            Range in ppm used to analyse peak phase when no reference signal is specified
+            Range in ppm used to analyze peak phase when no reference signal is specified
         delta_time_range : float
             Range in ms used to correlate / match the NMR and the physiological signal. Yes, since we are not really sure of the start timestamp we found in the TWIX header, we try to match perfectly the two signals.
         display : boolean
             Display correction process (True) or not (False)
         """
-        # hello
-        cprint(">> mrs.reco.MRSData2.analyse_physio:", 'green')
+        log.debug("analyzing physiological signals for [%s]..." % self.display_label)
+        # dimensions check
+        if(self.ndim != 2):
+            log.error("this method only works for 2D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
 
+        # init
         if(self.resp_trace is None):
             # no physio signal here, exiting
             return()
 
         # perform peak analysis
-        peak_prop_abs, _, _ = self._analyse_peak(peak_range)
+        peak_prop_abs, _, _ = self.correct_zerofill_nd()._analyze_peak_2d(peak_range)
 
         # physio signal
         resp_t = self.resp_trace[0]
@@ -1409,10 +1530,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
         dt_array = np.arange(-delta_time_range / 2.0, delta_time_range / 2.0, 1.0)
         cc_2d = np.zeros([dt_array.shape[0], 4])
 
-        print("  > correlating signals... ", end="", flush=True)
-        self._print_progress_bar(0, dt_array.shape[0])
-
         # shift signal and calculate corr coeff
+        pbar = log.progressbar("correlating signals", dt_array.shape[0])
         for idt, dt in enumerate(dt_array):
             # build time scale
             this_resp_t_interp = mri_t.copy() + dt
@@ -1436,7 +1555,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 cc = np.corrcoef(this_resp_s_interp, this_params_trace[:, p])
                 cc_2d[idt, p] = cc[0, 1]
 
-            self._print_progress_bar(idt)
+            pbar.update(idt)
 
         # find time shift that gives best correlation for each parameter
         best_dt_per_par = np.zeros(4)
@@ -1449,35 +1568,35 @@ class MRSData2(suspect.mrsobjects.MRSData):
         cc_2d_all = np.sum(np.abs(cc_2d), axis=1)
         i_maxcorr = np.argmax(cc_2d_all)
         best_dt_all = dt_array[i_maxcorr]
-        print(" done.")
+        pbar.finish("done")
 
         # some info in the term
         st_ms = self.timestamp
-        st_str = datetime.datetime.fromtimestamp(st_ms / 1000 - 3600).strftime('%H:%M:%S')
-        print(">> Data timestamp=\t" + str(st_ms) + "ms\t" + st_str)
-        print(">> Best start time for...")
+        st_str = datetime.fromtimestamp(st_ms / 1000 - 3600).strftime('%H:%M:%S')
+        log.info("data timestamp=\t" + str(st_ms) + "ms\t" + st_str)
+        log.info("best start time for...")
 
         st_ms = self.timestamp + best_dt_per_par[0]
-        st_str = datetime.datetime.fromtimestamp(st_ms / 1000 - 3600).strftime('%H:%M:%S')
-        print(" > amplitude=\t\t" + str(st_ms) + "ms\t" + st_str)
+        st_str = datetime.fromtimestamp(st_ms / 1000 - 3600).strftime('%H:%M:%S')
+        log.info("amplitude=\t\t" + str(st_ms) + "ms\t" + st_str)
         st_ms = self.timestamp + best_dt_per_par[1]
-        st_str = datetime.datetime.fromtimestamp(st_ms / 1000 - 3600).strftime('%H:%M:%S')
-        print(" > linewidth=\t\t" + str(st_ms) + "ms\t" + st_str)
+        st_str = datetime.fromtimestamp(st_ms / 1000 - 3600).strftime('%H:%M:%S')
+        log.info("linewidth=\t\t" + str(st_ms) + "ms\t" + st_str)
         st_ms = self.timestamp + best_dt_per_par[2]
-        st_str = datetime.datetime.fromtimestamp(st_ms / 1000 - 3600).strftime('%H:%M:%S')
-        print(" > frequency=\t\t" + str(st_ms) + "ms\t" + st_str)
+        st_str = datetime.fromtimestamp(st_ms / 1000 - 3600).strftime('%H:%M:%S')
+        log.info("frequency=\t\t" + str(st_ms) + "ms\t" + st_str)
         st_ms = self.timestamp + best_dt_per_par[3]
-        st_str = datetime.datetime.fromtimestamp(st_ms / 1000 - 3600).strftime('%H:%M:%S')
-        print(" > phase=\t\t" + str(st_ms) + "ms\t" + st_str)
+        st_str = datetime.fromtimestamp(st_ms / 1000 - 3600).strftime('%H:%M:%S')
+        log.info("phase=\t\t" + str(st_ms) + "ms\t" + st_str)
         st_ms = self.timestamp + best_dt_all
-        st_str = datetime.datetime.fromtimestamp(st_ms / 1000 - 3600).strftime('%H:%M:%S')
-        print(" > total=\t\t" + str(st_ms) + "ms\t" + st_str)
+        st_str = datetime.fromtimestamp(st_ms / 1000 - 3600).strftime('%H:%M:%S')
+        log.info("total=\t\t" + str(st_ms) + "ms\t" + st_str)
 
         imaxR = np.argmax(best_dt_per_par)
         best_dt = best_dt_per_par[imaxR]
         st_ms = self.timestamp + best_dt
-        st_str = datetime.datetime.fromtimestamp(st_ms / 1000 - 3600).strftime('%H:%M:%S')
-        print(" > max R for=\t\t" + str(st_ms) + "ms\t" + st_str)
+        st_str = datetime.fromtimestamp(st_ms / 1000 - 3600).strftime('%H:%M:%S')
+        log.info("max R for=\t\t" + str(st_ms) + "ms\t" + st_str)
 
         # time shift the signals with optimal shift
         # build time scale
@@ -1499,7 +1618,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             cc_final[p] = cc[0, 1]
 
         # now let's talk about FFT
-        print(">> FFT analysis...", end="", flush=True)
+        log.debug("FFT analysis...")
         nFFT = 2048
         # freq axis for resp trace
         resp_f_axis = np.fft.fftshift(np.fft.fftfreq(nFFT, d=(resp_t[1] - resp_t[0]) / 1000.0))  # Hz ou  / s
@@ -1516,21 +1635,20 @@ class MRSData2(suspect.mrsobjects.MRSData):
         for p in range(4):
             this_params_trace_fft[:, p] = np.abs(np.fft.fftshift(np.fft.fft((this_params_trace[:, p] - np.mean(this_params_trace[:, p])) * signal.windows.hann(this_params_trace.shape[0]), nFFT, axis=0, norm='ortho'), axes=0))
 
-        print(" done.")
-
         if(display):
             # display the cross-correlation plots
             fig = plt.figure(120)
             fig.clf()
             axs = fig.subplots(2, 2, sharex='all')
-            fig.canvas.set_window_title("mrs.reco.MRSData2.analyse_physio_1")
+            fig.canvas.set_window_title("mrs.reco.MRSData2.analyze_physio_2d_1")
+            fig.suptitle("analyzing physiological signals for [%s]" % self.display_label, fontsize=11)
 
             p = 0
             for ix in range(2):
                 for iy in range(2):
                     axs[ix, iy].plot(dt_array, cc_2d[:, p], '-', linewidth=1)
-                    axs[ix, iy].plot([best_dt_per_par[p], best_dt_per_par[p]], [cc_2d[:, p].min(), cc_2d[:, p].max()], 'r-', linewidth=1)
-                    axs[ix, iy].plot([best_dt, best_dt], [cc_2d[:, p].min(), cc_2d[:, p].max()], 'r--', linewidth=1)
+                    axs[ix, iy].axvline(x=best_dt_per_par[p], color='r', linestyle='-')
+                    axs[ix, iy].axvline(x=best_dt, color='r', linestyle='--')
                     axs[ix, iy].set_xlabel('time shift (ms)')
                     axs[ix, iy].grid('on')
                     p = p + 1
@@ -1539,13 +1657,16 @@ class MRSData2(suspect.mrsobjects.MRSData):
             axs[0, 1].set_ylabel('R linewidth. vs. resp.')
             axs[1, 0].set_ylabel('R frequency vs. resp.')
             axs[1, 1].set_ylabel('R phase vs. resp.')
-            fig.tight_layout()
+
+            fig.subplots_adjust()
+            fig.show()
 
             # display time signals
             fig = plt.figure(121)
             fig.clf()
             axs = fig.subplots(2, 2, sharex='all')
-            fig.canvas.set_window_title("mrs.reco.MRSData2.analyse_physio_2")
+            fig.canvas.set_window_title("mrs.reco.MRSData2.analyze_physio_2d_2")
+            fig.suptitle("analyzing physiological signals for [%s]" % self.display_label, fontsize=11)
 
             p = 0
             for ix in range(2):
@@ -1569,13 +1690,16 @@ class MRSData2(suspect.mrsobjects.MRSData):
             axs[0, 1].set_ylabel('Abs. linewidth (Hz)')
             axs[1, 0].set_ylabel('Abs. frequency (Hz)')
             axs[1, 1].set_ylabel('Abs. phase shift (rd)')
-            fig.tight_layout()
+
+            fig.subplots_adjust()
+            fig.show()
 
             # display correlation plots
             fig = plt.figure(122)
             fig.clf()
             axs = fig.subplots(2, 2, sharex='all')
-            fig.canvas.set_window_title("mrs.reco.MRSData2.analyse_physio_3")
+            fig.canvas.set_window_title("mrs.reco.MRSData2.analyze_physio_2d_3")
+            fig.suptitle("analyzing physiological signals for [%s]" % self.display_label, fontsize=11)
 
             p = 0
             for ix in range(2):
@@ -1590,13 +1714,16 @@ class MRSData2(suspect.mrsobjects.MRSData):
             axs[0, 1].set_ylabel('Abs. linewidth (Hz)')
             axs[1, 0].set_ylabel('Abs. frequency (Hz)')
             axs[1, 1].set_ylabel('Abs. phase shift (rd)')
-            fig.tight_layout()
+
+            fig.subplots_adjust()
+            fig.show()
 
             # display FFT plots
             fig = plt.figure(123)
             fig.clf()
             axs = fig.subplots(2, 2, sharex='all')
-            fig.canvas.set_window_title("mrs.reco.MRSData2.analyse_physio_4")
+            fig.canvas.set_window_title("mrs.reco.MRSData2.analyze_physio_2d_4")
+            fig.suptitle("analyzing physiological signals for [%s]" % self.display_label, fontsize=11)
 
             p = 0
             for ix in range(2):
@@ -1615,18 +1742,22 @@ class MRSData2(suspect.mrsobjects.MRSData):
             axs[0, 1].set_ylabel('Abs. linewidth (FFT)')
             axs[1, 0].set_ylabel('Abs. frequency (FFT)')
             axs[1, 1].set_ylabel('Abs. phase shift (FFT)')
-            fig.tight_layout()
+
+            fig.subplots_adjust()
+            fig.show()
 
         # done
 
-    def correct_analyse_and_reject(self, peak_range, moving_Naverages, peak_properties_ranges, peak_properties_rel2mean=True, auto_adjust_lw_bound=False, auto_adjust_allowed_snr_change=-10.0, display=True):
+    def correct_analyze_and_reject_2d(self, peak_range=[4.5, 5], moving_Naverages=1, peak_properties_ranges={"amplitude (%)": None, "linewidth (Hz)": 30.0, "chemical shift (ppm)": 0.5, "phase std. factor (%)": 60.0}, peak_properties_rel2mean=True, auto_adjust_lw_bound=False, auto_adjust_allowed_snr_change=-10.0, display=False):
         """
-        Analyse peak in each average in terms intensity, linewidth, chemical shift and phase and reject data if one of these parameters goes out of the min / max bounds. Usefull to understand what the hell went wrong during your acquisition when you have the raw data (TWIX) and to try to improve things a little...
+        Analyze peak in each average in terms intensity, linewidth, chemical shift and phase and reject data if one of these parameters goes out of the min / max bounds. Usefull to understand what the hell went wrong during your acquisition when you have the raw data (TWIX) and to try to improve things a little...
+
+        * Works only with a 2D [averages,timepoints] signal.
 
         Parameters
         ----------
         peak_range : list
-            Range in ppm used to analyse peak phase when no reference signal is specified
+            Range in ppm used to analyze peak phase when no reference signal is specified
         moving_Naverages : int
             Number of averages to perform when using moving average, need to be an odd number
         peak_properties_ranges : dict
@@ -1649,22 +1780,24 @@ class MRSData2(suspect.mrsobjects.MRSData):
         s_cor : MRSData2 numpy array [averages,timepoints]
            Data remaining after data rejection stored in a MRSData2 object.
         """
-        # hello
-        cprint(">> mrs.reco.MRSData2.correct_analyse_and_reject:", 'green')
+        log.debug("analyzing data and rejecting some for [%s]..." % self.display_label)
+        # dimensions check
+        if(self.ndim != 2):
+            log.error("this method only works for 2D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
 
         # init
         s = self.copy()
         if(s.shape[0] == 1):
-            print(" > single-shot signal, nothing to analyse!")
+            log.warning("single-shot signal, nothing to analyze!")
             return(s)
 
         ppm = s.frequency_axis_ppm()
 
         # build moving averaged data
-        s_ma = self._build_moving_average_data(moving_Naverages)
+        s_ma = self.correct_zerofill_nd()._build_moving_average_data_2d(moving_Naverages)
 
         # perform peak analysis
-        peak_prop_abs, peak_prop_rel2mean, peak_prop_rel2firstpt = s_ma._analyse_peak(peak_range)
+        peak_prop_abs, peak_prop_rel2mean, peak_prop_rel2firstpt = s_ma._analyze_peak_2d(peak_range)
 
         # first set the data according to relative option: this is a user option
         if(peak_properties_rel2mean):
@@ -1672,16 +1805,16 @@ class MRSData2(suspect.mrsobjects.MRSData):
         else:
             peak_prop_rel = peak_prop_rel2firstpt
 
-        # choose if absolute or relative will be analysed: this is hard-coded
-        peak_prop_analyse = peak_prop_abs * 0.0
+        # choose if absolute or relative will be analyzed: this is hard-coded
+        peak_prop_analyze = peak_prop_abs * 0.0
         # amplitude: relative in %
-        peak_prop_analyse[:, 0] = peak_prop_rel[:, 0]
+        peak_prop_analyze[:, 0] = peak_prop_rel[:, 0]
         # linewidth: absolute in Hz
-        peak_prop_analyse[:, 1] = peak_prop_abs[:, 1]
+        peak_prop_analyze[:, 1] = peak_prop_abs[:, 1]
         # frequency: relative in ppm
-        peak_prop_analyse[:, 2] = peak_prop_rel[:, 2]
+        peak_prop_analyze[:, 2] = peak_prop_rel[:, 2]
         # phase: absolute in rad
-        peak_prop_analyse[:, 3] = peak_prop_abs[:, 3]
+        peak_prop_analyze[:, 3] = peak_prop_abs[:, 3]
 
         # choose if absolute or relative will be displayed
         peak_prop_disp = peak_prop_rel * 0.0
@@ -1698,18 +1831,18 @@ class MRSData2(suspect.mrsobjects.MRSData):
         t_ma = np.linspace(0, self.tr * s.shape[0], s_ma.shape[0]) / 1000.0  # s
 
         # stats
-        print(">> peak analysis -> means ± std. deviations")
-        print(" > Rel. peak amplitude = %.2f ± %.2f %%" % (peak_prop_disp[:, 0].mean(), peak_prop_disp[:, 0].std()))
-        print(" > Abs. linewidth = %.1f ± %.1f Hz (%.3f ± %.3f ppm)" % (peak_prop_disp[:, 1].mean(), peak_prop_disp[:, 1].std(), (peak_prop_disp[:, 1] / s_ma.f0).mean(), (peak_prop_disp[:, 1] / s_ma.f0).std()))
-        print(" > Abs. frequency = %.2f ± %.2f ppm (± %.1f Hz)" % (peak_prop_disp[:, 2].mean(), peak_prop_disp[:, 2].std(), (peak_prop_disp[:, 2] * s_ma.f0).std()))
-        print(" > Abs. phase = %.2f ± %.2f rad" % (peak_prop_disp[:, 3].mean(), peak_prop_disp[:, 3].std()))
+        log.info("peak analysis: means ± std. deviations")
+        log.info("rel. peak amplitude = %.2f ± %.2f %%" % (peak_prop_disp[:, 0].mean(), peak_prop_disp[:, 0].std()))
+        log.info("abs. linewidth = %.1f ± %.1f Hz (%.3f ± %.3f ppm)" % (peak_prop_disp[:, 1].mean(), peak_prop_disp[:, 1].std(), (peak_prop_disp[:, 1] / s_ma.f0).mean(), (peak_prop_disp[:, 1] / s_ma.f0).std()))
+        log.info("abs. frequency = %.2f ± %.2f ppm (± %.1f Hz)" % (peak_prop_disp[:, 2].mean(), peak_prop_disp[:, 2].std(), (peak_prop_disp[:, 2] * s_ma.f0).std()))
+        log.info("abs. phase = %.2f ± %.2f rad" % (peak_prop_disp[:, 3].mean(), peak_prop_disp[:, 3].std()))
 
         # check for Nones
         peak_properties_ranges_list = list(peak_properties_ranges.values())
-        peak_properties_ranges_list[peak_properties_ranges_list == None] = np.inf
+        peak_properties_ranges_list = [np.inf if p is None else p for p in peak_properties_ranges_list]
 
         # special for phase: rejection range is a factor of std
-        phase_std = peak_prop_analyse[:, 3].std()
+        phase_std = peak_prop_analyze[:, 3].std()
         phase_std_reject_range = peak_properties_ranges_list[3] / 100.0 * phase_std
 
         # prepare rejection ranges
@@ -1727,13 +1860,12 @@ class MRSData2(suspect.mrsobjects.MRSData):
             # automatic rejection based on lw
 
             # first find optimal lw sweeping range
-            lw_min = (np.floor(peak_prop_analyse[:, 1].min() / 10.0)) * 10.0
-            lw_max = (np.floor(peak_prop_analyse[:, 1].max() / 10.0) + 1.0) * 10.0
+            lw_min = (np.floor(peak_prop_analyze[:, 1].min() / 10.0)) * 10.0
+            lw_max = (np.floor(peak_prop_analyze[:, 1].max() / 10.0) + 1.0) * 10.0
             lw_range = np.arange(lw_min, lw_max, 1.0)
 
             # iterate between max and min for linewidth, and test the resulting data
-            print(">> adjusting linewidth threshold ... ", end="", flush=True)
-            self._print_progress_bar(0, lw_range.shape[0])
+            pbar = log.progressbar("adjusting linewidth threshold", lw_range.shape[0])
 
             test_snr_list = np.zeros(lw_range.shape)
             test_lw_list = np.zeros(lw_range.shape)
@@ -1750,27 +1882,30 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 this_mask_reject_data = np.full([s_ma.shape[0], 4], False)
                 for a in range(0, s_ma.shape[0]):
                     for p in range(4):
-                        if(peak_prop_analyse[a, p] < peak_prop_min_auto[p]):
+                        if(peak_prop_analyze[a, p] < peak_prop_min_auto[p]):
                             this_mask_reject_data[a, p] = True
-                        if(peak_prop_analyse[a, p] > peak_prop_max_auto[p]):
+                        if(peak_prop_analyze[a, p] > peak_prop_max_auto[p]):
                             this_mask_reject_data[a, p] = True
 
                 # reject data now
                 this_mask_reject_data_sumup = (this_mask_reject_data.sum(axis=1) > 0)
                 this_s_cor = s[(this_mask_reject_data_sumup == False), :]
 
-                # analyse snr / lw and number of rejections
+                # analyze snr / lw and number of rejections
                 if(this_mask_reject_data_sumup.sum() < s_ma.shape[0]):
-                    test_snr_list[ilw], _, _ = this_s_cor._correct_realign()._correct_average()._correct_apodization().analyse_snr(peak_range, [-1, 0], '', False, False, False, [1, 6], True)
-                    test_lw_list[ilw] = this_s_cor._correct_realign()._correct_average()._correct_apodization().analyse_linewidth(peak_range, '', False, False, [1, 6], True)
+                    old_level = log.getLevel()
+                    log.setLevel(log.ERROR)
+                    test_snr_list[ilw], _, _ = this_s_cor.correct_zerofill_nd().correct_realign_2d().correct_average_2d().correct_apodization_1d().analyze_snr_1d(peak_range)
+                    test_lw_list[ilw] = this_s_cor.correct_zerofill_nd().correct_realign_2d().correct_average_2d().correct_apodization_1d().analyze_linewidth_1d(peak_range)
+                    log.setLevel(old_level)
                     test_nrej_list[ilw] = this_mask_reject_data_sumup.sum()
 
                 # progression
-                self._print_progress_bar(ilw)
+                pbar.update(ilw)
 
-            print(" done.")
+            pbar.finish("done")
 
-            # analyse SNR curve choose LW threshold
+            # analyze SNR curve choose LW threshold
             snr_initial = test_snr_list[-1]
             snr_threshold = snr_initial + snr_initial * auto_adjust_allowed_snr_change / 100.0
             test_snr_list_rel = test_snr_list / snr_initial * 100.0 - 100.0
@@ -1778,7 +1913,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
             if(not test_snr_list_mask.any()):
                 # that was a bit ambitious
-                Warning(" > Sorry but your exceptation regarding the SNR was a bit ambitious! You are refusing to go under %.0f%% SNR change. While trying to adjust the linewidth criteria for data rejection, the best we found was a %.0f%% SNR change :(" % (auto_adjust_allowed_snr_change, test_snr_list_rel.max()))
+                log.warning("sorry but your exceptation regarding the SNR was a bit ambitious! You are refusing to go under %.0f%% SNR change. While trying to adjust the linewidth criteria for data rejection, the best we found was a %.0f%% SNR change :(" % (auto_adjust_allowed_snr_change, test_snr_list_rel.max()))
                 # set optimal LW to max
                 optim_lw = lw_max
             else:
@@ -1786,7 +1921,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 # let's choose the one with the lowest LW
                 ind_lowest_lw = np.argmax(test_snr_list_rel > auto_adjust_allowed_snr_change)
                 optim_lw = lw_range[ind_lowest_lw]
-                print(" > Found optimal linewidth for data rejection = %.1f Hz" % optim_lw)
+                log.info("found optimal linewidth for data rejection = %.1f Hz" % optim_lw)
                 # adjusting bounds
                 peak_prop_max[1] = optim_lw
 
@@ -1797,7 +1932,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 axs = fig.subplots(1, 2, sharex='all')
                 ax2 = axs[0].twinx()
                 ax3 = axs[1].twinx()
-                fig.canvas.set_window_title("mrs.reco.MRSData2.correct_analyse_and_reject (auto)")
+                fig.canvas.set_window_title("mrs.reco.MRSData2.correct_analyze_and_reject_2d (auto)")
+                fig.suptitle("adjusting linewidth data rejection criteria for [%s]" % self.display_label, fontsize=11)
 
                 axs[0].plot(lw_range, test_snr_list, 'rx-', label='SNR')
                 axs[0].plot([optim_lw, optim_lw], [test_snr_list.min(), test_snr_list.max()], 'm--', label='Optimal linewidth')
@@ -1820,36 +1956,36 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 ax3.set_ylabel('Estimated linewidth (Hz)', fontsize=9)
                 ax3.set_ylabel('Rejection percentage (%)', fontsize=9)
 
-                fig.tight_layout()
+                fig.subplots_adjust()
+                fig.show()
 
         # for each average, check if peak parameters are in the min / max bounds
-        print(">> rejecting data ... ", end="", flush=True)
         mask_reject_data = np.full([s_ma.shape[0], 4], False)
-        self._print_progress_bar(0, s_ma.shape[0])
+        pbar = log.progressbar("rejecting data", s_ma.shape[0])
         for a in range(0, s_ma.shape[0]):
             for p in range(4):
-                if(peak_prop_analyse[a, p] < peak_prop_min[p]):
+                if(peak_prop_analyze[a, p] < peak_prop_min[p]):
                     mask_reject_data[a, p] = True
-                if(peak_prop_analyse[a, p] > peak_prop_max[p]):
+                if(peak_prop_analyze[a, p] > peak_prop_max[p]):
                     mask_reject_data[a, p] = True
 
-            self._print_progress_bar(a)
+            pbar.update(a)
 
-        print(" done.")
+        pbar.finish("done")
 
         # stats regarding data rejection, how many, for what reasons, overall percentage
-        print(">> data rejection -> summary")
-        print(">> number of averages rejected because of...")
-        print(" > amplitude = %d" % mask_reject_data[:, 0].sum())
-        print(" > linewidth = %d" % mask_reject_data[:, 1].sum())
-        print(" > frequency = %d" % mask_reject_data[:, 2].sum())
-        print(" > phase = %d" % mask_reject_data[:, 3].sum())
+        log.info("data rejection: summary")
+        log.info("number of averages rejected because of...")
+        log.info("amplitude = %d" % mask_reject_data[:, 0].sum())
+        log.info("linewidth = %d" % mask_reject_data[:, 1].sum())
+        log.info("frequency = %d" % mask_reject_data[:, 2].sum())
+        log.info("phase = %d" % mask_reject_data[:, 3].sum())
 
         # actually reject data now
         mask_reject_data_sumup = (mask_reject_data.sum(axis=1) > 0)
         s_cor = s[(mask_reject_data_sumup == False), :]
 
-        print(" > TOTAL data rejection = %d / %d (%.0f%%)" % (mask_reject_data_sumup.sum(), s_ma.shape[0], (mask_reject_data_sumup.sum() / s_ma.shape[0] * 100)))
+        log.info("TOTAL data rejection = %d / %d (%.0f%%)" % (mask_reject_data_sumup.sum(), s_ma.shape[0], (mask_reject_data_sumup.sum() / s_ma.shape[0] * 100)))
 
         # final display
         if(display):
@@ -1857,19 +1993,20 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig = plt.figure(131)
             fig.clf()
             axs = fig.subplots(2, 3, sharex='all')
-            fig.canvas.set_window_title("mrs.reco.MRSData2.correct_analyse_and_reject")
+            fig.canvas.set_window_title("mrs.reco.MRSData2.correct_analyze_and_reject_2d")
+            fig.suptitle("analyzing data and rejecting some for [%s]" % self.display_label, fontsize=11)
 
             k = 0
             for ix in range(2):
                 for iy in range(2):
                     # original data
-                    axs[ix, iy].plot(t_ma, peak_prop_analyse[:, k], 'k-x', linewidth=1)
+                    axs[ix, iy].plot(t_ma, peak_prop_analyze[:, k], 'k-x', linewidth=1)
                     # rejected data
                     t_ma_rej = t_ma[mask_reject_data[:, k]]
-                    this_peak_prop_analyse_rej = peak_prop_analyse[mask_reject_data[:, k], k]
-                    axs[ix, iy].plot(t_ma_rej, this_peak_prop_analyse_rej, 'ro', linewidth=1)
-                    axs[ix, iy].plot(t_ma, peak_prop_min[k] * np.ones(t_ma.shape), '-r', linewidth=1)
-                    axs[ix, iy].plot(t_ma, peak_prop_max[k] * np.ones(t_ma.shape), '-r', linewidth=1)
+                    this_peak_prop_analyze_rej = peak_prop_analyze[mask_reject_data[:, k], k]
+                    axs[ix, iy].plot(t_ma_rej, this_peak_prop_analyze_rej, 'ro', linewidth=1)
+                    axs[ix, iy].axhline(y=peak_prop_min[k], color='r', linestyle='--')
+                    axs[ix, iy].axhline(y=peak_prop_max[k], color='r', linestyle='--')
                     k = k + 1
 
             axs[0, 0].set_ylabel('Rel. amplitude change (%)', fontsize=9)
@@ -1904,61 +2041,61 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 else:
                     plt.plot(ppm, s_ma[k, :].spectrum().real * ampfactor + ystep * k, 'g-', linewidth=1)
 
-                sf_masked = np.real(s_ma[k, :].spectrum())
-                sf_masked[ippm_peak_range] = 0
-                ippm_peak = np.argmax(sf_masked)
+                # build lineshape segment
+                sf_analyze = np.real(s_ma[k, :].spectrum())
+                sf_analyze_cropped = sf_analyze.copy()
+                sf_analyze_cropped[ippm_peak_range] = 0
+                ippm_peak = np.argmax(sf_analyze_cropped)
                 if(ippm_peak == 0):
-                    raise Exception(" > no peak found in specified ppm range or badly phased data!")
-                amp_peak = sf_masked[ippm_peak]
-                ippm_half_peak = np.where(sf_masked > amp_peak / 2)
-                plt.plot(ppm[ippm_half_peak], sf_masked[ippm_half_peak].spectrum().real * ampfactor + ystep * k, 'k-', linewidth=1)
+                    log.error("no peak found in specified ppm range or badly phased data!")
+
+                # estimate linewidth in Hz
+                amp_peak = sf_analyze[ippm_peak]
+                ippm_max = ippm_peak + np.argmax(sf_analyze[ippm_peak:] < amp_peak / 2)
+                ippm_min = ippm_peak - np.argmax(sf_analyze[ippm_peak::-1] < amp_peak / 2)
+                ippm_half_peak = np.arange(ippm_min, ippm_max)
+                plt.plot(ppm[ippm_half_peak], sf_analyze[ippm_half_peak] * ampfactor + ystep * k, 'k-', linewidth=1)
 
             plt.xlim(peak_range[1], peak_range[0])
             plt.xlabel('chemical shift (ppm)', fontsize=9)
             plt.ylabel('individual spectra', fontsize=9)
+            plt.yticks([])
             plt.grid('on')
-
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                fig.tight_layout(rect=[0, 0, 1, 1])
-
-            # plt.pause(0.1)
+            fig.subplots_adjust()
+            fig.show()
 
         # wait, are we removing all data ???
         if(mask_reject_data_sumup.sum() == s.shape[0]):
-            raise Exception(" > All data is rejected! You need to readjust your rejection bounds...")
+            log.error("all data is rejected! You need to readjust your rejection bounds...")
 
         return(s_cor)
 
-    def correct_realign(self, peak_range, moving_Naverages, display=True, display_range=[1, 6]):
-        """Kind of wrapper method for the method just below."""
-        return(self._correct_realign(peak_range, moving_Naverages, display, display_range, False))
-
-    def _correct_realign(self, peak_range=[4, 6], moving_Naverages=1, display=False, display_range=[1, 6], beSilent=True):
+    def correct_realign_2d(self, peak_range=[4.5, 5], moving_Naverages=1, display=False, display_range=[1, 6]):
         """
         Realign each signal of interest in frequency by taking as a reference the first spectra in absolute mode.
+
+        * Works only with a 2D [averages,timepoints] signal.
 
         Parameters
         ----------
         peak_range : list [2]
-            Range in ppm used to analyse peak phase
+            Range in ppm used to analyze peak phase
         moving_Naverages : int
             Number of averages to perform when using moving average, need to be an odd number
         display : boolean
             Display correction process (True) or not (False)
         display_range : list [2]
             Range in ppm used for display
-        beSilent : boolean
-            No output in console (True)
 
         Returns
         -------
         s_realigned : MRSData2 numpy array [averages,timepoints]
             Resulting frequency realigned data stored in a MRSData2 object
         """
-        # hello
-        if(not beSilent):
-            cprint(">> mrs.reco.MRSData2.correct_realign:", 'green')
+        log.debug("frequency realigning [%s]..." % self.display_label)
+        # dimensions check
+        if(self.ndim != 2):
+            log.error("this method only works for 2D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
 
         # init
         s = self.copy()
@@ -1966,11 +2103,10 @@ class MRSData2(suspect.mrsobjects.MRSData):
         s_realigned = s.copy()
 
         if(s.shape[0] == 1):
-            if(not beSilent):
-                print(" > single-shot signal, cannot realign!")
+            log.warning("single-shot signal, cannot realign this!")
         else:
             # build moving averaged data
-            s_ma = self._build_moving_average_data(moving_Naverages, beSilent)
+            s_ma = self._build_moving_average_data_2d(moving_Naverages)
 
             # find peak in average spectrum absolute mode
             s_avg = np.mean(s, axis=0)
@@ -1982,16 +2118,12 @@ class MRSData2(suspect.mrsobjects.MRSData):
             if(ippm_peak_avg == 0):
                 raise Exception(" > no peak found in specified ppm range or badly phased data!")
             ppm_peak_avg = ppm[ippm_peak_avg]
-            if(not beSilent):
-                print(" > measuring peak properties at %0.2fppm!" % ppm_peak_avg)
+            log.debug("measuring peak properties at %0.2fppm!" % ppm_peak_avg)
 
             # for each average in moving averaged data
             s_realigned_ma = s_ma.copy()
             df_trace = np.zeros(s_ma.shape[0])
-            if(not beSilent):
-                print(" > realigning... ", end="", flush=True)
-            if(not beSilent):
-                self._print_progress_bar(0, s_ma.shape[0])
+            pbar = log.progressbar("realigning", s_ma.shape[0])
             for a in range(0, s_ma.shape[0]):
 
                 # measure shift on moving average data
@@ -1999,7 +2131,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 sf_masked[ippm_peak_range] = 0
                 ippm_peak = np.argmax(sf_masked)
                 if(ippm_peak == 0):
-                    raise Exception(" > no peak found in specified ppm range or badly phased data!")
+                    log.error("no peak found in specified ppm range or badly phased data!")
                 ppm_peak = ppm[ippm_peak]
 
                 # estimate frequency shift in Hz compared to average spectrum
@@ -2012,10 +2144,9 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 # correct original data
                 s_realigned[a, :] = s[a, :].adjust_frequency(df_trace[a])
 
-                if(not beSilent):
-                    self._print_progress_bar(a)
-            if(not beSilent):
-                print(" done.")
+                pbar.update(a)
+
+            pbar.finish("done")
 
             # final display
             if(display):
@@ -2023,7 +2154,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 fig = plt.figure(140)
                 fig.clf()
                 axs = fig.subplots(2, 3, sharex='all', sharey='all')
-                fig.canvas.set_window_title("mrs.reco.MRSData2.correct_realign")
+                fig.canvas.set_window_title("mrs.reco.MRSData2.correct_realign_2d")
+                fig.suptitle("frequency realigning [%s]" % self.display_label, fontsize=11)
 
                 # display original averaged spectrum
                 axs[0, 0].plot(ppm, sf_avg_abs, 'k-', linewidth=1)
@@ -2032,6 +2164,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 axs[0, 0].grid('on')
                 # add peak position
                 axs[0, 0].plot(ppm_peak_avg, sf_avg_abs[ippm_peak_avg], 'ro')
+                axs[0, 0].axvline(x=ppm_peak_avg, color='r', linestyle='--')
 
                 # display original data
                 axs[0, 1].plot(ppm, np.abs(s_ma.spectrum().transpose()), 'k-', linewidth=1)
@@ -2040,14 +2173,14 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 axs[0, 1].grid('on')
 
                 # display corrected spectrum
-                axs[1, 0].plot(s_realigned_ma.frequency_axis_ppm(), np.abs(s_realigned_ma.spectrum().transpose()), 'k-', linewidth=1)
+                axs[1, 0].plot(s_realigned_ma.frequency_axis_ppm(), np.abs(s_realigned_ma.spectrum().transpose()), 'b-', linewidth=1)
                 axs[1, 0].set_xlim(display_range[1], display_range[0])
                 axs[1, 0].set_xlabel('chemical shift (ppm)')
                 axs[1, 0].set_ylabel('corrected')
                 axs[1, 0].grid('on')
 
                 # display corrected averaged spectrum
-                axs[1, 1].plot(s_realigned_ma.frequency_axis_ppm(), np.abs(np.mean(s_realigned_ma, axis=0).spectrum().transpose()), 'k-', linewidth=1)
+                axs[1, 1].plot(s_realigned_ma.frequency_axis_ppm(), np.abs(np.mean(s_realigned_ma, axis=0).spectrum().transpose()), 'b-', linewidth=1)
                 axs[1, 1].set_xlim(display_range[1], display_range[0])
                 axs[1, 1].set_xlabel('chemical shift (ppm)')
                 axs[1, 1].set_ylabel('averaged & corrected')
@@ -2058,19 +2191,16 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 plt.xlabel('estimated frequency shift (Hz)')
                 plt.ylabel('average index')
                 plt.grid('on')
-
-                fig.tight_layout()
-                # plt.pause(0.1)
+                fig.subplots_adjust()
+                fig.show()
 
         return(self.inherit(s_realigned))
 
-    def correct_average(self, na=None, display=True, display_range=[1, 6]):
-        """Kind of wrapper method for the method just below."""
-        return(self._correct_average(na, display, display_range, False))
-
-    def _correct_average(self, na=None, display=False, display_range=[1, 6], beSilent=True):
+    def correct_average_2d(self, na=None, display=False, display_range=[1, 6]):
         """
         Average all averages data into one 1D MRS signal.
+
+        * Works only with a 2D [averages,timepoints] signal.
 
         Parameters
         ----------
@@ -2080,50 +2210,35 @@ class MRSData2(suspect.mrsobjects.MRSData):
             Display correction process (True) or not (False)
         display_range : list [2]
             Range in ppm used for display
-        beSilent : boolean
-            No output in console (True)
 
         Returns
         -------
         s_mean : MRSData2 numpy array [timepoints]
             Resulting frequency realigned data stored in a MRSData2 object
         """
-        # hello
-        if(not beSilent):
-            cprint(">> mrs.reco.MRSData2.correct_average", 'green')
+        log.debug("averaging [%s]..." % self.display_label)
+        # dimensions check
+        if(self.ndim != 2):
+            log.error("this method only works for 2D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
 
         # init
         s = self.copy()
 
         if(s.shape[0] == 1):
-            if(not beSilent):
-                print(" > single-shot signal, nothing to average!")
+            log.warning("single-shot signal, nothing to average!")
             s_mean = np.mean(s, axis=0)
-            if(not beSilent):
-                print(" > reshaped to a " + str(s_mean.shape) + " vector")
+            log.warning("reshaped to a " + str(s_mean.shape) + " vector")
         else:
-            if(not beSilent):
-                print(" > averaging data...", end="", flush=True)
-
-            # check parameters
-            if not display:
-                display = 0
-            if not any(display_range):
-                display_range = np.array([0, 5])
+            log.debug("averaging data...")
 
             if(na is not None):
+                log.debug("only " + str(na) + "...")
                 if(na == 1):
                     s_mean = s[0, :]
                 else:
                     s_mean = np.mean(s[0:(na - 1), :], axis=0)
-
-                if(not beSilent):
-                    print("only " + str(na) + "...", end="", flush=True)
             else:
                 s_mean = np.mean(s, axis=0)
-
-            # keep average dimension and set to 1
-            # s_mean=s_mean.reshape((1,) + s_mean.shape)
 
             if(display):
                 ppm = s.frequency_axis_ppm()
@@ -2132,7 +2247,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 fig = plt.figure(150)
                 fig.clf()
                 axs = fig.subplots(2, 1, sharex='all', sharey='all')
-                fig.canvas.set_window_title("mrs.reco.MRSData2.correct_average")
+                fig.canvas.set_window_title("mrs.reco.MRSData2.correct_average_2d")
+                fig.suptitle("averaging [%s]" % self.display_label, fontsize=11)
 
                 axs[0].plot(ppm, s.spectrum().real.transpose(), 'k-', linewidth=1)
                 axs[0].set_xlim(display_range[1], display_range[0])
@@ -2140,25 +2256,53 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 axs[0].set_ylabel('all spectra')
                 axs[0].grid('on')
 
-                axs[1].plot(ppm_mean, s_mean.spectrum().real.transpose(), 'k-', linewidth=1)
+                axs[1].plot(ppm_mean, s_mean.spectrum().real.transpose(), 'b-', linewidth=1)
                 axs[1].set_xlim(display_range[1], display_range[0])
                 axs[1].set_xlabel('chemical shift (ppm)')
                 axs[1].set_ylabel('averaged spectrum')
                 axs[1].grid('on')
 
-                fig.tight_layout()
-                # plt.pause(0.1)
-
-            if(not beSilent):
-                print("done.")
+                fig.subplots_adjust()
+                fig.show()
 
         return(self.inherit(s_mean))
 
-    def correct_apodization(self, apo_factor, nPoints_final=4096, display=True, display_range=[1, 6]):
-        """Kind of wrapper method for the method just below."""
-        return(self._correct_apodization(apo_factor, nPoints_final, display, display_range, False))
+    def analyze_noise_1d(self, n_pts=100):
+        """
+        Measure noise level in time domain and store it in the "noise_level" attribute. This is usefull to keep track of the original noise level for later use, CRB normalization durnig quantification for example.
 
-    def _correct_apodization(self, apo_factor=1.0, nPoints_final=4096, display=False, display_range=[1, 6], beSilent=True):
+        * Works only with a 1D [timepoints] signal.
+
+        Parameters
+        ----------
+        n_pts : int
+            Apodization factor in Hz
+
+        Returns
+        -------
+        noise_lev : float
+            Time-domain noise level
+        """
+        log.debug("estimating noise level for [%s]..." % self.display_label)
+        # dimensions check
+        if(self.ndim != 1):
+            log.error("this method only works for 1D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
+
+        # init
+        log.debug("estimating noise level in FID using last %d points..." % n_pts)
+        s = self.copy()
+        s_real = np.real(s)
+        # noise is the std of the last real points, but that is not so simple
+        # we really want real noise, not zeros from zero-filling
+        s_nonzero_mask = (s_real != 0.0)
+        s_analyze = s_real[s_nonzero_mask]
+        # now take the last 100 points
+        noise_lev = np.std(s_analyze[-n_pts:-1])
+        log.info("noise level = %.2E" % noise_lev)
+
+        return(noise_lev)
+
+    def correct_apodization_1d(self, apo_factor=1.0, display=False, display_range=[1, 6]):
         """
         Apodize signal using an exponential window adjusted by a linewidth parameter in Hz. Works only for a 1D MRSData2 object.
 
@@ -2166,44 +2310,28 @@ class MRSData2(suspect.mrsobjects.MRSData):
         ----------
         apo_factor : float
             Apodization factor in Hz
-        nPoints_final : int
-            Final number of points (crop)
         display : boolean
             Display correction process (True) or not (False)
         display_range : list [2]
             Range in ppm used for display
-        beSilent : boolean
-            No output in console (True)
 
         Returns
         -------
         s_apo : MRSData2 numpy array [timepoints]
             Resulting apodized data stored in a MRSData2 object
         """
-        # hello
-        if(not beSilent):
-            cprint(">> mrs.reco.MRSData2.correct_apodization:", 'green')
+        log.debug("apodizing [%s]..." % self.display_label)
+        # dimensions check
+        if(self.ndim != 1):
+            log.error("this method only works for 1D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
 
         # init
-        if(not beSilent):
-            print(" > apodizing data", end="", flush=True)
         s = self.copy()
         t = s.time_axis()
         w_apo = np.exp(-apo_factor * t)
         s_apo = s * w_apo
-        # crop
-        if(nPoints_final < s_apo.shape[0]):
-            if(not beSilent):
-                print(", cropping data ", end="", flush=True)
-            s_apo = s_apo[0:nPoints_final]
-            if(self.sequence is not None):
-                if(not beSilent):
-                    print(", updating sequence npts ", end="", flush=True)
-                self.sequence.npts = nPoints_final
-                self.sequence._ready = False
 
         if(display):
-            t_apo = s_apo.time_axis()
             ppm = s.frequency_axis_ppm()
             ppm_apo = s_apo.frequency_axis_ppm()
 
@@ -2211,6 +2339,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig.clf()
             axs = fig.subplots(2, 2, sharex='row', sharey='row')
             fig.canvas.set_window_title("mrs.reco.MRSData2.correct_apodization")
+            fig.suptitle("apodizing [%s]" % self.display_label, fontsize=11)
 
             axs[0, 0].plot(t, np.abs(s), 'k-', linewidth=1, label='fid')
             axs[0, 0].plot(t, w_apo * np.abs(s.max()), 'r-', linewidth=1, label='apodization window')
@@ -2218,7 +2347,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             axs[0, 0].set_ylabel('original')
             axs[0, 0].grid('on')
 
-            axs[0, 1].plot(t_apo, np.abs(s_apo), 'k-', linewidth=1)
+            axs[0, 1].plot(t, np.abs(s_apo), 'b-', linewidth=1)
             axs[0, 1].set_xlabel('time (s)')
             axs[0, 1].set_ylabel('apodized')
             axs[0, 1].grid('on')
@@ -2229,23 +2358,101 @@ class MRSData2(suspect.mrsobjects.MRSData):
             axs[1, 0].set_xlim(display_range[1], display_range[0])
             axs[1, 0].grid('on')
 
-            axs[1, 1].plot(ppm_apo, s_apo.spectrum().real, 'k-', linewidth=1)
+            axs[1, 1].plot(ppm_apo, s_apo.spectrum().real, 'b-', linewidth=1)
             axs[1, 1].set_xlabel("chemical shift (ppm)")
             axs[1, 1].set_ylabel('apodized spectrum')
             axs[1, 1].set_xlim(display_range[1], display_range[0])
             axs[1, 1].grid('on')
 
-            fig.tight_layout()
-            # plt.pause(0.1)
-
-        if(not beSilent):
-            print("...done.")
+            fig.subplots_adjust()
+            fig.show()
 
         return(self.inherit(s_apo))
 
-    def correct_water_removal(self, hsvd_nComponents, hsvd_range, display=True, display_range=[1, 6]):
+    def correct_crop_1d(self, nPoints_final=4096, display=False, display_range=[1, 6]):
+        """
+        Crop signal in time-domain to remove last points.
+
+        * Works only with a 1D [timepoints] signal.
+
+        Parameters
+        ----------
+        nPoints_final : int
+            Final number of points (after crop)
+        display : boolean
+            Display correction process (True) or not (False)
+        display_range : list [2]
+            Range in ppm used for display
+
+        Returns
+        -------
+        s_crop : MRSData2 numpy array [timepoints]
+            Resulting cropped data stored in a MRSData2 object
+        """
+        log.debug("cropping [%s]..." % self.display_label)
+        # dimensions check
+        if(self.ndim != 1):
+            log.error("this method only works for 1D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
+
+        # init
+        s = self.copy()
+
+        # crop
+        if(nPoints_final < s.shape[0]):
+            log.debug("cropping data from %d to %d points..." % (s.shape[0], nPoints_final))
+            s_crop = s[0:nPoints_final]
+            if(self.sequence is not None):
+                log.debug("updating sequence.npts...")
+                self.sequence.npts = nPoints_final
+                self.sequence._ready = False
+        else:
+            s_crop = self.copy()
+            log.debug("no cropping needed, getting bored...")
+
+        if(display):
+            t = s.time_axis()
+            t_crop = s_crop.time_axis()
+            ppm = s.frequency_axis_ppm()
+            ppm_crop = s_crop.frequency_axis_ppm()
+
+            fig = plt.figure(170)
+            fig.clf()
+            axs = fig.subplots(2, 2, sharex='row', sharey='row')
+            fig.canvas.set_window_title("mrs.reco.MRSData2.correct_crop_1d")
+            fig.suptitle("cropping [%s]" % self.display_label, fontsize=11)
+
+            axs[0, 0].plot(t, np.abs(s), 'k-', linewidth=1, label='fid')
+            axs[0, 0].set_xlabel('time (s)')
+            axs[0, 0].set_ylabel('original')
+            axs[0, 0].grid('on')
+
+            axs[0, 1].plot(t_crop, np.abs(s_crop), 'b-', linewidth=1)
+            axs[0, 1].set_xlabel('time (s)')
+            axs[0, 1].set_ylabel('cropped')
+            axs[0, 1].grid('on')
+
+            axs[1, 0].plot(ppm, s.spectrum().real, 'k-', linewidth=1)
+            axs[1, 0].set_xlabel('chemical shift (ppm)')
+            axs[1, 0].set_ylabel('original spectrum')
+            axs[1, 0].set_xlim(display_range[1], display_range[0])
+            axs[1, 0].grid('on')
+
+            axs[1, 1].plot(ppm_crop, s_crop.spectrum().real, 'b-', linewidth=1)
+            axs[1, 1].set_xlabel("chemical shift (ppm)")
+            axs[1, 1].set_ylabel('cropped spectrum')
+            axs[1, 1].set_xlim(display_range[1], display_range[0])
+            axs[1, 1].grid('on')
+
+            fig.subplots_adjust()
+            fig.show()
+
+        return(self.inherit(s_crop))
+
+    def correct_water_removal_1d(self, hsvd_nComponents=5, hsvd_range=[4.6, 4.8], display=False, display_range=[1, 6]):
         """
         Remove any water residual peak(s) within a ppm range using HSVD.
+
+        * Works only with a 1D [timepoints] signal.
 
         Parameters
         ----------
@@ -2263,41 +2470,43 @@ class MRSData2(suspect.mrsobjects.MRSData):
         s_water_removed : MRSData2 numpy array [timepoints]
             Resulting water HSVD suppressed data stored in a MRSData2 object
         """
-        # hello
-        cprint(">> mrs.reco.MRSData2.correct_water_removal:", 'green')
+        log.debug("removing water peak for [%s]..." % self.display_label)
+        # dimensions check
+        if(self.ndim != 1):
+            log.error("this method only works for 1D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
 
         # init
-        print(" > removing residual water peak with HSVD... ", end="", flush=True)
         s = self.copy()
         ppm = s.frequency_axis_ppm()
-        self._print_progress_bar(0, 5)
+        pbar = log.progressbar("removing residual water peak with HSVD", 5)
 
         # estimate HSVD components
         components = suspect.processing.water_suppression.hsvd(s, hsvd_nComponents)
-        self._print_progress_bar(1)
+        pbar.update(1)
 
         # filter them by keeping the ones contributing to the residual water peak and its sidebands
         water_components = [component for component in components if ((4.7 - component["frequency"] / self.f0) > hsvd_range[0] and (4.7 - component["frequency"] / self.f0) < hsvd_range[1])]
-        self._print_progress_bar(2)
+        pbar.update(2)
 
         # reconstruct the estimated water peak
         hsvd_fid = suspect.processing.water_suppression.construct_fid(water_components, s.time_axis())
-        self._print_progress_bar(3)
+        pbar.update(3)
 
         # rebuild object
         hsvd_fid = s.inherit(hsvd_fid)
-        self._print_progress_bar(4)
+        pbar.update(4)
 
         # and substract it from the fid
         s_water_removed = s - hsvd_fid
-        self._print_progress_bar(5)
+        pbar.update(5)
 
         # display this over the data
         if(display):
-            fig = plt.figure(170)
+            fig = plt.figure(180)
             fig.clf()
             axs = fig.subplots(2, 1, sharex='all', sharey='all')
-            fig.canvas.set_window_title("mrs.reco.MRSData2.correct_water_removal")
+            fig.canvas.set_window_title("mrs.reco.MRSData2.correct_water_removal_1d")
+            fig.suptitle("removing water peak for [%s]" % self.display_label, fontsize=11)
 
             # original spectrum
             axs[0].plot(ppm, s.spectrum().real, 'k-', linewidth=1, label='original data (real part)')
@@ -2309,27 +2518,25 @@ class MRSData2(suspect.mrsobjects.MRSData):
             axs[0].legend()
 
             # water removed spectrum
-            axs[1].plot(ppm, s_water_removed.spectrum().real, 'k-', linewidth=1)
+            axs[1].plot(ppm, s_water_removed.spectrum().real, 'b-', linewidth=1)
             axs[1].set_xlim(display_range[1], display_range[0])
             axs[1].set_xlabel('chemical shift (ppm)')
             axs[1].set_ylabel('water removed spectrum')
             axs[1].grid('on')
             axs[1].legend()
 
-            fig.tight_layout()
-            # plt.pause(0.1)
+            fig.subplots_adjust()
+            fig.show()
 
-        print(" done.")
+        pbar.finish("done")
 
         return(self.inherit(s_water_removed))
 
-    def correct_freqshift(self, peak_range=[4, 5], peak_real_ppm=4.7, display=True, display_range=[1, 6]):
-        """Kind of wrapper method for the method just below."""
-        return(self._correct_freqshift(peak_range, peak_real_ppm, display, display_range, False))
-
-    def _correct_freqshift(self, peak_range=[4, 5], peak_real_ppm=4.7, display=False, display_range=[1, 6], beSilent=True):
+    def correct_freqshift_1d(self, peak_range=[4.5, 5], peak_real_ppm=4.7, display=False, display_range=[1, 6]):
         """
-        Shift the spectrum in frequency in order to get the right peaks at the right chemical shifts. Peak-picking is done in magnitude mode to reduce sensitivity to phase shit.
+        Shift the spectrum in frequency in order to get the right peaks at the right chemical shifts.
+
+        * Works only with a 1D [timepoints] signal.
 
         Parameters
         ----------
@@ -2347,9 +2554,10 @@ class MRSData2(suspect.mrsobjects.MRSData):
         s_shifted : MRSData2 numpy array [timepoints]
             Resulting frequency calibrated data stored in a MRSData2 object
         """
-        # hello
-        if(not beSilent):
-            cprint(">> mrs.reco.MRSData2.correct_freqshift:", 'green')
+        log.debug("calibrating [%s]..." % self.display_label)
+        # dimensions check
+        if(self.ndim != 1):
+            log.error("this method only works for 1D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
 
         # init
         s = self.copy()
@@ -2357,51 +2565,55 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         # find maximum peak in range and its chemical shift
         ippm_peak_range = (peak_range[0] > ppm) | (ppm > peak_range[1])
-        sf_abs_masked = np.abs(s.spectrum())
+        sf_abs_masked = np.real(s.spectrum())
         sf_abs_masked[ippm_peak_range] = 0
         ippm_peak = np.argmax(sf_abs_masked)
         if(ippm_peak == 0):
-            raise Exception(" > no peak found in specified ppm range or badly phased data!")
+            log.error("no peak found in specified ppm range or badly phased data!")
         ppm_peak = ppm[ippm_peak]
-        if(not beSilent):
-            print(" > peak detected at %0.2fppm -> %0.2fppm!" % (ppm_peak, peak_real_ppm))
+        log.debug("peak detected at %0.2fppm -> %0.2fppm!" % (ppm_peak, peak_real_ppm))
 
-        if(not beSilent):
-            print(" > frequency shifting data...", end="", flush=True)
         # estimate frequency shift in Hz
+        log.debug("frequency shifting data...")
         dppm = (peak_real_ppm - ppm_peak)
         df = dppm * s.f0
         s_shifted = s.adjust_frequency(-df)
 
         if(display):
-            fig = plt.figure(180)
+            fig = plt.figure(190)
             fig.clf()
             axs = fig.subplots(2, 1, sharex='all', sharey='all')
-            fig.canvas.set_window_title("mrs.reco.MRSData2.correct_freqshift")
+            fig.canvas.set_window_title("mrs.reco.MRSData2.correct_freqshift_1d")
+            fig.suptitle("calibrating [%s]" % self.display_label, fontsize=11)
 
             axs[0].plot(ppm, s.spectrum().real, 'k-', linewidth=1)
             axs[0].set_xlim(display_range[1], display_range[0])
             axs[0].set_xlabel('chemical shift (ppm)')
             axs[0].set_ylabel('original')
             axs[0].grid('on')
+            # add peak position
+            axs[0].plot(ppm_peak, s.spectrum()[ippm_peak].real, 'ro')
+            axs[0].axvline(x=ppm_peak, color='r', linestyle='--')
 
-            axs[1].plot(ppm, s_shifted.spectrum().real, 'k-', linewidth=1)
+            axs[1].plot(ppm, s_shifted.spectrum().real, 'b-', linewidth=1)
             axs[1].set_xlim(display_range[1], display_range[0])
             axs[1].set_xlabel('chemical shift (ppm)')
             axs[1].set_ylabel('shifted')
             axs[1].grid('on')
+            # add new peak position
+            axs[1].plot(peak_real_ppm, s.spectrum()[ippm_peak].real, 'ro')
+            axs[1].axvline(x=peak_real_ppm, color='r', linestyle='--')
 
-            fig.tight_layout()
-            # plt.pause(0.1)
-
-        if(not beSilent):
-            print("done.")
+            fig.subplots_adjust()
+            fig.show()
 
         return(self.inherit(s_shifted))
 
-    def analyse_snr(self, peak_range, noise_range, lbl, time_domain=False, magnitude_mode=False, display=True, display_range=[1, 6], beSilent=False):
+    def analyze_snr_1d(self, peak_range, noise_range=[-1, 0], magnitude_mode=False, display=False, display_range=[1, 6]):
         """
         Estimate the SNR of a peak in the spectrum ; chemical shift ranges for the peak and the noise regions are specified by the user. Can also look at time-domain SNR. Works only for a 1D MRSData2 objects.
+
+        * Works only with a 1D [timepoints] signal.
 
         Parameters
         ----------
@@ -2409,18 +2621,12 @@ class MRSData2(suspect.mrsobjects.MRSData):
             Range in ppm used to find a peak of interest
         noise_range : list [2]
             Range in ppm used to estimate noise
-        lbl : string
-            Plot label to specify
-        time_domain : boolean
-            Time domain SNR estimation: in real part, signal is max, noise is std of last 100 points
         magnitude_mode : boolean
-            Analyse signal in magnitude mode (True) or the real part (False)
+            analyze signal in magnitude mode (True) or the real part (False)
         display : boolean
             Display process (True) or not (False)
         display_range : list [2]
             Range in ppm used for display
-        beSilent : boolean
-            No output in console (True)
 
         Returns
         -------
@@ -2431,165 +2637,110 @@ class MRSData2(suspect.mrsobjects.MRSData):
         n : float
             Resulting noise value
         """
-        # hello
-        if(not beSilent):
-            cprint(">> mrs.reco.MRSData2.analyse_snr:", 'green')
-
-        # constant for now: number of last time points to analyse for noise
-        npts_noise = 100
+        log.debug("analyzing SNR for [%s]..." % self.display_label)
+        # dimensions check
+        if(self.ndim != 1):
+            log.error("this method only works for 1D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
 
         # init
         s = self.copy()
         # display
         if(display):
-            fig = plt.figure(190)
+            fig = plt.figure(200)
             fig.clf()
             axs = fig.subplots(2, 1, sharex='all', sharey='all')
-            fig.canvas.set_window_title("mrs.reco.MRSData2.analyse_snr")
+            fig.canvas.set_window_title("mrs.reco.MRSData2.analyze_snr_1d")
+            fig.suptitle("analyzing SNR for [%s]" % self.display_label, fontsize=11)
 
-        if(time_domain):
-            # time-domain SNR estimation
-            t = s.time_axis() * 1000.0
-            if(magnitude_mode):
-                s_analyse = np.abs(s)
-                if(not beSilent):
-                    print(" > going to analyse the MAGNITUDE FID ", end="", flush=True)
-            else:
-                s_analyse = np.real(s)
-                if(not beSilent):
-                    print(" > going to analyse the REAL FID ", end="", flush=True)
-
-            # signal is the max of signal (usually the first point)
-            imax_time = np.argmax(s_analyse)
-            snr_signal = s_analyse[imax_time]
-            # noise is the std of the last real points, but that is not so simple
-            # we really want real noise, not zeroes from zero-filling
-            s_nonzero_mask = (s != 0.0)
-            t = t[s_nonzero_mask]
-            s_analyse = s_analyse[s_nonzero_mask]
-            # now take the last 100 points
-            snr_noise = np.std(s_analyse[-npts_noise:-1])
-
-            if(display):
-                axs[0].plot(t, np.real(s_analyse.spectrum()), 'k-', linewidth=1)
-                axs[0].set_xlabel('time (ms)')
-                axs[0].set_ylabel('real part')
-                axs[0].grid('on')
-
-                axs[1].plot(t, np.abs(s_analyse.spectrum()), 'k-', linewidth=1)
-                axs[1].set_xlabel('time (ms)')
-                axs[1].set_ylabel('magnitude mode')
-                axs[1].grid('on')
-
-                if(magnitude_mode):
-                    ax = axs[1]
-                else:
-                    ax = axs[0]
-
-                # show peak of interest
-                ax.plot(t[imax_time], s_analyse[imax_time], 'ro')
-
-                # show noise region
-                ax.plot(t[-npts_noise:-1], s_analyse[-npts_noise:-1], 'bo')
+        # find maximum peak in range and its chemical shift
+        ppm = s.frequency_axis_ppm()
+        sf = s.spectrum()
+        if(magnitude_mode):
+            sf_analyze = np.abs(sf)
+            log.debug("going to analyze the MAGNITUDE spectrum...")
         else:
-            # frequency-domain SNR estimation
+            sf_analyze = np.real(sf)
+            log.debug("going to analyze the REAL spectrum...")
 
-            # find maximum peak in range and its chemical shift
-            ppm = s.frequency_axis_ppm()
-            sf = s.spectrum()
+        ippm_peak_range = (peak_range[0] > ppm) | (ppm > peak_range[1])
+        sf_analyze2 = sf_analyze.copy()
+        sf_analyze2[ippm_peak_range] = 0
+        ippm_peak = np.argmax(sf_analyze2)
+        if(ippm_peak == 0):
+            log.warning("no peak found in specified ppm range or badly phased data!")
+            return(np.nan, np.nan, np.nan)
+
+        ppm_peak = ppm[ippm_peak]
+        log.debug("by measuring the intensity at %0.2fppm!" % ppm_peak)
+        snr_signal = sf_analyze[ippm_peak]
+
+        # estimate noise in user specified spectral region
+        log.debug("estimating noise from %0.2f to %0.2fppm region!" % (noise_range[0], noise_range[1]))
+        ippm_noise_range = (noise_range[0] < ppm) & (ppm < noise_range[1])
+        snr_noise = np.std(sf_analyze[ippm_noise_range])
+
+        if(display):
+            axs[0].plot(ppm, np.real(s.spectrum()), 'k-', linewidth=1)
+            axs[0].set_xlim(display_range[1], display_range[0])
+            axs[0].set_xlabel('chemical shift (ppm)')
+            axs[0].set_ylabel('real part')
+            axs[0].grid('on')
+
+            axs[1].plot(ppm, np.abs(s.spectrum()), 'k-', linewidth=1)
+            axs[1].set_xlim(display_range[1], display_range[0])
+            axs[1].set_xlabel('chemical shift (ppm)')
+            axs[1].set_ylabel('magnitude mode')
+            axs[1].grid('on')
+
             if(magnitude_mode):
-                sf_analyse = np.abs(sf)
-                if(not beSilent):
-                    print(" > going to analyse the MAGNITUDE spectrum ", end="", flush=True)
+                ax = axs[1]
             else:
-                sf_analyse = np.real(sf)
-                if(not beSilent):
-                    print(" > going to analyse the REAL spectrum ", end="", flush=True)
+                ax = axs[0]
 
-            ippm_peak_range = (peak_range[0] > ppm) | (ppm > peak_range[1])
-            sf_analyse2 = sf_analyse.copy()
-            sf_analyse2[ippm_peak_range] = 0
-            ippm_peak = np.argmax(sf_analyse2)
-            if(ippm_peak == 0):
-                Warning(" > no peak found in specified ppm range or badly phased data!")
-                return(np.nan)
-
-            ppm_peak = ppm[ippm_peak]
-            if(not beSilent):
-                print("by measuring the intensity at %0.2fppm!" % ppm_peak)
-
-            snr_signal = sf_analyse[ippm_peak]
-
-            # estimate noise in user specified spectral region
-            if(not beSilent):
-                print(" > estimating noise from %0.2f to %0.2fppm region!" % (noise_range[0], noise_range[1]))
-            ippm_noise_range = (noise_range[0] < ppm) & (ppm < noise_range[1])
-            snr_noise = np.std(sf_analyse[ippm_noise_range])
-
-            if(display):
-                axs[0].plot(ppm, np.real(s.spectrum()), 'k-', linewidth=1)
-                axs[0].set_xlim(display_range[1], display_range[0])
-                axs[0].set_xlabel('chemical shift (ppm)')
-                axs[0].set_ylabel('real part')
-                axs[0].grid('on')
-
-                axs[1].plot(ppm, np.abs(s.spectrum()), 'k-', linewidth=1)
-                axs[1].set_xlim(display_range[1], display_range[0])
-                axs[1].set_xlabel('chemical shift (ppm)')
-                axs[1].set_ylabel('magnitude mode')
-                axs[1].grid('on')
-
-                if(magnitude_mode):
-                    ax = axs[1]
-                else:
-                    ax = axs[0]
-
-                # show peak of interest
-                ax.plot(ppm[ippm_peak], sf_analyse[ippm_peak], 'ro')
-                # show noise region
-                ax.plot(ppm[ippm_noise_range], sf_analyse[ippm_noise_range], 'bo')
+            # show peak of interest
+            ax.plot(ppm[ippm_peak], sf_analyze[ippm_peak], 'ro')
+            ax.axvline(x=ppm[ippm_peak], color='r', linestyle='--')
+            # show noise region
+            ax.plot(ppm[ippm_noise_range], sf_analyze[ippm_noise_range], 'bo')
 
         # finish display
         if(display):
-            fig.tight_layout()
-            # plt.pause(0.1)
+            fig.subplots_adjust()
+            fig.show()
 
         # that's it
         snr = snr_signal / snr_noise
-        if(not beSilent):
-            print(" > results for [" + lbl + "] coming...")
-        if(not beSilent):
-            print(" > S = %.2E, N = %.2E, SNR = %0.2f!" % (snr_signal, snr_noise, snr))
+        log.info("results for [" + s.display_label + "] coming...")
+        log.info("S = %.2E, N = %.2E, SNR = %0.2f!" % (snr_signal, snr_noise, snr))
 
         return(snr, snr_signal, snr_noise)
 
-    def analyse_linewidth(self, peak_range, lbl, magnitude_mode=False, display=True, display_range=[1, 6], beSilent=False):
+    def analyze_linewidth_1d(self, peak_range, magnitude_mode=False, display=False, display_range=[1, 6]):
         """
-        Estimate the linewidth of a peak in the spectrum ; chemical shift ranges for the peak and the noise regions are specified by the user. !Works only for a 1D MRSData2 object.
+        Estimate the linewidth of a peak in the spectrum ; chemical shift ranges for the peak and the noise regions are specified by the user.
+
+        * Works only with a 1D [timepoints] signal.
 
         Parameters
         ----------
         peak_range : list [2]
             Range in ppm used to find a peak of interest
-        lbl : string
-            Plot label to specify
         magnitude_mode : boolean
-            Analyse signal in magnitude mode (True) or the real part (False)
+            analyze signal in magnitude mode (True) or the real part (False)
         display : boolean
             Display process (True) or not (False)
         display_range : list [2]
             Range in ppm used for display
-        beSilent : boolean
-            No output in console (True)
 
         Returns
         -------
         lw : float
             Linewidth in Hz
         """
-        # hello
-        if(not beSilent):
-            cprint(">> mrs.reco.MRSData2.analyse_linewidth:", 'green')
+        log.debug("analyzing peak linewidth for [%s]..." % self.display_label)
+        # dimensions check
+        if(self.ndim != 1):
+            log.error("this method only works for 1D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
 
         # init
         s = self.copy()
@@ -2598,41 +2749,38 @@ class MRSData2(suspect.mrsobjects.MRSData):
         # find maximum peak in range and its chemical shift
         sf = s.spectrum()
         if(magnitude_mode):
-            sf_analyse = np.abs(sf)
-            if(not beSilent):
-                print(" > going to analyse the MAGNITUDE spectrum ", end="", flush=True)
+            sf_analyze = np.abs(sf)
+            log.debug("going to analyze the MAGNITUDE spectrum...")
         else:
-            sf_analyse = np.real(sf)
-            if(not beSilent):
-                print(" > going to analyse the REAL spectrum ", end="", flush=True)
+            sf_analyze = np.real(sf)
+            log.debug("going to analyze the REAL spectrum...")
 
         # find peak in range
         ippm_peak_range = (peak_range[0] > ppm) | (ppm > peak_range[1])
-        sf_analyse[ippm_peak_range] = 0
-        ippm_peak = np.argmax(sf_analyse)
+        sf_analyze_cropped = sf_analyze.copy()
+        sf_analyze_cropped[ippm_peak_range] = 0
+        ippm_peak = np.argmax(sf_analyze_cropped)
         if(ippm_peak == 0):
-            raise Exception(" > no peak found in specified ppm range or badly phased data!")
+            log.error("no peak found in specified ppm range or badly phased data!")
         ppm_peak = ppm[ippm_peak]
-        if(not beSilent):
-            print("and estimate the linewidth of the peak at %0.2fppm!" % ppm_peak)
+        log.debug("estimating the peak linewidth at %0.2fppm!" % ppm_peak)
 
         # estimate linewidth in Hz
-        amp_peak = sf_analyse[ippm_peak]
-        ippm_half_peak = np.where(sf_analyse > amp_peak / 2)
-        ippm_min = np.min(ippm_half_peak)
-        ippm_max = np.max(ippm_half_peak)
+        amp_peak = sf_analyze[ippm_peak]
+        ippm_max = ippm_peak + np.argmax(sf_analyze[ippm_peak:] < amp_peak / 2)
+        ippm_min = ippm_peak - np.argmax(sf_analyze[ippm_peak::-1] < amp_peak / 2)
+        ippm_half_peak = np.arange(ippm_min, ippm_max)
         dppm = np.abs(ppm[ippm_max] - ppm[ippm_min])
         lw = dppm * s.f0
-        if(not beSilent):
-            print(" > results for [" + lbl + "] coming...")
-        if(not beSilent):
-            print(" > LW = %0.2f Hz!" % lw)
+        log.info("results for [" + s.display_label + "] coming...")
+        log.info("LW = %0.2f Hz!" % lw)
 
         if(display):
-            fig = plt.figure(200)
+            fig = plt.figure(210)
             fig.clf()
             axs = fig.subplots(2, 1, sharex='all', sharey='all')
-            fig.canvas.set_window_title("mrs.reco.MRSData2.analyse_linewidth")
+            fig.canvas.set_window_title("mrs.reco.MRSData2.analyze_linewidth_1d")
+            fig.suptitle("analyzing peak linewidth for [%s]" % self.display_label, fontsize=11)
 
             axs[0].plot(ppm, np.real(s.spectrum()), 'k-', linewidth=1)
             axs[0].set_xlim(display_range[1], display_range[0])
@@ -2652,16 +2800,18 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 ax = axs[0]
 
             # show noise region
-            ax.plot(ppm[ippm_half_peak], sf_analyse[ippm_half_peak], 'r-')
+            ax.plot(ppm[ippm_half_peak], sf_analyze[ippm_half_peak], 'r-')
 
-            fig.tight_layout()
-            # plt.pause(0.1)
+            fig.subplots_adjust()
+            fig.show()
 
         return(lw)
 
-    def display_spectrum(self, ifig=1, lbl="", display_range=[1, 6], amp_factor=1.0, yoffset=0.0, magnitude_mode=False):
+    def display_spectrum_1d(self, ifig=1, display_range=[1, 6], magnitude_mode=False):
         """
         Display spectrum in figure 'ifig', overlaying if needed.
+
+        * Works only with a 1D [timepoints] signal.
 
         Parameters
         ----------
@@ -2669,14 +2819,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
             The figure index that shoud host the plot
         s : MRSData2 numpy array [timepoints]
             MRS data to display
-        lbl : string
-            Plot label to specify
         display_range : list [2]
             Range in ppm used for display
-        amp_factor : float
-            Spectrum intensity amplification factor
-        yoffset : float
-            Spectrum intensity offset
         magnitude_mode : boolean
             Displays in magnitude mode (True) or the real part (False)
 
@@ -2685,23 +2829,25 @@ class MRSData2(suspect.mrsobjects.MRSData):
         fig : matplotlib.figure
             Resulting matplotlib figure
         """
-        # hello
-        cprint(">> mrs.reco.MRSData2.display_spectrum:", 'green')
+        log.debug("displaying [%s]..." % self.display_label)
+        # dimensions check
+        if(self.ndim != 1):
+            log.error("this method only works for 1D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
 
         # init
         s = self.copy()
-        print(" > displaying stuff!")
+        log.debug("displaying stuff!")
 
-        plt.figure(ifig).canvas.set_window_title("mrs.reco.MRSData2.display_spectrum")
+        plt.figure(ifig).canvas.set_window_title("mrs.reco.MRSData2.display_spectrum_1d")
         if(magnitude_mode):
-            plt.plot(s.frequency_axis_ppm(), np.abs(s.spectrum()) * amp_factor + yoffset, linewidth=1, label=lbl)
+            plt.plot(s.frequency_axis_ppm(), np.abs(s.spectrum()) + self.display_offset, linewidth=1, label=self.display_label)
         else:
-            plt.plot(s.frequency_axis_ppm(), s.spectrum().real * amp_factor + yoffset, linewidth=1, label=lbl)
+            plt.plot(s.frequency_axis_ppm(), s.spectrum().real + self.display_offset, linewidth=1, label=self.display_label)
 
         # add ytick if offset
-        if(yoffset != 0):
+        if(self.display_offset != 0):
             yt = plt.yticks()
-            yt2 = np.hstack((yt[0], yoffset))
+            yt2 = np.hstack((yt[0], self.display_offset))
             yt3 = np.sort(yt2)
             plt.yticks(yt3)
 
@@ -2713,11 +2859,112 @@ class MRSData2(suspect.mrsobjects.MRSData):
         plt.grid('on')
         plt.legend()
 
-        plt.tight_layout()
+        plt.subplots_adjust()
+        plt.show()
 
         return(plt)
 
-    def save2mat(self, mat_filepath):
+    def save_ismrmd(self, h5_filepath):
+        """
+        Save the MRSData2 object to a ISMRMRD format file. This function depends on ismrmrd-python, available at https://github.com/ismrmrd/ismrmrd-python. General info about this open file format is available here: https://ismrmrd.github.io/. Got inspired by this example: https://github.com/ismrmrd/ismrmrd-python-tools/blob/master/generate_cartesian_shepp_logan_dataset.py .
+
+        Parameters
+        ----------
+        h5_filepath: string
+            Full absolute file path pointing to h5 file
+        """
+        log.debug("saving MRS signal to " + h5_filepath + "...")
+        # dimensions check
+        if(self.ndim != 1):
+            log.error("this method only works for 3D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
+
+        # try importing here in order not to break everything because you do not have this dependency
+        import ismrmrd
+
+        # TODO: need to add more info to the header: voxel size/position, etc.
+
+        # open  dataset
+        dset = ismrmrd.Dataset(h5_filepath, "dataset", create_if_needed=True)
+
+        # create the XML header
+        header = ismrmrd.xsd.ismrmrdHeader()
+
+        # subject stuff
+        subj = ismrmrd.xsd.subjectInformationType()
+        subj.patientName = self.patient_name
+        subj.patientID = self.patient_name
+        # bug here...
+        # subj.patientBirthdate = self.patient_birthday.strftime('%Y-%m-%d')
+        if(self.patient_sex == 0):
+            subj.patientGender = "M"
+        elif(self.patient_sex == 1):
+            subj.patientGender = "F"
+        elif(self.patient_sex == 2):
+            subj.patientGender = "O"
+        else:
+            log.error("patient gender unknown!")
+        subj.patientWeight_kg = self.patient_weight
+        # no patient height in the ismrmrd format!?
+        # add to header
+        header.subjectInformation = subj
+
+        # sequence stuff
+        seq = ismrmrd.xsd.sequenceParametersType()
+        seq.TR = self.sequence.tr
+        seq.TE = [self.sequence.te]
+        seq.sequence_type = self.sequence.name
+        # add to header
+        header.sequenceParameters = seq
+
+        # experimental conditions
+        exp = ismrmrd.xsd.experimentalConditionsType()
+        exp.H1resonanceFrequency_Hz = self.f0 * 1e6
+        header.experimentalConditions = exp
+
+        # dummy encoding
+        encoding = ismrmrd.xsd.encoding()
+        encoding.trajectory = ismrmrd.xsd.trajectoryType.cartesian
+        efov = ismrmrd.xsd.fieldOfView_mm()
+        efov.x = 1
+        efov.y = 1
+        efov.z = 1
+        rfov = ismrmrd.xsd.fieldOfView_mm()
+        rfov.x = 1
+        rfov.y = 1
+        rfov.z = 1
+        ematrix = ismrmrd.xsd.matrixSize()
+        ematrix.x = 1
+        ematrix.y = 1
+        ematrix.z = 1
+        rmatrix = ismrmrd.xsd.matrixSize()
+        rmatrix.x = 1
+        rmatrix.y = 1
+        rmatrix.z = 1
+        espace = ismrmrd.xsd.encodingSpaceType()
+        espace.matrixSize = ematrix
+        espace.fieldOfView_mm = efov
+        rspace = ismrmrd.xsd.encodingSpaceType()
+        rspace.matrixSize = rmatrix
+        rspace.fieldOfView_mm = rfov
+        encoding.encodedSpace = espace
+        encoding.reconSpace = rspace
+        limits = ismrmrd.xsd.encodingLimitsType()
+        encoding.encodingLimits = limits
+        header.encoding.append(encoding)
+
+        # write header
+        dset.write_xml_header(header.toxml('utf-8'))
+
+        # data
+        acq = ismrmrd.Acquisition()
+        acq.resize(self.shape[0], 0)
+        acq.data[:] = self[:]
+        dset.append_acquisition(acq)
+
+        # done
+        dset.close()
+
+    def save_mat(self, mat_filepath):
         """
         Save the numpy array content to a MATLAB mat file.
 
@@ -2726,10 +2973,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
         mat_filepath: string
             Full absolute file path pointing to mat file
         """
-        # hello
-        cprint(">> mrs.MRSData2.save2mat:", 'green')
-
-        print(" > saving MRS signal to " + mat_filepath + "...")
+        # TODO: need to add some header info
+        log.debug("saving MRS signal to " + mat_filepath + "...")
         sio.savemat(mat_filepath, {'MRSdata': self})
 
 
@@ -2769,194 +3014,428 @@ class pipeline:
         # to avoid any data reshaping misunderstanding, the number of coil channels
         self.data_coil_nChannels = 8
 
+        # option to process only a set of datasets: list of indexes
+        self.data_process_only_this_data_index = []
+
         # --- physio data ---
         # list of filepaths pointing to physio files
         self.data_physio_filepaths = ""
         # parsed list of physio filepaths
         self._data_physio_list = []
 
-        # set reference ppm
-        self.ppm0 = 4.7
-
-        # option to process only a set of datasets: lsit of indexes
-        self.data_process_only_this_data_index = []
-        # by default, process each data/ref.data separatly. If this option is set to true, all data will be concatenated
-        self.data_concatenate = False
-
-        # --- Amplification ---
-        self.scaling_factor = 1e8
-
-        # --- FID modulus process ---
-        self.fid_modulus = False
-
-        # --- automatic rephasing ---
-        self.phase_enable = True
-        # weak water suppression was used, meaning we can use the 1st point of the FID (mainly water)
-        self.phase_weak_ws_mode = False
-        # super high SNR? cool, we can rephase each individual spectrum from each channel separatly (by default, spectra are averaged by channel)
-        self.phase_high_snr_mode = False
-        # if peak phasing, order of rephasing: 0 means 0th order, 1 means 0th + 1st order (in time) phasing
-        self.phase_order = 0
-        # add an additional 0th order phase (rd)
-        self.phase_offset = 0
-        # ppm range to look fo peak used to estimate phase
-        self.phase_POI_range_ppm = [1.5, 2.5]
-        # display all this process to check what the hell is going on
-        self.phase_display = False
-
-        # --- channel recombination ---
-        self.recombine_enable = True
-        # use non water-suppressed data to recombine and rephase channels
-        self.recombine_use_data_ref = True
-        # should we rephase (0th order) data while recombining?
-        self.recombine_phasing = True
-        # boolean mask to switch on/off some Rx channels
-        self.recombine_weights = [True]
-
-        # --- zero-filling ---
-        self.zerofill_enable = True
-        # number of signal points after zf
-        self.zerofill_npts = 8192 * 2
-        # display all this process to check what the hell is going on
-        self.zerofill_display = True
-
-        # --- analyse physio signal ---
-        self.analyse_physio_enable = False
-        # ppm range to look for a peak to analyse
-        self.analyse_physio_POI_range_ppm = [4, 5]
-        # time range in (ms) to look around timestamp for the best correlation physio/MRS
-        self.analyse_physio_delta_time_ms = 1000.0
-        # display all this process to check what the hell is going on
-        self.analyse_physio_display = True
-
-        # --- automatic data rejection based on criterias ---
-        self.analyse_and_reject_enable = False
-        # ppm range to look for a peak to analyse
-        self.analyse_and_reject_POI_range_ppm = [4.5, 5]
-        # size of moving average window
-        self.analyse_and_reject_moving_averages = 1
-        # rejection criterias for
-        # amplitude relative changes: keep data if within +/-val % range
-        # linewidth changes: keep data is below val Hz
-        # chemical shift changes: keep data is within +/-val ppm
-        # phase changes: keep data if within +/-val/100 * std(phase) rd
-        self.analyse_and_reject_ranges = {"amplitude (%)": None,
-                                          "linewidth (Hz)": 30.0,
-                                          "chemical shift (ppm)": 0.5,
-                                          "phase std. factor (%)": 60.0}
-
-        # for amplitude, chemical shift and phase, the rejection of data is based on ranges of relative changes of those metrics. Relative to what? The mean value over the whole acquisition (True) or the first acquired point (False)
-        self.analyse_and_reject_rel2mean = True
-        # automatic adjustement of linewidth criteria
-        self.analyse_and_reject_auto = False
-        # minimum allowed SNR change (%) when adjusting the linewidth criteria
-        # this can be positive (we want to increase SNR +10% by rejecting crappy data)
-        # or negative (we are ok in decreasing the SNR -10% in order to get better resolved spectra)
-        self.analyse_and_reject_auto_allowed_snr_change = -10.0
-        # display all this process to check what the hell is going on
-        self.analyse_and_reject_display = True
-
-        # --- automatic data frequency realignment ---
-        self.realign_enable = True
-        # ppm range to look for a peak to analyse
-        self.realign_POI_range_ppm = [4.5, 5]
-        # size of moving average window
-        self.realign_moving_averages = 1
-        # display all this process to check what the hell is going on
-        self.realign_display = True
-
-        # --- data averaging ---
-        self.average_enable = True
-        # number of averages to mean
-        self.average_na = None
-        # display all this process to check what the hell is going on
-        self.average_display = True
-
-        # --- data apodization an crop ---
-        self.apodize_enable = True
-        # exponential damping factor for apodization (Hz)
-        self.apodize_damping_hz = 5
-        # final number of signal points after crop
-        self.apodize_npts = 4096
-        # display all this process to check what the hell is going on
-        self.apodize_display = True
-
-        # --- water post-acquisition removal ---
-        self.remove_water_enable = False
-        # number of components when running HSVD
-        self.remove_water_hsvd_components = 5
-        # ppm range where all components will be remove
-        self.remove_water_hsvd_range = [4.6, 4.8]
-        # display all this process to check what the hell is going on
-        self.remove_water_display = True
-
-        # --- spectrum chemical shift calibration ---
-        self.calibrate_enable = True
-        # ppm range to look for the peak of interest (NAA by default)
-        self.calibrate_POI_range_ppm = [1.8, 2.3]
-        # real ppm value for this peak
-        self.calibrate_POI_true_ppm = 2.008  # ppm
-        # display all this process to check what the hell is going on
-        self.calibrate_display = True
-
-        # --- spectrum final display ---
-        self.display_enable = True
-        # figure index
-        self.display_fig_index = 1
-        # ppm range used for display
-        self.display_range_ppm = [1, 6]  # ppm
-        # spectrum intensity scaling factor
-        self.display_amp_factor_list = []
-        # spectrum y offset parameter
-        self.display_offset = 0
-        # display spectrum in magnitude mode?
-        self.display_magnitude_mode = False
-        # display legend captions
+        # --- display legend captions ---
         # this can be either one big string with captions separated by line breaks (that will be parsed) OR simply a list
         self.display_legends = ""
         # internal list of legend captions
         self._display_legends_list = []
 
-        # --- SNR analysis ---
-        self.analyse_snr_enable = True
-        # ppm range to look for a peak to analyse
-        self.analyse_snr_s_range_ppm = [1.8, 2.1]  # ppm
-        # ppm range to look for pute noise
-        self.analyse_snr_n_range_ppm = [-1, 0]  # ppm
-        # should we look at the magnitude (True) or real (False) spectrum for signal estimation?
-        self.analyse_snr_magnitude_mode = False
-        # display all this process to check what the hell is going on
-        self.analyse_snr_display = True
+        # --- display options ---
+        self.display_offset = 0.0
+        # set reference ppm
+        self.ppm0 = 4.7
 
-        # --- SNR analysis during signal processing ---
-        # SNR will be estimated by max of real peak intensity / standard deviation of noise
-        self.analyse_snr_evol_enable = True
-        # list of measured SNR
-        self.analyse_snr_evol_list = []
-        # list of captions
-        self.analyse_snr_evol_list_labels = []
-        # list of SNR measured per processed signals
-        self.analyse_snr_final_list = []
+        # --- available jobs and their parameters ---
+        self.jobs = {}
+        # start with display because other jobs depend on some display parameters
+        # --- job: spectrum final display ---
+        self.jobs["displaying"] = {0:
+                                   {"func": MRSData2.display_spectrum_1d, "name": "displaying"},
+                                   # figure index
+                                   "fig_index": 1,
+                                   # ppm range used for display
+                                   "range_ppm": [1, 6],
+                                   # display spectrum in magnitude mode?
+                                   "magnitude_mode": False
+                                   }
 
-        self.analyse_linewidth_enable = True
-        # ppm range to look for a peak to analyse
-        self.analyse_linewidth_range_ppm = [4.5, 5]  # ppm
-        # should we look at the magnitude (True) or real (False) spectrum for linewidth estimation?
-        self.analyse_linewidth_magnitude_mode = False
-        # display all this process to check what the hell is going on
-        self.analyse_linewidth_display = True
+        # --- job: automatic rephasing ---
+        self.jobs["phasing"] = {0:
+                                {"func": MRSData2.correct_phase_3d, "name": "phasing"},
+                                # use reference data is available?
+                                "using_ref_data": True,
+                                # ppm range to look fo peak used to estimate phase
+                                "POI_range_ppm": [1.5, 2.5],
+                                # weak water suppression was used, thus we can use the 1st pt of the FID
+                                "weak_ws_mode": False,
+                                # high SNR? we rephase each individual spectrum from each channel separately
+                                "high_snr_mode": False,
+                                # order of phasing in time: 0th or 1st order
+                                "order": 0,
+                                # add an additional 0th order phase (rd)
+                                "offset": 0.0,
+                                # display all this process to check what the hell is going on
+                                "display": False,
+                                "display_range_ppm": self.jobs["displaying"]["range_ppm"]
+                                }
 
-        # --- Linewidth analysis during signal processing ---
-        self.analyse_linewidth_evol_enable = True
-        # list of measured linewidths
-        self.analyse_linewidth_evol_list = []
-        # list of captions
-        self.analyse_linewidth_evol_list_labels = []
-        # list of linewidhs measured per processed signals
-        self.analyse_linewidth_final_list = []
+        # --- job: amplification ---
+        self.jobs["scaling"] = {0:
+                                {"func": MRSData2.correct_intensity_scaling_nd, "name": "scaling intensity"},
+                                "scaling_factor": 1e8
+                                }
+
+        # --- job: FID modulus ---
+        self.jobs["FID modulus"] = {0:
+                                    {"func": MRSData2.correct_fidmodulus_nd, "name": "FID modulus"}
+                                    }
+
+        # --- job: channel combination ---
+        self.jobs["channel-combining"] = {0:
+                                          {"func": MRSData2.correct_combine_channels_3d, "name": "channel-combining"},
+                                          # use non water-suppressed data to recombine and rephase channels
+                                          "using_ref_data": True,
+                                          # should we rephase (0th order) data while combining?
+                                          "phasing": True,
+                                          # boolean mask to switch on/off some Rx channels
+                                          "weights": [True]
+                                          }
+
+        # --- job: concatenate ---
+        self.jobs["concatenate"] = {0:
+                                    {"func": MRSData2.concatenate_2d, "name": "concatenate"}
+                                    }
+
+        # --- job: zero-filling ---
+        self.jobs["zero-filling"] = {0:
+                                     {"func": MRSData2.correct_zerofill_nd, "name": "zero-filling"},
+                                     # number of signal points after zf
+                                     "npts": 8192 * 2,
+                                     # display all this process to check what the hell is going on
+                                     "display": True,
+                                     "display_range_ppm": self.jobs["displaying"]["range_ppm"]
+                                     }
+
+        # --- job: analyze physio signal ---
+        self.jobs["physio-analysis"] = {0:
+                                        {"func": MRSData2.analyze_physio_2d, "name": "analyzing physio. signals"},
+                                        # ppm range to look for a peak to analyze
+                                        "POI_range_ppm": [4.5, 5],
+                                        # time range in (ms) to look around timestamp for correlation physio/MRS
+                                        "delta_time_ms": 1000.0,
+                                        # display all this process to check what the hell is going on
+                                        "display": True
+                                        }
+
+        # --- job: automatic data rejection based on criterias ---
+        self.jobs["data-rejecting"] = {0:
+                                       {"func": MRSData2.correct_analyze_and_reject_2d, "name": "data rejecting"},
+                                       # ppm range to look for a peak to analyze
+                                       "POI_range_ppm": [4.5, 5],
+                                       # size of moving average window
+                                       "moving_averages": 1,
+                                       # rejection criterias for
+                                       # amplitude relative changes: keep data if within +/-val % range
+                                       # linewidth changes: keep data is below val Hz
+                                       # chemical shift changes: keep data is within +/-val ppm
+                                       # phase changes: keep data if within +/-val/100 * std(phase) rd
+                                       "ranges": {"amplitude (%)": None,
+                                                  "linewidth (Hz)": 30.0,
+                                                  "chemical shift (ppm)": 0.5,
+                                                  "phase std. factor (%)": None},
+                                       # for amplitude, chemical shift and phase, the rejection of data is based on ranges of relative changes of those metrics. Relative to what? The mean value over the whole acquisition (True) or the first acquired point (False)
+                                       "rel2mean": True,
+                                       # automatic adjustement of linewidth criteria
+                                       "auto": False,
+                                       # minimum allowed SNR change (%) when adjusting the linewidth criteria, this can be positive (we want to increase SNR +10% by rejecting crappy data) or negative (we are ok in decreasing the SNR -10% in order to get better resolved spectra)
+                                       "auto_allowed_snr_change": -10.0,
+                                       # display all this process to check what the hell is going on
+                                       "display": True
+                                       }
+
+        # --- job: automatic data frequency realignment ---
+        self.jobs["realigning"] = {0:
+                                   {"func": MRSData2.correct_realign_2d, "name": "frequency realigning"},
+                                   # ppm range to look for a peak to analyze
+                                   "POI_range_ppm": [4.5, 5],
+                                   # size of moving average window
+                                   "moving_averages": 1,
+                                   # display all this process to check what the hell is going on
+                                   "display": True,
+                                   "display_range_ppm": self.jobs["displaying"]["range_ppm"]
+                                   }
+
+        # --- job: data averaging ---
+        self.jobs["averaging"] = {0:
+                                  {"func": MRSData2.correct_average_2d, "name": "averaging"},
+                                  # number of averages to mean (None = all)
+                                  "na": None,
+                                  # display all this process to check what the hell is going on
+                                  "display": True,
+                                  "display_range_ppm": self.jobs["displaying"]["range_ppm"]
+                                  }
+
+        # --- job: noise level analysis ---
+        self.jobs["noise-estimation"] = {0:
+                                         {"func": MRSData2.analyze_noise_1d, "name": "estimating noise level"},
+                                         # estimate noise std time-domain on the last 100 pts of the FID
+                                         "npts": 100
+                                         }
+
+        # --- job: data apodization ---
+        self.jobs["apodizing"] = {0:
+                                  {"func": MRSData2.correct_apodization_1d, "name": "apodizing"},
+                                  # exponential damping factor for apodization (Hz)
+                                  "damping_hz": 5,
+                                  # display all this process to check what the hell is going on
+                                  "display": True,
+                                  "display_range_ppm": self.jobs["displaying"]["range_ppm"]
+                                  }
+
+        # --- job: data cropping ---
+        self.jobs["cropping"] = {0:
+                                 {"func": MRSData2.correct_crop_1d, "name": "cropping"},
+                                 # final number of signal points after crop
+                                 "final_npts": 4096,
+                                 # display all this process to check what the hell is going on
+                                 "display": True,
+                                 "display_range_ppm": self.jobs["displaying"]["range_ppm"]
+                                 }
+
+        # --- job: water post-acquisition removal ---
+        self.jobs["water-removal"] = {0:
+                                      {"func": MRSData2.correct_water_removal_1d, "name": "removing water peak"},
+                                      # number of components when running HSVD
+                                      "hsvd_components": 5,
+                                      # ppm range where all components will be remove
+                                      "hsvd_range": [4.6, 4.8],
+                                      # display all this process to check what the hell is going on
+                                      "display": True,
+                                      "display_range_ppm": self.jobs["displaying"]["range_ppm"]
+                                      }
+
+        # --- job: spectrum chemical shift calibration ---
+        self.jobs["calibrating"] = {0:
+                                    {"func": MRSData2.correct_freqshift_1d, "name": "frequency shifting"},
+                                    # ppm range to look for the peak of interest (NAA by default)
+                                    "POI_range_ppm": [1.8, 2.3],
+                                    # real ppm value for this peak
+                                    "POI_true_ppm": 2.008,
+                                    # display all this process to check what the hell is going on
+                                    "display": True,
+                                    "display_range_ppm": self.jobs["displaying"]["range_ppm"]
+                                    }
+
+        # --- job: SNR analysis ---
+        self.jobs["analyzing-snr"] = {0:
+                                      {"func": MRSData2.analyze_snr_1d, "name": "analyzing SNR"},
+                                      # ppm range to look for a peak to analyze
+                                      "s_range_ppm": [1.8, 2.1],
+                                      # ppm range to look for pure noise
+                                      "n_range_ppm": [-1, 0],
+                                      # should we look at the magnitude or real spectrum?
+                                      "magnitude_mode": False,
+                                      # display all this process to check what the hell is going on
+                                      "display": True,
+                                      "display_range_ppm": self.jobs["displaying"]["range_ppm"]
+                                      }
+
+        # --- job: LW analysis ---
+        self.jobs["analyzing-lw"] = {0:
+                                     {"func": MRSData2.analyze_linewidth_1d, "name": "analyzing peak-linewidth"},
+                                     # ppm range to look for a peak to analyze
+                                     "range_ppm": [4.5, 5],
+                                     # should we look at the magnitude or real spectrum?
+                                     "magnitude_mode": False,
+                                     # display all this process to check what the hell is going on
+                                     "display": True,
+                                     "display_range_ppm": self.jobs["displaying"]["range_ppm"]
+                                     }
+
+        # --- job list ---
+        # list of data processing to apply to the data
+        # beware, you need to know what you are doing here
+        # also, be careful with the dimensionality of data 3D, 2D, 1D along the data processing
+        # order is important!
+        self.job_list = [self.jobs["phasing"],
+                         self.jobs["scaling"],
+                         self.jobs["FID modulus"],
+                         self.jobs["channel-combining"],
+                         self.jobs["concatenate"],
+                         self.jobs["zero-filling"],
+                         self.jobs["physio-analysis"],
+                         self.jobs["data-rejecting"],
+                         self.jobs["realigning"],
+                         self.jobs["averaging"],
+                         self.jobs["noise-estimation"],
+                         self.jobs["apodizing"],
+                         self.jobs["cropping"],
+                         self.jobs["water-removal"],
+                         self.jobs["calibrating"],
+                         self.jobs["displaying"]]
+
+        # --- analyze job list ---
+        # SNR/LW analysis job list
+        self.analyze_job_list = [self.jobs["channel-combining"],
+                                 self.jobs["zero-filling"],
+                                 self.jobs["averaging"],
+                                 self.jobs["calibrating"]]
+
+        # --- SNR/LW analysis ---
+        self.analyze_enable = True
+        self.analyze_display = True
+        # list of measured SNR/LW
+        self._analyze_results_dict = {}
 
         # freeze the object and prevent the creation of new attributes
         self.__isfrozen = True
+
+    def _run_job(self, job, data, default_args=False):
+        """
+        Estimate SNR and/or peak linewidth for this dataset. Values are stored. A mini default pipeline is applied before SNR/LW measurements and can be set with self.analyze_job_list.
+
+        Parameters
+        ----------
+        job : dict entry from self.jobs
+            The job to run on the data
+        data : MRSData2 object [whatever,...,timepoints]
+            Data to process
+        default_args : boolean
+            Should we ignore the pipeline job parameters and run with default arguments (True)?
+
+        Returns
+        -------
+        job_result : ?
+            Stuff returned by the job
+        """
+        # get job name
+        log.info_line_break()
+        log.info_line________________________()
+        job_name = job[0]["name"]
+        log.info("%s on [%s]..." % (job_name, data.display_label))
+        # get function
+        job_func = job[0]["func"]
+        if(default_args):
+            job_args = [data]
+        else:
+            # get arguments
+            job_args = job.copy()
+            del job_args[0]
+            job_args = [data] + list(job_args.values())
+
+        # call job on data
+        job_result = job_func(*job_args)
+        log.info_line________________________()
+
+        # return
+        return(job_result)
+
+    def _analyze(self, data, current_job, already_done_jobs):
+        """
+        Estimate SNR and/or peak linewidth for this dataset. Values are stored. A mini default pipeline is applied before SNR/LW measurements and can be set with self.analyze_job_list.
+
+        Parameters
+        ----------
+        data : MRSData2 object [whatever,...,timepoints]
+            One of the processing function of the MRSData2 class
+        current_job : MRSData2 method function
+            The job that was just applied to data before calling this function
+        already_done_jobs : list (stack)
+            List of already applied processing functions to this dataset
+        """
+        log.debug("estimating SNR and peak-linewidth for [%s]..." % data.display_label)
+
+        # init job list
+        this_analyze_job_list = [j for j in self.analyze_job_list + already_done_jobs if (j in self.analyze_job_list) and (j not in already_done_jobs)]
+
+        # run mini-pipeline with default arguments (= no display)
+        # and with no log output
+        old_level = log.getLevel()
+        log.setLevel(log.ERROR)
+        for j in this_analyze_job_list:
+            # run job on this dataset with default arguments
+            data = self._run_job(j, data, True)
+
+        # measure snr
+        data_snr, _, _ = self._run_job(self.jobs["analyzing-snr"], data)
+        data_lw = self._run_job(self.jobs["analyzing-lw"], data)
+
+        # allow outputs
+        log.setLevel(old_level)
+
+        # first time we report this dataset: init result dict
+        if(data.display_label not in list(self._analyze_results_dict.keys())):
+            self._analyze_results_dict[data.display_label] = {"snr": {}, "lw": {}}
+
+        # output and store SNR
+        job_label = "post-" + current_job[0]["name"]
+        log.info(job_label + " SNR of [%s] = %.2f" % (data.display_label, data_snr))
+        self._analyze_results_dict[data.display_label]["snr"][job_label] = data_snr
+
+        # output and store lw
+        log.info(job_label + " LW of [%s] = %.2f" % (data.display_label, data_lw))
+        self._analyze_results_dict[data.display_label]["lw"][job_label] = data_lw
+
+    def _display_analyze_results(self):
+        """Print final SNR and peak-linewidth for each dataset. Plot bargraph showing evolution of SNR and linewidth during data processing (to check that a job didd not destroy the data for example!)."""
+        log.info("displaying SNR and linewidth final results...")
+
+        # terminal output
+        # first find longest data label
+        data_labels = list(self._analyze_results_dict.keys())
+        data_label_nchar = len(max(data_labels, key=len))
+
+        # for each dataset (line), print final SNR/LW columns
+        log.info_line________________________()
+        print("dataset".ljust(data_label_nchar) + "\t" + "SNR (u.a)".ljust(10) + "\t" + "LW (Hz)".ljust(10), flush=True)
+        print("", flush=True)
+        first_data_key = list(self._analyze_results_dict.keys())[0]
+        job_labels = list(self._analyze_results_dict[first_data_key]["snr"].keys())
+        last_job_key = job_labels[-1]
+        for d in data_labels:
+            data_label_padded = d.ljust(data_label_nchar)
+            d_snr = self._analyze_results_dict[d]["snr"][last_job_key]
+            d_snr_str = ("%.2f" % d_snr).ljust(10)
+            d_lw = self._analyze_results_dict[d]["lw"][last_job_key]
+            d_lw_str = ("%.2f" % d_lw).ljust(10)
+            print("%s\t%s\t%s" % (data_label_padded, d_snr_str, d_lw_str), flush=True)
+        log.info_line________________________()
+
+        # display SNR/LW evolution for all data and all jobs
+        if(self.analyze_display):
+            fig = plt.figure(220)
+            fig.clf()
+            axs = fig.subplots(2, 1, sharex='row')
+            fig.canvas.set_window_title("mrs.reco.pipeline._display_analyze_results")
+            fig.suptitle("SNR/peak-linewidth results", fontsize=11)
+
+            # prepare bars
+            nBars = len(data_labels)
+            width = max(-0.15 * nBars + 0.6, 0.1)  # bars get thinner if more data
+            pos_bars = np.arange(len(job_labels))
+            pos_shift = np.linspace(-width * (nBars - 1) / 2.0, +width * (nBars - 1) / 2.0, nBars)
+            snr_ylim = [+np.inf, -np.inf]
+            lw_ylim = [+np.inf, -np.inf]
+
+            # iterate in lists and plot bars
+            for d, pos in zip(data_labels, pos_shift):
+                # snr list for this dataset
+                this_snr_list = list(self._analyze_results_dict[d]["snr"].values())
+                snr_ylim[0] = min(snr_ylim[0], np.min(this_snr_list))
+                snr_ylim[1] = max(snr_ylim[1], np.max(this_snr_list))
+                axs[0].bar(pos_bars + pos, this_snr_list, width, label=d)
+                # lw list for this dataset
+                this_lw_list = list(self._analyze_results_dict[d]["lw"].values())
+                lw_ylim[0] = min(lw_ylim[0], np.min(this_lw_list))
+                lw_ylim[1] = max(lw_ylim[1], np.max(this_lw_list))
+                axs[1].bar(pos_bars + pos, this_lw_list, width, label=d)
+
+            # snr bargraph
+            axs[0].set_ylabel("SNR (u.a)")
+            axs[0].set_xticks(pos_bars)
+            axs[0].set_xticklabels([])
+            axs[0].set_ylim(np.add(snr_ylim, [-5, +5]))
+            axs[0].grid('on')
+            axs[0].legend()
+
+            # lw bargraph
+            axs[1].set_ylabel("Estimated linewidth (Hz)")
+            axs[1].set_xticks(pos_bars)
+            axs[1].set_xticklabels(job_labels, rotation=45, fontsize=9)
+            axs[1].set_ylim(np.add(lw_ylim, [-3, +3]))
+            axs[1].grid('on')
+
+            fig.subplots_adjust(bottom=0.2)
+            fig.show()
 
     def get_te_list(self):
         """
@@ -2964,86 +3443,56 @@ class pipeline:
 
         Returns
         -------
-        te_list : list
+        [s.te for s in self._data_list] : list
             TEs for all signals stored in here
         """
-        te_list = []
-        for s in self._data_list:
-            te_list.append(s.te)
+        return([s.te for s in self._data_list])
 
-        return(te_list)
-
-    def run_pipeline_std(self):
+    def run(self):
         """
-        Run the standard pipeline for MRS reco. It includes.
+        Run the pipeline for MRS reco. It includes.
 
             * reading the data
             * phasing
             * combining channels
-            * analyse real noise level before going on with processing
+            * analyze real noise level before going on with processing
             * zero-filling
             * peak analysis & data rejection
             * realigning
             * averaging
+            * checking original noise level
             * apodizing
+            * cropping
             * removing water reidue with HSVD
             * shifting the spectrum
             * analyzing the SNR
             * analyzing the linewidth
             * displaying the spectrum
+            +
+            * analyzing the SNR evolution during data processing
+            * analyzing the linewidth evolution during data processing
 
         Returns
         -------
-        s : MRSData2 numpy array [timepoints]
-            Final MRS data signal obtained from reconstruction pipeline stored in a MRSData2 object
+        self._data_list : list of MRSData2 objects
+            Final MRS data signals obtained from reconstruction pipeline stored in a MRSData2 object
         """
-        print("")
-        print("------------------------------------------------------------------")
-        print("mrs.reco.pipeline.run_pipeline_std:")
-        print("------------------------------------------------------------------")
-        print("> phase_enable = ", end="", flush=True)
-        cprint("%r" % self.phase_enable, ('green' if self.phase_enable else 'red'), attrs=['bold'])
-        print("> scaling_factor = %E" % self.scaling_factor)
-        print("> fid_modulus = ", end="", flush=True)
-        cprint("%r" % self.fid_modulus, ('green' if self.fid_modulus else 'red'), attrs=['bold'])
-        print("> recombine_enable = ", end="", flush=True)
-        cprint("%r" % self.recombine_enable, ('green' if self.recombine_enable else 'red'), attrs=['bold'])
-        print("> data_concatenate = ", end="", flush=True)
-        cprint("%r" % self.data_concatenate, ('green' if self.data_concatenate else 'red'), attrs=['bold'])
-        print("> zerofill_enable = ", end="", flush=True)
-        cprint("%r" % self.zerofill_enable, ('green' if self.zerofill_enable else 'red'), attrs=['bold'])
-        print("> analyse_physio_enable = ", end="", flush=True)
-        cprint("%r" % self.analyse_physio_enable, ('green' if self.analyse_physio_enable else 'red'), attrs=['bold'])
-        print("> analyse_and_reject_enable = ", end="", flush=True)
-        cprint("%r" % self.analyse_and_reject_enable, ('green' if self.analyse_and_reject_enable else 'red'), attrs=['bold'])
-        print("> realign_enable = ", end="", flush=True)
-        cprint("%r" % self.realign_enable, ('green' if self.realign_enable else 'red'), attrs=['bold'])
-        print("> average_enable = ", end="", flush=True)
-        cprint("%r" % self.average_enable, ('green' if self.average_enable else 'red'), attrs=['bold'])
-        print("> apodize_enable = ", end="", flush=True)
-        cprint("%r" % self.apodize_enable, ('green' if self.apodize_enable else 'red'), attrs=['bold'])
-        print("> remove_water_enable = ", end="", flush=True)
-        cprint("%r" % self.remove_water_enable, ('green' if self.remove_water_enable else 'red'), attrs=['bold'])
-        print("> calibrate_enable = ", end="", flush=True)
-        cprint("%r" % self.calibrate_enable, ('green' if self.calibrate_enable else 'red'), attrs=['bold'])
-        print("> display_enable = ", end="", flush=True)
-        cprint("%r" % self.display_enable, ('green' if self.display_enable else 'red'), attrs=['bold'])
-        print("> analyse_snr_enable = ", end="", flush=True)
-        cprint("%r" % self.analyse_snr_enable, ('green' if self.analyse_snr_enable else 'red'), attrs=['bold'])
-        print("> analyse_linewidth_enable = ", end="", flush=True)
-        cprint("%r" % self.analyse_linewidth_enable, ('green' if self.analyse_linewidth_enable else 'red'), attrs=['bold'])
-        print("> analyse_snr_evol_enable = ", end="", flush=True)
-        cprint("%r" % self.analyse_snr_evol_enable, ('green' if self.analyse_snr_evol_enable else 'red'), attrs=['bold'])
-        print("> analyse_linewidth_evol_enable = ", end="", flush=True)
-        cprint("%r" % self.analyse_linewidth_evol_enable, ('green' if self.analyse_linewidth_evol_enable else 'red'), attrs=['bold'])
+        # --- init stuff ---
+        # init some private attributes
+        self._data_list = []
+        self._data_ref_filepaths_list = []
+        self._data_ref_list = []
+        self._data_physio_list = []
+        self._display_legends_list = []
+        self._analyze_results_dict = {}
 
-        print("")
-        print("------------------------------------------------------------------")
-        print("> checking some stuff...")
-        print("------------------------------------------------------------------")
+        # --- parsing some attributes: filepaths, legends, etc. ---
+        log.info_line________________________()
+        log.info("checking some stuff...")
+        log.info_line________________________()
 
         # data files: parse
-        print("> parsing data file paths...")
+        log.info("parsing data file paths...")
         if(self.data_filepaths == []):
             parsed_list = None
         elif(type(self.data_filepaths) == list):
@@ -3054,10 +3503,10 @@ class pipeline:
         if(parsed_list is not None):
             self._data_filepaths_list = parsed_list
         else:
-            raise Exception("> no data scan files specified!")
+            log.error("no data scan files specified!")
 
         # ref data files: parse
-        print("> parsing ref. data file paths...")
+        log.info("parsing ref. data file paths...")
 
         if(self.data_ref_filepaths == []):
             parsed_list = None
@@ -3072,7 +3521,7 @@ class pipeline:
             self._data_ref_filepaths_list = [None] * len(self._data_filepaths_list)
 
         # physio files: parse
-        print("> parsing physio data file paths...")
+        log.info("parsing physio data file paths...")
         if(self.data_physio_filepaths == []):
             parsed_list = None
         elif(type(self.data_physio_filepaths) == list):
@@ -3086,7 +3535,7 @@ class pipeline:
             self._data_physio_list = [None] * len(self._data_filepaths_list)
 
         # legend captions: parse
-        print("> parsing legend captions...")
+        log.info("parsing legend captions...")
         if(self.display_legends == []):
             parsed_list = None
         elif(type(self.display_legends) == list):
@@ -3099,31 +3548,41 @@ class pipeline:
         else:
             self._display_legends_list = [""] * len(self._data_filepaths_list)
 
-        # amplitude factors: "parse"
-        if(len(self.display_amp_factor_list) == 0):
-            self.display_amp_factor_list = np.ones([len(self._data_filepaths_list), ])
+        # legend captions: parse
+        log.info("parsing legend captions...")
+        if(self.display_legends == []):
+            parsed_list = None
+        elif(type(self.display_legends) == list):
+            parsed_list = self.display_legends
+        else:
+            parsed_list = _parse_string_into_list(self.display_legends)
 
+        if(parsed_list is not None):
+            self._display_legends_list = parsed_list
+        else:
+            self._display_legends_list = [""] * len(self._data_filepaths_list)
+
+        # --- checking consistency of some pipeline attributes ---
         # before reading data and stuff, let's check the list dimensions are consistent
+        log.info("checking parameter list sizes consistency...")
         if(len(self._data_ref_filepaths_list) == 0):
-            Warning("> no data ref. scans specified, that's ok, it is optional...")
+            log.warning("no data ref. scans specified, that's ok, it is optional...")
         if(len(self._data_physio_list) == 0):
-            Warning("> no physio log files specified, that's ok, it is optional...")
+            log.warning("no physio log files specified, that's ok, it is optional...")
 
         n = len(self._data_filepaths_list)
         if(len(self._data_ref_filepaths_list) != n and len(self._data_ref_filepaths_list) > 0):
-            raise Exception("> weird, not the same number of data files (" + str(n) + ") and data ref. scans (" + str(len(self._data_ref_filepaths_list)) + ")?!")
-        elif(len(self._data_physio_list) != n and len(self._data_physio_list) > 0):
-            raise Exception("> weird, not the same number of data files (" + str(n) + ") and physio log files (" + str(len(self._data_physio_list)) + ")?!")
-        elif(len(self._display_legends_list) != n):
-            raise Exception("> weird, not the same number of data files (" + str(n) + ") and legend captions (" + str(len(self._display_legends_list)) + ")?!")
-        elif(len(self.display_amp_factor_list) != n):
-            raise Exception("> weird, not the same number of data files (" + str(n) + ") and display scale factors (" + str(len(self.display_amp_factor_list)) + ")?!")
+            log.error("weird, not the same number of data files (" + str(n) + ") and data ref. scans (" + str(len(self._data_ref_filepaths_list)) + ")?!")
+        if(len(self._data_physio_list) != n and len(self._data_physio_list) > 0):
+            log.error("weird, not the same number of data files (" + str(n) + ") and physio log files (" + str(len(self._data_physio_list)) + ")?!")
+        if(len(self._display_legends_list) != n):
+            log.error("weird, not the same number of data files (" + str(n) + ") and legend captions (" + str(len(self._display_legends_list)) + ")?!")
 
         # check if there are some blanks
         if(any(d is None for d in self._data_filepaths_list)):
-            raise Exception("> hey, you missed a line in the data scan file path list?!")
+            log.error("hey, you missed a line in the data scan file path list?!")
         if(any(d is None for d in self._display_legends_list)):
-            raise Exception("> hey, you missed a line in the legend caption list?!")
+            log.error("hey, you missed a line in the legend caption list?!")
 
         # oh, we want to process only one dataset in the list
         if(len(self.data_process_only_this_data_index) > 0):
@@ -3135,466 +3594,239 @@ class pipeline:
                 self._data_physio_list = [self._data_physio_list[i] for i in self.data_process_only_this_data_index]
             if(len(self._display_legends_list) > 0):
                 self._display_legends_list = [self._display_legends_list[i] for i in self.data_process_only_this_data_index]
-            if(len(self.display_amp_factor_list) > 0):
-                self.display_amp_factor_list = [self.display_amp_factor_list[i] for i in self.data_process_only_this_data_index]
+        log.info_line________________________()
 
+        # --- reading data ---
         # now let's read the data files
-        print("")
-        print("------------------------------------------------------------------")
-        print("> reading data files...")
+        log.info_line_break()
+        log.info_line________________________()
+        log.info("reading data files...")
+        log.info_line________________________()
         max_len_patient_name = 0
         for data_fn, physio_fn, data_leg in zip(self._data_filepaths_list, self._data_physio_list, self._display_legends_list):
-            print("------------------------------------------------------------------")
-            cprint("> reading data [" + data_leg + "]", 'green', attrs=['bold'])
+            log.info_line_break()
+            log.info_line________________________()
+            log.info("reading data [" + data_leg + "]")
+            log.info_line________________________()
             s = MRSData2(data_fn, self.data_coil_nChannels, physio_fn)
-            print("> got a " + str(s.shape) + " vector")
+            log.debug("got a " + str(s.shape) + " vector")
             # store
             self._data_list.append(s)
             # patient name length
             if(s.patient_name is not None and len(s.patient_name) > max_len_patient_name):
                 max_len_patient_name = len(s.patient_name)
+            log.info_line________________________()
 
-        print("------------------------------------------------------------------")
-        print("> reading ref. data files...")
+        log.info_line_break()
+        log.info_line________________________()
+        log.info("reading ref. data files...")
+        log.info_line________________________()
         for data_ref_fn, data_leg in zip(self._data_ref_filepaths_list, self._display_legends_list):
             if(data_ref_fn is not None):
-                print("------------------------------------------------------------------")
-                cprint("> reading ref. data [" + data_leg + "]", 'green', attrs=['bold'])
+                log.info_line_break()
+                log.info_line________________________()
+                log.info("reading ref. data [" + data_leg + "]")
+                log.info_line________________________()
                 s = MRSData2(data_ref_fn, self.data_coil_nChannels, None)
-                print("> got a " + str(s.shape) + " vector")
-                # if several averages, mean now
+                log.info("got a " + str(s.shape) + " vector")
+                # if several averages, mean now (that could be a problem!?)
                 s = s.mean(axis=0)
                 # add 1 dimension
                 s = s.reshape((1,) + s.shape)
-                print("> reshaped to a " + str(s.shape) + " vector")
+                log.debug("reshaped to a " + str(s.shape) + " vector")
             else:
                 s = None
             # store
             self._data_ref_list.append(s)
+            log.info_line________________________()
 
+        # --- setting up legends and offsets ---
         # legends: add patient name and format (space pads)
-        nchar = 5 + max_len_patient_name + len(max(self._display_legends_list, key=len))
-        display_legends_list_formatted = []
-        for i, l, d in zip(range(len(self._display_legends_list)), self._display_legends_list, self._data_list):
-            if(d.patient_name is not None):
-                this_new_legend = "[" + str(i) + "] " + d.patient_name + " - " + l
-            else:
-                this_new_legend = l
+        log.debug_line_break()
+        log.debug_line________________________()
+        log.debug("processing displays legends and offsets...")
+        display_legends_list_indexed = []
+        for i, l in enumerate(self._display_legends_list):
+            # add an index
+            this_new_legend = ("#%d " % i) + l
+            # set new legend
+            display_legends_list_indexed.append(this_new_legend)
+            self._data_list[i].set_display_label(this_new_legend)
+            # new display label for ref. data reference, if any
+            if(self._data_ref_list[i] is not None):
+                self._data_ref_list[i].set_display_label(this_new_legend + " [REF]")
 
-            this_new_legend = this_new_legend.ljust(nchar)
-            display_legends_list_formatted.append(this_new_legend)
+            # y offset
+            self._data_list[i].set_display_offset(self.display_offset * i)
 
-        self._display_legends_list = display_legends_list_formatted
+        self._display_legends_list = display_legends_list_indexed
 
+        log.debug_line________________________()
+        log.debug("referencing all scans to %.2fppm..." % self.ppm0)
         # set ppm0 for all signals
-        for ind, d in enumerate(self._data_list):
-            self._data_list[ind].ppm0 = self.ppm0
-        for ind, d in enumerate(self._data_ref_list):
+        for i, d in enumerate(self._data_list):
+            self._data_list[i].ppm0 = self.ppm0
+        for i, d in enumerate(self._data_ref_list):
             if d is not None:
-                self._data_ref_list[ind].ppm0 = self.ppm0
+                self._data_ref_list[i].ppm0 = self.ppm0
 
-        print("")
+        log.debug_line________________________()
+        log.debug("linking each dataset to its reference...")
+        # --- linking each data set to its reference
+        for i, d in enumerate(self._data_ref_list):
+            # the ref scan for this dataset
+            self._data_list[i].data_ref = d
 
-        # rephase
-        if(self.phase_enable):
-            print("------------------------------------------------------------------")
-            print("> rephasing...")
-            print("------------------------------------------------------------------")
-            for i in range(0, len(self._data_list)):
-                cprint("> rephasing [" + self._display_legends_list[i] + "]", 'green', attrs=['bold'])
+        # --- reading job list ---
+        log.info_line________________________()
+        log.info("reading your job list...")
+        log.info_line________________________()
+        # first, for each job reset the display_range_ppm parameter if any
+        # BECAUSE PYTHON CANNOT DO POINTERS -_-
+        for j in list(self.jobs.keys()):
+            if("display_range_ppm" in self.jobs[j]):
+                self.jobs[j]["display_range_ppm"] = self.jobs["displaying"]["range_ppm"]
 
-                s = self._data_list[i]
-                s_ref = self._data_ref_list[i]
-                s_phased = s.correct_phase(s_ref, self.phase_POI_range_ppm, self.phase_weak_ws_mode, self.phase_high_snr_mode, self.phase_order, self.phase_offset, self.phase_display, self.display_range_ppm)
-                # replace / store
-                self._data_list[i] = s_phased
-                print("------------------------------------------------------------------")
+        # for each job
+        for k, j in enumerate(self.job_list):
+            this_job_name = j[0]["name"]
+            log.info("#%d %s" % (k, this_job_name))
+        log.info_line________________________()
 
-                if(s_ref is not None):
-                    cprint("> rephasing ref. data for [" + self._display_legends_list[i] + "]", 'green', attrs=['bold'])
+        # --- running job list now ---
+        # exception here: if any concatenate, we need to run the job list in two parts (before and after concatenation in order to reload the processed data)
+        log.info_line_break()
+        log.info_line________________________()
+        log.info("running job list...")
+        log.info_line________________________()
+        # init job stacks
+        concatenate_loop = int(self.jobs["concatenate"] in self.job_list) + 1
+        jobs_stack_init = self.job_list[::-1].copy()
+        jobs_stack = jobs_stack_init.copy()
+        jobs_done_stack_init = []
+        jobs_done_stack = jobs_done_stack_init.copy()
+        for k in range(concatenate_loop):
+            # resuming job stack after concatenate
+            jobs_stack_init = jobs_stack.copy()
+            jobs_done_stack_init = jobs_done_stack.copy()
+            # for each dataset, the list of data processing functions with the right arguments
+            for k, data in enumerate(self._data_list):
+                log.info_line_break()
+                log.info_line________________________()
+                log.info("processing [" + data.display_label + "]")
+                log.info_line________________________()
 
-                    s_ref_phased = s_ref.correct_phase(s_ref, self.phase_POI_range_ppm, self.phase_weak_ws_mode, self.phase_high_snr_mode, self.phase_order, self.phase_offset, False, self.display_range_ppm)
-                    # replace / store
-                    self._data_ref_list[i] = s_ref_phased
-                    print("------------------------------------------------------------------")
-            print("")
+                # run job list for this dataset
+                jobs_stack = jobs_stack_init.copy()
+                jobs_done_stack = jobs_done_stack_init.copy()
+                while(len(jobs_stack) > 0):
+                    # job pop
+                    job = jobs_stack.pop()
+                    # if concatenate, get out of this dataset job loop
+                    if(job == self.jobs["concatenate"]):
+                        break
 
-        # amplification
-        if(self.scaling_factor > 0):
-            print("------------------------------------------------------------------")
-            print("> Amplifying...")
-            print("------------------------------------------------------------------")
-            for i in range(0, len(self._data_list)):
-                cprint("> Amplification of [" + self._display_legends_list[i] + "]", 'green', attrs=['bold'])
-                s = self._data_list[i]
-                s_amplified = s.correct_amplify(self.scaling_factor)
-                # replace / store
-                self._data_list[i] = s_amplified
-            print("------------------------------------------------------------------")
-            print("")
+                    # run job on this dataset
+                    job_result = self._run_job(job, data)
 
-        # FID modulus
-        if(self.fid_modulus):
-            print("------------------------------------------------------------------")
-            print("> FID modulus...")
-            print("------------------------------------------------------------------")
-            for i in range(0, len(self._data_list)):
-                cprint("> FID modulus of [" + self._display_legends_list[i] + "]", 'green', attrs=['bold'])
-                s = self._data_list[i]
-                s_fidmod = s.correct_fidmodulus()
-                # replace / store
-                self._data_list[i] = s_fidmod
-            print("------------------------------------------------------------------")
-            print("")
+                    # push job in the stack of jobs done
+                    jobs_done_stack.append(job)
 
-        # recombine
-        if(self.recombine_enable):
-            print("------------------------------------------------------------------")
-            print("> recombining channels...")
-            print("------------------------------------------------------------------")
-            # recombine using reference data
-            for i in range(0, len(self._data_list)):
-                cprint("> recombining [" + self._display_legends_list[i] + "]", 'green', attrs=['bold'])
-                # try and use a ref scan for rephasing if available
-                # checking if use_data_ref flag is consistent with the data
-                if(self.recombine_use_data_ref):
-                    if(len(self._data_ref_list) > 0 and self._data_ref_list[i] is not None):
-                        s_ref = self._data_ref_list[i]
-                    else:
-                        Warning("> no ref. data scan available for this data!")
-                        s_ref = None
-                else:
-                    s_ref = None
-                s = self._data_list[i]
-                s_combined = s.correct_combine_channels(s_ref, self.recombine_phasing, self.recombine_weights)
+                    # replace with processed signal
+                    if(type(job_result) == MRSData2):
+                        data = job_result
+                        # measure SNR/LW after this process?
+                        if(self.analyze_enable):
+                            self._analyze(job_result, job, jobs_done_stack)
+                            log.info_line________________________()
 
-                # replace / store
-                self._data_list[i] = s_combined
-                print("------------------------------------------------------------------")
+                # we finish running all jobs on a dataset, storing
+                self._data_list[k] = data
 
-                if(s_ref is not None):
-                    cprint("> recombining ref. data for [" + self._display_legends_list[i] + "]", 'green', attrs=['bold'])
+            # if last job was concatenate, that means all datasets were processed and are ready for it
+            if(job == self.jobs["concatenate"]):
+                job_name = self.jobs["concatenate"][0]["name"]
+                log.info("%s..." % job_name)
+                s_concatenated = self._data_list[0]
+                for i in range(1, len(self._data_list)):
+                    s_concatenated = s_concatenated.concatenate_2d(self._data_list[i])
 
-                    s_ref_combined = s_ref.correct_combine_channels(s_ref, self.recombine_phasing, self.recombine_weights)
+                # empty and store the single concatenated signal in the data list
+                s_concatenated.set_display_label(s_concatenated.display_label + " (concatenated)")
+                self._data_list = []
+                self._data_list.append(s_concatenated)
 
-                    # replace / store
-                    self._data_ref_list[i] = s_ref_combined
-                    print("------------------------------------------------------------------")
-            print("")
+                # if analyze going on, empty the results dict to avoid conflicts
+                self._analyze_results_dict = {}
 
-        # concatenate data or process / display separatly?
-        if(len(self._data_list) > 1 and self.data_concatenate):
-            print("------------------------------------------------------------------")
-            print("> concatenating data...")
-            print("------------------------------------------------------------------")
-            s_concatenated = self._data_list[0]
-            for i in range(1, len(self._data_list)):
-                s = self._data_list[i]
-                s_concatenated = np.concatenate((s_concatenated, s))
-                s_concatenated = s.inherit(s_concatenated)
+        # --- summary final linewidths ---
+        if(self.analyze_enable):
+            self._display_analyze_results()
 
-            # empty and store the single concatenated signal in the data list
-            self._data_list = []
-            self._data_list.append(s_concatenated)
-            print("------------------------------------------------------------------")
-            print("")
+        log.info("pipeline terminated!")
+        log.info("returning processed signals!")
+        return(self._data_list)
 
-        # and go on with the processing
-        d_offset = 0
-        for (k, s, s_ref, s_legend, d_factor) in zip(range(len(self._data_list)), self._data_list, self._data_ref_list, self._display_legends_list, self.display_amp_factor_list):
+    def display_results(self):
+        """Plot final processed datasets."""
+        log.info("displaying final processed data...")
 
-            # check initial snr
-            if(self.analyse_snr_enable and self.analyse_snr_evol_enable):
-                print("------------------------------------------------------------------")
-                this_snr, _, _ = s._correct_realign()._correct_average()._correct_apodization()._correct_freqshift().analyse_snr(self.analyse_snr_s_range_ppm, self.analyse_snr_n_range_ppm, s_legend, False, self.analyse_snr_magnitude_mode, self.analyse_snr_display, self.display_range_ppm, True)
-                print("> initial SNR of [" + s_legend + "] = %.2f" % this_snr)
-                self.analyse_snr_evol_list.append([])
-                self.analyse_snr_evol_list[k].append(this_snr)
-                self.analyse_snr_evol_list_labels.append([])
-                self.analyse_snr_evol_list_labels[k].append('initial')
-                print("------------------------------------------------------------------")
-                print("")
+        # get display job
+        disp_job = self.jobs["displaying"]
 
-            # check initial lw
-            if(self.analyse_linewidth_enable and self.analyse_linewidth_evol_enable):
-                print("------------------------------------------------------------------")
-                this_lw = s._correct_realign()._correct_average()._correct_apodization()._correct_freqshift().analyse_linewidth(self.analyse_linewidth_range_ppm, s_legend, self.analyse_linewidth_magnitude_mode, self.analyse_linewidth_display, self.display_range_ppm, True)
-                print("> initial LW of [" + s_legend + "] = %.2f" % this_lw)
-                self.analyse_linewidth_evol_list.append([])
-                self.analyse_linewidth_evol_list[k].append(this_lw)
-                self.analyse_linewidth_evol_list_labels.append([])
-                self.analyse_linewidth_evol_list_labels[k].append('initial')
-                print("------------------------------------------------------------------")
-                print("")
+        # run a diplay job for each dataset
+        for d in self._data_list:
+            # run job on this dataset
+            self._run_job(disp_job, d)
 
-            # zero-filling
-            if(self.zerofill_enable):
-                print("------------------------------------------------------------------")
-                print("> zero-filling data...")
-                print("------------------------------------------------------------------")
-                cprint("> zero-filling [" + s_legend + "]", 'green', attrs=['bold'])
-                s = s.correct_zerofill(self.zerofill_npts, self.zerofill_display, self.display_range_ppm)
+    def save(self, reco_data_db_file=default_paths.DEFAULT_RECO_DATA_DB_FILE):
+        """
+        Save each data set and the current pipeline to the big PKL file containing a dict with all our processed data, sorted by patient name, dataset name. Deal with conflicts like already existing patient name/ dataset name.
 
-                # check snr
-                if(self.analyse_snr_enable and self.analyse_snr_evol_enable):
-                    print("------------------------------------------------------------------")
-                    this_snr, _, _ = s._correct_realign()._correct_average()._correct_apodization()._correct_freqshift().analyse_snr(self.analyse_snr_s_range_ppm, self.analyse_snr_n_range_ppm, s_legend, False, self.analyse_snr_magnitude_mode, self.analyse_snr_display, self.display_range_ppm, True)
-                    print("> post zero-filling SNR of [" + s_legend + "] = %.2f" % this_snr)
-                    self.analyse_snr_evol_list[k].append(this_snr)
-                    self.analyse_snr_evol_list_labels[k].append('post zero-filling')
+        Parameters
+        ----------
+        reco_data_db_file: string
+            PKL file where all the data is stored
+        """
+        log.info("saving %d dataset(s) to file [%s]..." % (len(self._data_list), reco_data_db_file))
 
-                # check lw
-                if(self.analyse_linewidth_enable and self.analyse_linewidth_evol_enable):
-                    print("------------------------------------------------------------------")
-                    this_lw = s._correct_realign()._correct_average()._correct_apodization()._correct_freqshift().analyse_linewidth(self.analyse_linewidth_range_ppm, s_legend, self.analyse_linewidth_magnitude_mode, self.analyse_linewidth_display, self.display_range_ppm, True)
-                    print("> post zero-filling LW of [" + s_legend + "] = %.2f" % this_lw)
-                    self.analyse_linewidth_evol_list[k].append(this_lw)
-                    self.analyse_linewidth_evol_list_labels[k].append('post zero-filling')
+        # if pkl does not exist, it is our very first time :heart:
+        # let's write an empty dict
+        if(not os.path.isfile(reco_data_db_file)):
+            log.debug("%s does not exist, creating it!" % reco_data_db_file)
+            # write pkl file
+            with open(reco_data_db_file, 'wb') as f:
+                pickle.dump([{}], f)
 
-                print("------------------------------------------------------------------")
-                print("")
+        # now open pkl file
+        with open(reco_data_db_file, 'rb') as f:
+            [pkl_data_dict] = pickle.load(f)
 
-            # analysis of physiological stuff
-            if(self.analyse_physio_enable):
-                print("------------------------------------------------------------------")
-                print("> data and physio analysis...")
-                print("------------------------------------------------------------------")
-                cprint("> data and physio analysis [" + s_legend + "]", 'green', attrs=['bold'])
-                s.analyse_physio(self.analyse_physio_POI_range_ppm, self.analyse_physio_delta_time_ms, self.analyse_physio_display)
-                print("------------------------------------------------------------------")
-                print("")
+        # if we reached here, that means the PKL file is not corrupted
+        # let's make a backup of it
+        copyfile(reco_data_db_file, reco_data_db_file + ".bak")
 
-            # analysis and data rejection
-            if(self.analyse_and_reject_enable):
-                print("------------------------------------------------------------------")
-                print("> data analysis and rejection...")
-                print("------------------------------------------------------------------")
-                cprint("> data analysing / rejecting [" + s_legend + "]", 'green', attrs=['bold'])
-                s = s.correct_analyse_and_reject(self.analyse_and_reject_POI_range_ppm, self.analyse_and_reject_moving_averages, self.analyse_and_reject_ranges, self.analyse_and_reject_rel2mean, self.analyse_and_reject_auto, self.analyse_and_reject_auto_allowed_snr_change, self.analyse_and_reject_display)
+        # for each dataset
+        for d in self._data_list:
+            # we already have this patient in the db
+            if(d.patient_name in pkl_data_dict):
+                log.debug("patient name [%s] already exists!" % d.patient_name)
+                nd = len(list(pkl_data_dict[d.patient_name].keys()))
+                log.debug("already contains %d dataset(s)!" % nd)
+            else:
+                # create patient entry
+                pkl_data_dict[d.patient_name] = {}
+            # add/update with the dataset
+            log.debug("adding/updating dataset [%s]/[%s]..." % (d.patient_name, d.display_label))
+            pkl_data_dict[d.patient_name][d.display_label] = {"data": d, "pipeline": self, "patient_name": d.patient_name, "patient_weight": d.patient_weight, "patient_height": d.patient_height, "vref": d.vref, "te": d.te}
+            if(d.sequence is not None and d.sequence.name == "eja_svs_slaser"):
+                pkl_data_dict[d.patient_name][d.display_label].update({"r": d.sequence.pulse_rfc_r, "n": d.sequence.pulse_rfc_n, "te2": d.sequence.te})
+            else:
+                pkl_data_dict[d.patient_name][d.display_label].update({"r": None, "n": None, "te2": None})
 
-                # check snr
-                if(self.analyse_snr_enable and self.analyse_snr_evol_enable):
-                    print("------------------------------------------------------------------")
-                    this_snr, _, _ = s._correct_realign()._correct_average()._correct_apodization()._correct_freqshift().analyse_snr(self.analyse_snr_s_range_ppm, self.analyse_snr_n_range_ppm, s_legend, False, self.analyse_snr_magnitude_mode, self.analyse_snr_display, self.display_range_ppm, True)
-                    print("> post analyse / reject SNR of [" + s_legend + "] = %.2f" % this_snr)
-                    self.analyse_snr_evol_list[k].append(this_snr)
-                    self.analyse_snr_evol_list_labels[k].append('post analyse / reject')
-
-                # check lw
-                if(self.analyse_linewidth_enable and self.analyse_linewidth_evol_enable):
-                    print("------------------------------------------------------------------")
-                    this_lw = s._correct_realign()._correct_average()._correct_apodization()._correct_freqshift().analyse_linewidth(self.analyse_linewidth_range_ppm, s_legend, self.analyse_linewidth_magnitude_mode, self.analyse_linewidth_display, self.display_range_ppm, True)
-                    print("> post analyse / reject LW of [" + s_legend + "] = %.2f" % this_lw)
-                    self.analyse_linewidth_evol_list[k].append(this_lw)
-                    self.analyse_linewidth_evol_list_labels[k].append('post analyse / reject')
-
-                print("------------------------------------------------------------------")
-                print("")
-
-            # realignement
-            if(self.realign_enable):
-                print("------------------------------------------------------------------")
-                print("> frequency realignment...")
-                print("------------------------------------------------------------------")
-                cprint("> realigning [" + s_legend + "]", 'green', attrs=['bold'])
-                s = s.correct_realign(self.realign_POI_range_ppm, self.realign_moving_averages, self.realign_display, self.display_range_ppm)
-
-                # check snr
-                if(self.analyse_snr_enable and self.analyse_snr_evol_enable):
-                    print("------------------------------------------------------------------")
-                    this_snr, _, _ = s._correct_average()._correct_apodization()._correct_freqshift().analyse_snr(self.analyse_snr_s_range_ppm, self.analyse_snr_n_range_ppm, s_legend, False, self.analyse_snr_magnitude_mode, self.analyse_snr_display, self.display_range_ppm, True)
-                    print("> post realignement SNR of [" + s_legend + "] = %.2f" % this_snr)
-                    self.analyse_snr_evol_list[k].append(this_snr)
-                    self.analyse_snr_evol_list_labels[k].append('post realignement')
-
-                # check lw
-                if(self.analyse_linewidth_enable and self.analyse_linewidth_evol_enable):
-                    print("------------------------------------------------------------------")
-                    this_lw = s._correct_average()._correct_apodization()._correct_freqshift().analyse_linewidth(self.analyse_linewidth_range_ppm, s_legend, self.analyse_linewidth_magnitude_mode, self.analyse_linewidth_display, self.display_range_ppm, True)
-                    print("> post realignement LW of [" + s_legend + "] = %.2f" % this_lw)
-                    self.analyse_linewidth_evol_list[k].append(this_lw)
-                    self.analyse_linewidth_evol_list_labels[k].append('post realignement')
-
-                print("------------------------------------------------------------------")
-                print("")
-
-            # average
-            if(self.average_enable):
-                print("------------------------------------------------------------------")
-                print("> averaging...")
-                print("------------------------------------------------------------------")
-                cprint("> averaging [" + s_legend + "]", 'green', attrs=['bold'])
-                s = s.correct_average(self.average_na, self.average_display, self.display_range_ppm)
-
-                # check snr
-                if(self.analyse_snr_enable and self.analyse_snr_evol_enable):
-                    print("------------------------------------------------------------------")
-                    this_snr, _, _ = s._correct_apodization()._correct_freqshift().analyse_snr(self.analyse_snr_s_range_ppm, self.analyse_snr_n_range_ppm, s_legend, False, self.analyse_snr_magnitude_mode, self.analyse_snr_display, self.display_range_ppm, True)
-                    print("> post averaging SNR of [" + s_legend + "] = %.2f" % this_snr)
-                    self.analyse_snr_evol_list[k].append(this_snr)
-                    self.analyse_snr_evol_list_labels[k].append('post averaging')
-
-                # check lw
-                if(self.analyse_linewidth_enable and self.analyse_linewidth_evol_enable):
-                    print("------------------------------------------------------------------")
-                    this_lw = s._correct_apodization()._correct_freqshift().analyse_linewidth(self.analyse_linewidth_range_ppm, s_legend, self.analyse_linewidth_magnitude_mode, self.analyse_linewidth_display, self.display_range_ppm, True)
-                    print("> post averaging LW of [" + s_legend + "] = %.2f" % this_lw)
-                    self.analyse_linewidth_evol_list[k].append(this_lw)
-                    self.analyse_linewidth_evol_list_labels[k].append('post averaging')
-
-                print("------------------------------------------------------------------")
-                print("")
-
-            # look at real noise level
-            print("------------------------------------------------------------------")
-            print("> analysing real noise level before denoizing...")
-            print("------------------------------------------------------------------")
-            for i in range(0, len(self._data_list)):
-                cprint("> analysing noise [" + s_legend + "]", 'green', attrs=['bold'])
-                _, _, nl = s.analyse_snr(None, None, s_legend, True, False, False)
-                # store in object for later use (during quantification)
-                s._noise_level = nl
-                print("> time-domain noise level = %.2E" % nl)
-                print("------------------------------------------------------------------")
-
-            # apodize
-            if(self.apodize_enable):
-                print("------------------------------------------------------------------")
-                print("> apodizing...")
-                print("------------------------------------------------------------------")
-                cprint("> apodizing [" + s_legend + "]", 'green', attrs=['bold'])
-
-                s = s.correct_apodization(self.apodize_damping_hz, self.apodize_npts, self.apodize_display, self.display_range_ppm)
-
-                if(s_ref is not None):
-                    print("------------------------------------------------------------------")
-                    cprint("> apodizing (cropping really) ref. data for [" + s_legend + "]", 'green', attrs=['bold'])
-                    s_ref = s_ref._correct_average().correct_apodization(1.0, self.apodize_npts, False, self.display_range_ppm)
-
-                # check snr
-                if(self.analyse_snr_enable and self.analyse_snr_evol_enable):
-                    print("------------------------------------------------------------------")
-                    this_snr, _, _ = s._correct_freqshift().analyse_snr(self.analyse_snr_s_range_ppm, self.analyse_snr_n_range_ppm, s_legend, False, self.analyse_snr_magnitude_mode, self.analyse_snr_display, self.display_range_ppm, True)
-                    print("> post apodization SNR of [" + s_legend + "] = %.2f" % this_snr)
-                    self.analyse_snr_evol_list[k].append(this_snr)
-                    self.analyse_snr_evol_list_labels[k].append('post apodization')
-
-                # check lw
-                if(self.analyse_linewidth_enable and self.analyse_linewidth_evol_enable):
-                    print("------------------------------------------------------------------")
-                    this_lw = s._correct_freqshift().analyse_linewidth(self.analyse_linewidth_range_ppm, s_legend, self.analyse_linewidth_magnitude_mode, self.analyse_linewidth_display, self.display_range_ppm, True)
-                    print("> post apodization LW of [" + s_legend + "] = %.2f" % this_lw)
-                    self.analyse_linewidth_evol_list[k].append(this_lw)
-                    self.analyse_linewidth_evol_list_labels[k].append('post apodization')
-
-                print("------------------------------------------------------------------")
-                print("")
-
-            # water residue removal
-            if(self.remove_water_enable):
-                print("------------------------------------------------------------------")
-                print("> removing water...")
-                print("------------------------------------------------------------------")
-                cprint("> removing water from [" + s_legend + "]", 'green', attrs=['bold'])
-                s = s.correct_water_removal(self.remove_water_hsvd_components, self.remove_water_hsvd_range, self.remove_water_display, self.display_range_ppm)
-                print("------------------------------------------------------------------")
-                print("")
-
-            # frequency shift calibration
-            if(self.calibrate_enable):
-                print("------------------------------------------------------------------")
-                print("> calibrating spectrum...")
-                print("------------------------------------------------------------------")
-                cprint("> calibrating [" + s_legend + "]", 'green', attrs=['bold'])
-                s = s.correct_freqshift(self.calibrate_POI_range_ppm, self.calibrate_POI_true_ppm, self.calibrate_display, self.display_range_ppm)
-                print("------------------------------------------------------------------")
-                print("")
-
-            # display
-            if(self.display_enable):
-                print("------------------------------------------------------------------")
-                print("> display spectrum...")
-                print("------------------------------------------------------------------")
-                cprint("> displaying [" + s_legend + "]", 'green', attrs=['bold'])
-                s.display_spectrum(self.display_fig_index, s_legend, self.display_range_ppm, d_factor, d_offset, self.display_magnitude_mode)
-                d_offset = d_offset + self.display_offset
-                print("------------------------------------------------------------------")
-                print("")
-
-            # snr estimation
-            if(self.analyse_snr_enable):
-                print("------------------------------------------------------------------")
-                print("> estimating final SNR...")
-                print("------------------------------------------------------------------")
-                cprint("> estimating final SNR of [" + s_legend + "]", 'green', attrs=['bold'])
-                this_snr, _, _ = s.analyse_snr(self.analyse_snr_s_range_ppm, self.analyse_snr_n_range_ppm, s_legend, False, self.analyse_snr_magnitude_mode, self.analyse_snr_display, self.display_range_ppm)
-                self.analyse_snr_final_list.append(this_snr)
-                if(self.analyse_snr_evol_enable):
-                    self.analyse_snr_evol_list[k].append(this_snr)
-                    self.analyse_snr_evol_list_labels[k].append('final')
-                print("------------------------------------------------------------------")
-                print("")
-
-            # lw estimation
-            if(self.analyse_linewidth_enable):
-                print("------------------------------------------------------------------")
-                print("> estimating final linewidth...")
-                print("------------------------------------------------------------------")
-                cprint("> estimating final linewidth of [" + s_legend + "]", 'green', attrs=['bold'])
-                this_lw = s.analyse_linewidth(self.analyse_linewidth_range_ppm, s_legend, self.analyse_linewidth_magnitude_mode, self.analyse_linewidth_display, self.display_range_ppm)
-                self.analyse_linewidth_final_list.append(this_lw)
-                if(self.analyse_linewidth_evol_enable):
-                    self.analyse_linewidth_evol_list[k].append(this_lw)
-                    self.analyse_linewidth_evol_list_labels[k].append('final')
-                print("------------------------------------------------------------------")
-                print("")
-
-        # summary display in console
-        if(self.analyse_snr_enable):
-            print("------------------------------------------------------------------")
-            print("---SNR results summary--------------------------------------------")
-            print("------------------------------------------------------------------")
-            for (this_legend, this_snr) in zip(self._display_legends_list, self.analyse_snr_final_list):
-                print("> " + this_legend + "\tSNR=%.2f" % this_snr)
-
-            # plot snr evolution
-            if(self.analyse_snr_evol_enable):
-                plt.figure(210).canvas.set_window_title("mrs.reco.pipeline.run_pipeline_std.analyse_snr_evol_enable")
-                plt.clf()
-                plt.bar(np.arange(len(self.analyse_snr_evol_list[k])), self.analyse_snr_evol_list[k])
-                plt.plot(np.arange(len(self.analyse_snr_evol_list[k])), self.analyse_snr_evol_list[k], 'kx-')
-                plt.xticks(np.arange(len(self.analyse_snr_evol_list[k])), labels=self.analyse_snr_evol_list_labels[k], rotation=45)
-                plt.ylabel('Estimated SNR (u.a)')
-                plt.grid('on')
-                plt.tight_layout()
-            print("------------------------------------------------------------------")
-            print("")
-
-        if(self.analyse_linewidth_enable):
-            print("------------------------------------------------------------------")
-            print("---LW results summary---------------------------------------------")
-            print("------------------------------------------------------------------")
-            for (this_legend, this_lw) in zip(self._display_legends_list, self.analyse_linewidth_final_list):
-                print("> " + this_legend + "\tLW=%.2f Hz" % this_lw)
-
-            # plot snr evolution
-            if(self.analyse_linewidth_evol_enable):
-                plt.figure(211).canvas.set_window_title("mrs.reco.pipeline.run_pipeline_std.analyse_linewidth_evol_enable")
-                plt.clf()
-                plt.bar(np.arange(len(self.analyse_linewidth_evol_list[k])), self.analyse_linewidth_evol_list[k])
-                plt.plot(np.arange(len(self.analyse_linewidth_evol_list[k])), self.analyse_linewidth_evol_list[k], 'kx-')
-                plt.xticks(np.arange(len(self.analyse_linewidth_evol_list[k])), labels=self.analyse_linewidth_evol_list_labels[k], rotation=45)
-                plt.ylabel('Estimated LW (Hz)')
-                plt.grid('on')
-                plt.tight_layout()
-            print("------------------------------------------------------------------")
-            print("")
-            print("------------------------------------------------------------------")
-            print("")
-
-        print("> Pipeline terminated!")
-        print("> Returning last processed signal and its corresponding ref. signal!")
-        return(s, s_ref)
+        # write back pkl file
+        with open(reco_data_db_file, 'wb') as f:
+            pickle.dump([pkl_data_dict], f)
 
 
 class voi_pipeline:
@@ -3651,7 +3883,7 @@ class voi_pipeline:
 
         return(te_list)
 
-    def run_pipeline_std(self):
+    def run(self):
         """
         Run the standard pipeline for VOI trace signals. It includes.
 
@@ -3659,16 +3891,10 @@ class voi_pipeline:
             * displaying the spatial selection profiles
             * analyzing the selectivity
         """
-        print("")
-        print("------------------------------------------------------------------")
-        print("mrs.reco.voi_pipeline.run_pipeline_std:")
-        print("------------------------------------------------------------------")
-        print("")
-
         # parse
-        print("------------------------------------------------------------------")
-        print("> parsing data file paths...")
-        print("------------------------------------------------------------------")
+        log.info_line________________________()
+        log.info("parsing data file paths...")
+        log.info_line________________________()
         if(self.data_filepaths == []):
             parsed_list = None
         elif(type(self.data_filepaths) == list):
@@ -3677,16 +3903,15 @@ class voi_pipeline:
             parsed_list = _parse_string_into_list(self.data_filepaths)
 
         if(parsed_list is None):
-            raise Exception("> no data scan files specified!")
+            log.error("no data scan files specified!")
         else:
             self._data_filepaths_list = parsed_list
-        print("------------------------------------------------------------------")
-        print("")
+        log.info_line________________________()
 
         # legends
-        print("------------------------------------------------------------------")
-        print("> parsing legend captions...")
-        print("------------------------------------------------------------------")
+        log.info_line________________________()
+        log.info("parsing legend captions...")
+        log.info_line________________________()
         if(self.display_legends == []):
             parsed_list = None
         elif(type(self.display_legends) == list):
@@ -3697,22 +3922,20 @@ class voi_pipeline:
         if(parsed_list is None):
             # oh no, no legend captions were specified
             # let's create them using filenames
-            self._display_legends_list = _build_legend_list_from_filepath_list(
-                self._data_filepaths_list)
+            self._display_legends_list = _build_legend_list_from_filepath_list(self._data_filepaths_list)
         else:
             self._display_legends_list = parsed_list
-        print("------------------------------------------------------------------")
-        print("")
+        log.info_line________________________()
 
         # read the 3 VOI traces per dataset
-        print("------------------------------------------------------------------")
-        print("> reading data files...")
-        print("------------------------------------------------------------------")
+        log.info_line________________________()
+        log.info("reading data files...")
+        log.info_line________________________()
         for f in self._data_filepaths_list:
             # read data
-            print("> looking in folder: ")
-            print(f)
-            print("> reading the 3 dicom files...")
+            log.info("looking in folder: ")
+            log.info(f)
+            log.info("reading the 3 dicom files...")
             sx = suspect.io.load_siemens_dicom(f + "/original-primary_e09_0001.dcm")
             sy = suspect.io.load_siemens_dicom(f + "/original-primary_e09_0002.dcm")
             sz = suspect.io.load_siemens_dicom(f + "/original-primary_e09_0003.dcm")
@@ -3728,13 +3951,12 @@ class voi_pipeline:
             self._xdata_axis.append(sx.frequency_axis())
             self._ydata_axis.append(sy.frequency_axis())
             self._zdata_axis.append(sz.frequency_axis())
-        print("------------------------------------------------------------------")
-        print("")
+        log.info_line________________________()
 
         # analysis
-        print("------------------------------------------------------------------")
-        print("> evaluating selectivity using a " + str(self.analyze_selectivity_range_list) + "ppm ranges...")
-        print("------------------------------------------------------------------")
+        log.info_line________________________()
+        log.info("evaluating selectivity using a " + str(self.analyze_selectivity_range_list) + "ppm ranges...")
+        log.info_line________________________()
         self.analyze_selectivity_list = np.zeros([len(self._data_filepaths_list), 3, 2])
         k = 0
         for (sx, sy, sz, sx_ax, sy_ax, sz_ax, leg) in zip(self._xdata, self._ydata, self._zdata, self._xdata_axis, self._ydata_axis, self._zdata_axis, self._display_legends_list):
@@ -3765,10 +3987,10 @@ class voi_pipeline:
             sy_out = np.trapz(sy_masked, sy_ax)
             sz_out = np.trapz(sz_masked, sz_ax)
 
-            print("> selectivity results for [" + leg + "]...")
-            print("> [X] IN=%.0fHz-1 OUT=%.0f Hz-1" % (sx_in, sx_out))
-            print("> [Y] IN=%.0fHz-1 OUT=%.0f Hz-1" % (sy_in, sy_out))
-            print("> [Z] IN=%.0fHz-1 OUT=%.0f Hz-1" % (sz_in, sz_out))
+            log.info("selectivity results for [" + leg + "]...")
+            log.info(" [X] IN=%.0fHz-1 OUT=%.0f Hz-1" % (sx_in, sx_out))
+            log.info(" [Y] IN=%.0fHz-1 OUT=%.0f Hz-1" % (sy_in, sy_out))
+            log.info(" [Z] IN=%.0fHz-1 OUT=%.0f Hz-1" % (sz_in, sz_out))
 
             # store
             self.analyze_selectivity_list[k, :, 0] = [sx_in, sy_in, sz_in]
@@ -3776,113 +3998,61 @@ class voi_pipeline:
             k = k + 1
 
             '''
-            print("> mrs.reco.voi_pipeline.run_pipeline_std: Selectivity debug info for [" + leg + "] coming...")
-            print("> [X] Intersection at %f Hz and %f Hz" % (sx_ax[sx_ithreshold_l],sx_ax[sx_ithreshold_r]))
-            print("> [Y] Intersection at %f Hz and %f Hz" % (sy_ax[sy_ithreshold_l],sy_ax[sy_ithreshold_r]))
-            print("> [Z] Intersection at %f Hz and %f Hz" % (sz_ax[sz_ithreshold_l],sz_ax[sz_ithreshold_r]))
+            log.info("selectivity debug info for [" + leg + "] coming...")
+            log.info(" [X] Intersection at %f Hz and %f Hz" % (sx_ax[sx_ithreshold_l],sx_ax[sx_ithreshold_r]))
+            log.info(" [Y] Intersection at %f Hz and %f Hz" % (sy_ax[sy_ithreshold_l],sy_ax[sy_ithreshold_r]))
+            log.info(" [Z] Intersection at %f Hz and %f Hz" % (sz_ax[sz_ithreshold_l],sz_ax[sz_ithreshold_r]))
             '''
-        print("------------------------------------------------------------------")
-        print("")
+        log.info_line________________________()
 
         # display
-        sx_min_all = 0
-        sx_max_all = 0
-        sy_min_all = 0
-        sy_max_all = 0
-        sz_min_all = 0
-        sz_max_all = 0
-        print("------------------------------------------------------------------")
-        print("> displaying the 3 spatial profiles...")
-        print("------------------------------------------------------------------")
+        log.info_line________________________()
+        log.info("displaying the 3 spatial profiles...")
+        log.info_line________________________()
+        fig = plt.figure(self.display_fig_index)
+        fig.clf()
+        axs = fig.subplots(2, 3)
+        fig.canvas.set_window_title("mrs.reco.voi_pipeline.run")
+        fig.suptitle("spatial selection profiles", fontsize=11)
         for (sx, sy, sz, sx_ax, sy_ax, sz_ax, leg) in zip(self._xdata, self._ydata, self._zdata, self._xdata_axis, self._ydata_axis, self._zdata_axis, self._display_legends_list):
 
-            # record min / max
-            if(sx.min() < sx_min_all):
-                sx_min_all = sx.min()
-            if(sx.max() > sx_max_all):
-                sx_max_all = sx.max()
-            if(sy.min() < sy_min_all):
-                sy_min_all = sy.min()
-            if(sy.max() > sy_max_all):
-                sy_max_all = sy.max()
-            if(sz.min() < sz_min_all):
-                sz_min_all = sz.min()
-            if(sz.max() > sz_max_all):
-                sz_max_all = sz.max()
+            axs[0, 0].plot(sx_ax, sx, linewidth=1, label=leg)
+            axs[0, 0].set_xlabel('frequency dispersion (Hz)')
+            axs[0, 0].grid('on')
 
-            # display
-            plt.figure(self.display_fig_index).canvas.set_window_title("mrs.reco.read_trace_data_and_display")
+            axs[1, 0].plot(sx_ax, sx, linewidth=1, label=leg)
+            axs[1, 0].set_xlabel('frequency dispersion (Hz)')
+            axs[1, 0].set_ylabel('X spatial profile')
+            axs[1, 0].grid('on')
 
-            plt.subplot(2, 4, 1)
-            plt.plot(sx_ax, sx, linewidth=1, label=leg)
-            plt.xlabel('frequency dispersion (Hz)')
-            plt.grid('on')
+            axs[0, 1].plot(sy_ax, sy, linewidth=1, label=leg)
+            axs[0, 1].set_xlabel('frequency dispersion (Hz)')
+            axs[0, 1].grid('on')
 
-            plt.subplot(2, 4, 5)
-            plt.plot(sx_ax, sx, linewidth=1, label=leg)
-            plt.xlabel('frequency dispersion (Hz)')
-            plt.ylabel('X spatial profile')
-            plt.grid('on')
+            axs[1, 1].plot(sy_ax, sy, linewidth=1, label=leg)
+            axs[1, 1].set_xlabel('frequency dispersion (Hz)')
+            axs[1, 1].set_ylabel('Y spatial profile')
+            axs[1, 1].grid('on')
 
-            plt.subplot(2, 4, 2)
-            plt.plot(sy_ax, sy, linewidth=1, label=leg)
-            plt.xlabel('frequency dispersion (Hz)')
-            plt.grid('on')
+            axs[0, 2].plot(sz_ax, sz, linewidth=1, label=leg)
+            axs[0, 2].set_xlabel('frequency dispersion (Hz)')
+            axs[0, 2].grid('on')
 
-            plt.subplot(2, 4, 6)
-            plt.plot(sy_ax, sy, linewidth=1, label=leg)
-            plt.xlabel('frequency dispersion (Hz)')
-            plt.ylabel('Y spatial profile')
-            plt.grid('on')
-
-            plt.subplot(2, 4, 3)
-            plt.plot(sz_ax, sz, linewidth=1, label=leg)
-            plt.xlabel('frequency dispersion (Hz)')
-            plt.grid('on')
-
-            plt.subplot(2, 4, 7)
-            plt.plot(sz_ax, sz, linewidth=1, label=leg)
-            plt.xlabel('frequency dispersion (Hz)')
-            plt.ylabel('Z spatial profile')
-            plt.grid('on')
+            axs[1, 2].plot(sz_ax, sz, linewidth=1, label=leg)
+            axs[1, 2].set_xlabel('frequency dispersion (Hz)')
+            axs[1, 2].set_ylabel('Z spatial profile')
+            axs[1, 2].grid('on')
 
         # display ppm range lines
-        for (sx, sy, sz, sx_ax, sy_ax, sz_ax) in zip(self._xdata, self._ydata, self._zdata, self._xdata_axis, self._ydata_axis, self._zdata_axis):
+        for i in range(3):
+            axs[0, i].axvline(x=self.analyze_selectivity_range_list[i][0], linestyle='--')
+            axs[0, i].axvline(x=self.analyze_selectivity_range_list[i][1], linestyle='--')
+            axs[1, i].axvline(x=self.analyze_selectivity_range_list[i][0], linestyle='--')
+            axs[1, i].axvline(x=self.analyze_selectivity_range_list[i][1], linestyle='--')
 
-            plt.subplot(2, 4, 1)
-            sx_minmax = np.array([sx_min_all, sx_max_all])
-            sx_ax_l = np.ones(2,) * self.analyze_selectivity_range_list[0][0]
-            sx_ax_r = np.ones(2,) * self.analyze_selectivity_range_list[0][1]
-            plt.plot(sx_ax_l, sx_minmax, '--', linewidth=0.5)
-            plt.plot(sx_ax_r, sx_minmax, '--', linewidth=0.5)
-            plt.subplot(2, 4, 5)
-            plt.plot(sx_ax_l, sx_minmax, '--', linewidth=0.5)
-            plt.plot(sx_ax_r, sx_minmax, '--', linewidth=0.5)
-
-            plt.subplot(2, 4, 2)
-            sy_minmax = np.array([sy_min_all, sy_max_all])
-            sy_ax_l = np.ones(2,) * self.analyze_selectivity_range_list[1][0]
-            sy_ax_r = np.ones(2,) * self.analyze_selectivity_range_list[1][1]
-            plt.plot(sy_ax_l, sy_minmax, '--', linewidth=0.5)
-            plt.plot(sy_ax_r, sy_minmax, '--', linewidth=0.5)
-            plt.subplot(2, 4, 6)
-            plt.plot(sy_ax_l, sy_minmax, '--', linewidth=0.5)
-            plt.plot(sy_ax_r, sy_minmax, '--', linewidth=0.5)
-
-            plt.subplot(2, 4, 3)
-            sz_minmax = np.array([sz_min_all, sz_max_all])
-            sz_ax_l = np.ones(2,) * self.analyze_selectivity_range_list[2][0]
-            sz_ax_r = np.ones(2,) * self.analyze_selectivity_range_list[2][1]
-            plt.plot(sz_ax_l, sz_minmax, '--', linewidth=0.5)
-            plt.plot(sz_ax_r, sz_minmax, '--', linewidth=0.5)
-            plt.subplot(2, 4, 7)
-            plt.plot(sz_ax_l, sz_minmax, '--', linewidth=0.5)
-            plt.plot(sz_ax_r, sz_minmax, '--', linewidth=0.5)
-
-        plt.legend(bbox_to_anchor=(1.05, 1), loc=2, mode='expand', borderaxespad=0)
-        plt.tight_layout()
-        plt.show()
-        print("")
+        axs[1, 2].legend()
+        fig.subplots_adjust()
+        fig.show()
 
 
 def _parse_string_into_list(big_string):

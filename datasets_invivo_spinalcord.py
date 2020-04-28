@@ -8,13 +8,18 @@ A user script used to store calls for the reconstruction of in vivo data.
 # %% init
 from IPython import get_ipython
 import matplotlib.pylab as plt
-import mrs.aliases as xxx
 import mrs.reco as reco
+import mrs.log as log
 import numpy as np
 get_ipython().magic("clear")
 plt.close("all")
 
-# %% 15/03/2019 - 291-vs-moelle-spectro-p1 - STEAM #1 :(
+get_ipython().magic("matplotlib auto")
+plt.rcParams['figure.dpi'] = 100
+plt.rcParams['figure.max_open_warning'] = 1000
+log.setLevel(log.DEBUG)
+
+# %% 15/03/2019 - 291-vs-moelle-spectro-p1 - concatenated STEAM #1 :(
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -41,21 +46,31 @@ STEAM #1
 STEAM #1
 """
 
-p.phase_enable = False
-p.data_concatenate = True
-p.phase_display = False
-p.remove_water_enable = False
-s, s_ref = p.run_pipeline_std()
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
-fit_metabolites = fit_metabolites_prefit + [
-    xxx.m_Cho_CH2,
-    xxx.m_Cr_CH2,
-    xxx.m_NAA_CH2,
-    xxx.m_mI,
-    xxx.m_Tau]
+p.jobs["data-rejecting"]["auto"] = True
+p.jobs["data-rejecting"]["ranges"]["amplitude (%)"] = 50
+p.jobs["data-rejecting"]["ranges"]["phase std. factor (%)"] = 150
+p.data_process_only_this_data_index = []
+p.run()
+p.save()
 
-# %% 15/03/2019 - 291-vs-moelle-spectro-p1 - sLASER #1 :(
+# %% 15/03/2019 - 291-vs-moelle-spectro-p1 - concatenated sLASER #1 :(
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -82,17 +97,29 @@ sLASER #1
 sLASER #1
 """
 
-p.data_concatenate = True
-p.phase_display = False
-p.remove_water_enable = False
-s, s_ref = p.run_pipeline_std()
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
-fit_metabolites = fit_metabolites_prefit + [
-    xxx.m_Cho_CH2,
-    xxx.m_Cr_CH2,
-    xxx.m_NAA_CH2,
-    xxx.m_mI, xxx.m_Tau]
+p.jobs["data-rejecting"]["auto"] = True
+p.jobs["data-rejecting"]["ranges"]["amplitude (%)"] = 50
+p.jobs["data-rejecting"]["ranges"]["phase std. factor (%)"] = 150
+p.data_process_only_this_data_index = []
+p.run()
+p.save()
 
 # %% 15/03/2019 - 291-vs-moelle-spectro-p1 - sLASER #2 :(
 get_ipython().magic("clear")
@@ -112,150 +139,31 @@ p.display_legends = """
 sLASER #2
 """
 
-p.phase_display = False
-p.remove_water_enable = False
-s, s_ref = p.run_pipeline_std()
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
-fit_metabolites = fit_metabolites_prefit + [
-    xxx.m_Cho_CH2,
-    xxx.m_Cr_CH2,
-    xxx.m_NAA_CH2,
-    xxx.m_mI, xxx.m_Tau]
+p.jobs["data-rejecting"]["auto"] = True
+p.jobs["data-rejecting"]["ranges"]["amplitude (%)"] = 50
+p.jobs["data-rejecting"]["ranges"]["phase std. factor (%)"] = 150
+p.data_process_only_this_data_index = []
+p.run()
+p.save()
 
-# %% 20/06/2019 - 296_ym_p1_brainmoelle - brain - sLASER DICOM and TWIX :)
-get_ipython().magic("clear")
-plt.close("all")
-
-p = reco.pipeline()
-p.data_coil_nChannels = 32
-p.data_filepaths = """
-/home/tangir/crmbm/acq/296_ym_p1_brainmoelle/296-ym-p1-brainmoelle/20190619/01_0014_slaser-r-n/original-primary_e09_0001.dcm
-/home/tangir/crmbm/acq/296_ym_p1_brainmoelle/296-ym-p1-brainmoelle/20190619/01_0012_slaser-r-n/original-primary_e09_0001.dcm
-/home/tangir/crmbm/acq_twix/296_ym_p1_brainmoelle/meas_MID79_slaser_R_N=20+_1_longTE_SNR++++_FID33878.dat
-/home/tangir/crmbm/acq_twix/296_ym_p1_brainmoelle/meas_MID81_slaser_R_N=5_5+_shortTE_SNR++_FID33880.dat
-/home/tangir/crmbm/acq_twix/296_ym_p1_brainmoelle/meas_MID73_slaser_R_N=20+_1_longTE_SNR++++_FID33872.dat
-"""
-
-p.data_ref_filepaths = """
-/home/tangir/crmbm/acq/296_ym_p1_brainmoelle/296-ym-p1-brainmoelle/20190619/01_0013_slaser-r-n/original-primary_e09_0001.dcm
-/home/tangir/crmbm/acq/296_ym_p1_brainmoelle/296-ym-p1-brainmoelle/20190619/01_0009_slaser-r-n/original-primary_e09_0001.dcm
-/home/tangir/crmbm/acq_twix/296_ym_p1_brainmoelle/meas_MID73_slaser_R_N=20+_1_longTE_SNR++++_FID33872.dat
-/home/tangir/crmbm/acq_twix/296_ym_p1_brainmoelle/meas_MID80_slaser_R_N=5_5+_shortTE_SNR++_FID33879.dat
-/home/tangir/crmbm/acq_twix/296_ym_p1_brainmoelle/meas_MID73_slaser_R_N=20+_1_longTE_SNR++++_FID33872.dat
-"""
-
-p.display_legends = """
-brain - sLASER R:N=5:5 (DICOM)
-brain - sLASER R:N=25:1 (DICOM)
-brain - sLASER R:N=25:1 (TWIX)
-brain - sLASER R:N=5:5 (TWIX)
-brain - sLASER R:N=25:1 REF (TWIX)
-"""
-
-p.display_amp_factor_list = [1, 1, 1e8 * 50800 / 26300 * 59000 / 75000, 1e8 * 50800 / 26300 * 59000 / 75000, 1e8 * 50800 / 26300 * 59000 / 75000]
-
-p.recombine_phasing = False
-p.apodize_enable = True
-p.apodize_damping_hz = 3
-p.remove_water_enable = False
-
-p.analyse_and_reject_enable = False
-
-p.analyse_snr_evol = True
-p.analyse_linewidth_evol = True
-
-p.average_na = 4
-p.fid_modulus = False
-p.remove_water_enable = False
-p.remove_water_hsvd_components = 10
-p.remove_water_hsvd_range = [4.6, 4.8]
-
-p.data_process_only_this_data_index = [2]
-p.display_range_ppm = [1, 5]
-s, s_ref = p.run_pipeline_std()
-
-fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
-fit_metabolites = fit_metabolites_prefit + [
-    xxx.m_Cho_CH2,
-    xxx.m_Cr_CH2,
-    xxx.m_NAA_CH2,
-    xxx.m_mI, xxx.m_Tau]
-
-# %% 20/06/2019 - 296_ym_p1_brainmoelle - brain - STEAM DICOM and TWIX :) but bad phase
-get_ipython().magic("clear")
-plt.close("all")
-
-p = reco.pipeline()
-p.data_coil_nChannels = 32
-p.data_filepaths = """
-/home/tangir/crmbm/acq/296_ym_p1_brainmoelle/296-ym-p1-brainmoelle/20190619/01_0008_steam-shortte-snr/original-primary_e09_0001.dcm
-/home/tangir/crmbm/acq_twix/296_ym_p1_brainmoelle/meas_MID71_steam_shortTE_SNR+_FID33870.dat
-"""
-p.data_ref_filepaths = """
-/home/tangir/crmbm/acq/296_ym_p1_brainmoelle/296-ym-p1-brainmoelle/20190619/01_0006_steam-shortte-snr/original-primary_e09_0001.dcm
-/home/tangir/crmbm/acq_twix/296_ym_p1_brainmoelle/meas_MID69_steam_shortTE_SNR+_FID33868.dat
-"""
-
-p.display_legends = """
-brain - STEAM (DICOM)
-brain - STEAM (TWIX)
-"""
-
-p.display_amp_factor_list = [1, 1e8 * 50800 / 26300 * 59000 / 75000]
-
-p.phase_enable = True
-p.phase_POI_range_ppm = [4, 6]
-p.phase_weak_ws_mode = True
-p.realign_enable = True
-p.realign_moving_averages = 5
-p.realign_POI_range_ppm = [1.5, 2.5]
-p.apodize_enable = False
-p.apodize_damping_hz = 5
-p.remove_water_enable = False
-p.analyse_linewidth_evol = True
-p.analyse_snr_evol = True
-s, s_ref = p.run_pipeline_std()
-
-fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
-fit_metabolites = fit_metabolites_prefit + [
-    xxx.m_Cho_CH2,
-    xxx.m_Cr_CH2,
-    xxx.m_NAA_CH2,
-    xxx.m_mI, xxx.m_Tau]
-
-# %% 25/06/2019 - 296_ym_p1_brainmoelle - brain - in vivo sLASER TWIX FID modulus tests to compare with conventional MRS
-get_ipython().magic("clear")
-plt.close("all")
-
-p = reco.pipeline()
-p.data_coil_nChannels = 32
-p.data_filepaths = """
-/home/tangir/crmbm/acq_twix/296_ym_p1_brainmoelle/meas_MID73_slaser_R_N=20+_1_longTE_SNR++++_FID33872.dat
-"""
-
-p.display_legends = """
-brain - sLASER FIDmod VAPOR FA=0deg
-"""
-
-p.display_amp_factor_list = []
-
-p.fid_modulus = True
-p.phase_enable = False
-p.recombine_phasing = False
-p.apodize_enable = False
-p.apodize_damping_hz = 5
-p.remove_water_enable = True
-s, s_ref = p.run_pipeline_std()
-
-fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
-fit_metabolites = fit_metabolites_prefit + [
-    xxx.m_Cho_CH2,
-    xxx.m_Cr_CH2,
-    xxx.m_NAA_CH2,
-    xxx.m_mI, xxx.m_Tau]
-
-# %% 26/06/2019 - 296_ym_p1_brainmoelle - STEAM and sLASER :)
+# %% 26/06/2019 - 296_ym_p1_brainmoelle - Yasmin
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -276,30 +184,37 @@ p.data_ref_filepaths = """
 """
 
 p.display_legends = """
-DCM steam
-DCM sLASER R:N=20:1
-TWIX steam
-TWIX sLASER R:N=20:1
+comparing DCM steam
+comparing DCM sLASER R:N=20:1
+comparing TWIX steam
+comparing TWIX sLASER R:N=20:1
 """
 
-p.display_amp_factor_list = [1 / 25000, 6 / 25000, 1 / 7.3e-5, 1 / 7.3e-5]
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.analyse_and_reject_enable = True
+p.jobs["data-rejecting"]["auto"] = True
+p.jobs["data-rejecting"]["ranges"]["amplitude (%)"] = 50
+p.jobs["data-rejecting"]["ranges"]["phase std. factor (%)"] = 150
+p.data_process_only_this_data_index = []
+p.run()
+p.save()
 
-p.apodize_enable = True
-p.apodize_damping_hz = 10
-
-p.data_process_only_this_data_index = [3]
-s, s_ref = p.run_pipeline_std()
-
-fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
-fit_metabolites = fit_metabolites_prefit + [
-    xxx.m_Cho_CH2,
-    xxx.m_Cr_CH2,
-    xxx.m_NAA_CH2,
-    xxx.m_mI]
-
-# %% 16/07/2019 - 300-pm-p1-moelle - sLASER trig or not, DICOM and TWIX :)
+# %% 16/07/2019 - 300-pm-p1-moelle - Pelayo :)
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -319,24 +234,29 @@ sLASER R:N=25:1 (TWIX)
 sLASER R:N=25:1 trig (TWIX)
 """
 
-p.display_amp_factor_list = [1e-8, 1e-8, 1, 1]
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.analyse_and_reject_enable = True
+p.jobs["data-rejecting"]["auto"] = True
+p.data_process_only_this_data_index = []
+p.run()
+p.save()
 
-p.apodize_enable = True
-p.apodize_damping_hz = 5
-
-p.data_process_only_this_data_index = [3]
-s, s_ref = p.run_pipeline_std()
-
-fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
-fit_metabolites = fit_metabolites_prefit + [
-    xxx.m_Cho_CH2,
-    xxx.m_Cr_CH2,
-    xxx.m_NAA_CH2,
-    xxx.m_mI]
-
-# %% 14/08/2019 - 304-ka-p1-moelle - sLASER, bad day :(
+# %% 14/08/2019 - 304-ka-p1-moelle - Karen :(
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -350,29 +270,36 @@ p.display_legends = """
 crappy
 """
 
-p.analyse_and_reject_enable = True
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                p.jobs["calibrating"],
+                p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.apodize_enable = True
-p.apodize_damping_hz = 10
+p.jobs["data-rejecting"]["auto"] = True
+p.data_process_only_this_data_index = []
+p.run()
+p.save()
 
-p.remove_water_enable = False
-s, s_ref = p.run_pipeline_std()
-
-fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
-fit_metabolites = fit_metabolites_prefit + [
-    xxx.m_Cho_CH2,
-    xxx.m_Cr_CH2,
-    xxx.m_NAA_CH2,
-    xxx.m_mI, xxx.m_Tau]
-
-# %% 21/08/2019 - 307-ap-p1-moelle - sLASER on Ariane :) ok bof
+# %% 21/08/2019 - 307-ap-p1-moelle - Ariane :)
 get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
 
 p.data_filepaths = """
-/home/tangir/crmbm/acq/307-ap-p1-moelle/20190821/01_0012_slaser-r-n
 /home/tangir/crmbm/acq/307-ap-p1-moelle/20190821/01_0011_slaser-r-n
 /home/tangir/crmbm/acq/307-ap-p1-moelle/20190821/01_0013_slaser-r-n
 /home/tangir/crmbm/acq/307-ap-p1-moelle/20190821/01_0015_slaser-r-n
@@ -385,7 +312,6 @@ p.data_filepaths = """
 
 p.data_ref_filepaths = """
 /home/tangir/crmbm/acq/307-ap-p1-moelle/20190821/01_0012_slaser-r-n
-/home/tangir/crmbm/acq/307-ap-p1-moelle/20190821/01_0012_slaser-r-n
 /home/tangir/crmbm/acq/307-ap-p1-moelle/20190821/01_0014_slaser-r-n
 /home/tangir/crmbm/acq/307-ap-p1-moelle/20190821/01_0016_slaser-r-n
 /home/tangir/crmbm/acq/307-ap-p1-moelle/20190821/01_0019_slaser-r-n
@@ -396,7 +322,6 @@ p.data_ref_filepaths = """
 """
 
 p.display_legends = """
-sLASER 20:1 cardiac trig REF
 sLASER 20:1 cardiac trig
 sLASER 20:1 resp trig
 sLASER 20:1 no trig
@@ -407,74 +332,31 @@ sLASER 20:1 no trig (TWIX)
 sLASER 10:1 repos. + resp trig (TWIX)
 """
 
-p.analyse_and_reject_enable = True
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.apodize_enable = True
-p.apodize_damping_hz = 5
+p.jobs["data-rejecting"]["auto"] = True
+p.jobs["data-rejecting"]["ranges"]["amplitude (%)"] = 25
+p.jobs["data-rejecting"]["ranges"]["phase std. factor (%)"] = 150
+p.data_process_only_this_data_index = []
+p.run()
+p.save()
 
-p.data_process_only_this_data_index = [6]
-
-s, s_ref = p.run_pipeline_std()
-
-fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
-fit_metabolites = fit_metabolites_prefit + [
-    xxx.m_Cho_CH2,
-    xxx.m_Cr_CH2,
-    xxx.m_NAA_CH2,
-    xxx.m_mI]
-
-# %% 27/08/2019 - 308-rs-p1-moelle - brain - sLASER on Ocha
-get_ipython().magic("clear")
-plt.close("all")
-
-p = reco.pipeline()
-
-p.data_filepaths = """
-/home/tangir/crmbm/acq/308-rs-p1-moelle/20190827/01_0024_slaser-r-n/original-primary_e09_0001.dcm
-/home/tangir/crmbm/acq_twix/308-rs-p1-moelle/meas_MID210_slaser_R_N=20+_1_longTE_SNR++++_FID38955.dat
-"""
-
-p.data_ref_filepaths = """
-/home/tangir/crmbm/acq/308-rs-p1-moelle/20190827/01_0025_slaser-r-n/original-primary_e09_0001.dcm
-/home/tangir/crmbm/acq_twix/308-rs-p1-moelle/meas_MID211_slaser_R_N=20+_1_longTE_SNR++++_FID38956.dat
-"""
-
-p.display_legends = """
-brain - sLASER 20:1 resp trig
-brain - sLASER 20:1 resp trig (TWIX)
-"""
-
-p.phase_enable = True
-p.recombine_phasing = True
-p.realign_enable = True
-
-p.analyse_and_reject_enable = True
-
-p.apodize_enable = True
-p.apodize_damping_hz = 5
-p.calibrate_enable = True
-
-p.analyse_linewidth_enable = True
-p.analyse_linewidth_magnitude_mode = False
-
-p.analyse_snr_enable = True
-p.analyse_snr_magnitude_mode = False
-
-p.remove_water_enable = False
-
-p.display_amp_factor_list = [1, 1e8]
-p.data_process_only_this_data_index = [1]
-
-s, s_ref = p.run_pipeline_std()
-
-fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
-fit_metabolites = fit_metabolites_prefit + [
-    xxx.m_Cho_CH2,
-    xxx.m_Cr_CH2,
-    xxx.m_NAA_CH2,
-    xxx.m_mI, xxx.m_Tau, xxx.m_Glu]
-
-# %% 27/08/2019 - 308-rs-p1-moelle - sLASER on Ocha :(
+# %% 27/08/2019 - 308-rs-p1-moelle - Ocha
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -495,21 +377,29 @@ sLASER 20:1 resp trig
 sLASER 20:1 resp trig (TWIX)
 """
 
-p.analyse_and_reject_enable = True
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.apodize_enable = True
-p.apodize_damping_hz = 5
-
-p.data_process_only_this_data_index = [1]
-
-s, s_ref = p.run_pipeline_std()
-
-fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
-fit_metabolites = fit_metabolites_prefit + [
-    xxx.m_Cho_CH2,
-    xxx.m_Cr_CH2,
-    xxx.m_NAA_CH2,
-    xxx.m_mI]
+p.jobs["data-rejecting"]["auto"] = True
+p.jobs["data-rejecting"]["ranges"]["amplitude (%)"] = 75
+p.jobs["data-rejecting"]["ranges"]["phase std. factor (%)"] = 150
+p.data_process_only_this_data_index = []
+p.run()
+p.save()
 
 # %% 29/08/2019 - 310-mg-p1-moelle - Maxime :(
 get_ipython().magic("clear")
@@ -529,19 +419,27 @@ p.display_legends = """
 sLASER 20:1 SC
 """
 
-p.analyse_and_reject_enable = True
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.apodize_enable = True
-p.apodize_damping_hz = 15
-
-s, s_ref = p.run_pipeline_std()
-
-fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
-fit_metabolites = fit_metabolites_prefit + [
-    xxx.m_Cho_CH2,
-    xxx.m_Cr_CH2,
-    xxx.m_NAA_CH2,
-    xxx.m_mI]
+p.jobs["data-rejecting"]["auto"] = True
+p.data_process_only_this_data_index = []
+p.run()
+p.save()
 
 # %% 05/09/2019 - 311-sl-p1-moelle - Simon :)
 get_ipython().magic("clear")
@@ -564,20 +462,27 @@ sLASER 20:1 (DICOM)
 sLASER 20:1 (TWIX)
 """
 
-p.analyse_and_reject_enable = True
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.apodize_enable = True
-p.apodize_damping_hz = 10
-
-p.data_process_only_this_data_index = [1]
-s, s_ref = p.run_pipeline_std()
-
-fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
-fit_metabolites = fit_metabolites_prefit + [
-    xxx.m_Cho_CH2,
-    xxx.m_Cr_CH2,
-    xxx.m_NAA_CH2,
-    xxx.m_mI]
+p.jobs["data-rejecting"]["auto"] = True
+p.data_process_only_this_data_index = []
+p.run()
+p.save()
 
 # %% 23/09/2019 - 313-ft-p1-moelle - Fransiska :(
 get_ipython().magic("clear")
@@ -597,21 +502,31 @@ p.display_legends = """
 sLASER 20:1
 """
 
-p.analyse_and_reject_enable = True
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.apodize_enable = True
-p.apodize_damping_hz = 20
-
-p.analyse_snr_n_range_ppm = [-4, -3]  # fat !
-
-s, s_ref = p.run_pipeline_std()
-
-fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
-fit_metabolites = fit_metabolites_prefit + [
-    xxx.m_Cho_CH2,
-    xxx.m_Cr_CH2,
-    xxx.m_NAA_CH2,
-    xxx.m_mI]
+p.jobs["analyzing-snr"]["n_range_ppm"] = [-3, -2]
+p.jobs["data-rejecting"]["auto"] = True
+p.jobs["data-rejecting"]["ranges"]["amplitude (%)"] = 50
+p.jobs["data-rejecting"]["ranges"]["chemical shift (ppm)"] = 0.3
+p.jobs["data-rejecting"]["ranges"]["phase std. factor (%)"] = 100
+p.data_process_only_this_data_index = []
+p.run()
+p.save()
 
 # %% 25/09/2019 - 314-yt-p1-moelle - Yolanda :)))
 get_ipython().magic("clear")
@@ -620,7 +535,6 @@ plt.close("all")
 p = reco.pipeline()
 
 p.data_filepaths = """
-/home/tangir/crmbm/acq_twix/314-yt-p1-moelle/meas_MID81_slaser_R_N=20+_1_longTE_SNR++++_FID41679.dat
 /home/tangir/crmbm/acq_twix/314-yt-p1-moelle/meas_MID83_slaser_R_N=20+_1_longTE_SNR++++_FID41681.dat
 /home/tangir/crmbm/acq/314-yt-p1-moelle/20190925/01_0010_slaser-r-n
 /home/tangir/crmbm/acq_twix/314-yt-p1-moelle/meas_MID88_slaser_R_N=5_5+_shortTE_SNR++_FID41686.dat
@@ -629,14 +543,12 @@ p.data_filepaths = """
 
 p.data_ref_filepaths = """
 /home/tangir/crmbm/acq_twix/314-yt-p1-moelle/meas_MID81_slaser_R_N=20+_1_longTE_SNR++++_FID41679.dat
-/home/tangir/crmbm/acq_twix/314-yt-p1-moelle/meas_MID81_slaser_R_N=20+_1_longTE_SNR++++_FID41679.dat
 /home/tangir/crmbm/acq/314-yt-p1-moelle/20190925/01_0009_slaser-r-n
 /home/tangir/crmbm/acq_twix/314-yt-p1-moelle/meas_MID86_slaser_R_N=5_5+_shortTE_SNR++_FID41684.dat
 /home/tangir/crmbm/acq/314-yt-p1-moelle/20190925/01_0011_slaser-r-n
 """
 
 p.data_physio_filepaths = """
-
 /home/tangir/crmbm/acq_physio/314_YT_P1_MOELLE_2.resp
 
 
@@ -644,35 +556,33 @@ p.data_physio_filepaths = """
 """
 
 p.display_legends = """
-sLASER 20:1 REF (TWIX)
 sLASER 20:1 (TWIX)
 sLASER 20:1 (DICOM)
 sLASER 5:5 (TWIX)
 sLASER 5:5 (DICOM)
 """
 
-p.analyse_and_reject_enable = True
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.apodize_enable = True
-p.apodize_damping_hz = 10
-
-p.remove_water_enable = False
-p.remove_water_hsvd_components = 5
-p.remove_water_hsvd_range = [4.6, 4.8]
-
-p.data_process_only_this_data_index = [1]
-s, s_ref = p.run_pipeline_std()
-
-# let's assume we were using super adiabatic pulses (important for simulation/fit)
-s.sequence.pulse_rfc_r = 50.0
-
-fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
-fit_metabolites = fit_metabolites_prefit + [
-    xxx.m_Cho_CH2,
-    xxx.m_Cr_CH2,
-    xxx.m_NAA_CH2,
-    xxx.m_mI]
-fit_metabolite_concentration_threshold = 0.75  # mmol/kg
+p.jobs["data-rejecting"]["auto"] = True
+p.data_process_only_this_data_index = []
+p.run()
+p.save()
 
 # %% 03/10/2019 - 316-ap-p1-moelle - Anissa :)
 get_ipython().magic("clear")
@@ -708,25 +618,27 @@ sLASER 20:1 (DICOM)
 sLASER 5:5 (DICOM)
 """
 
-p.analyse_and_reject_enable = True
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.realign_moving_averages = 1
-p.realign_POI_range_ppm = [4.5, 4.8]
-
-p.analyse_linewidth_range_ppm = [4.5, 4.8]
-
-p.apodize_enable = True
-p.apodize_damping_hz = 10
-
-p.data_process_only_this_data_index = [0]
-s, s_ref = p.run_pipeline_std()
-
-fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
-fit_metabolites = fit_metabolites_prefit + [
-    xxx.m_Cho_CH2,
-    xxx.m_Cr_CH2,
-    xxx.m_NAA_CH2,
-    xxx.m_mI]
+p.jobs["data-rejecting"]["auto"] = True
+p.data_process_only_this_data_index = []
+p.run()
+p.save()
 
 # %% 17/10/2019 - 319-fc-p1-moelle - Fernando :)
 get_ipython().magic("clear")
@@ -745,25 +657,29 @@ sLASER 20:1 (TWIX)
 sLASER 10:2 (TWIX)
 """
 
-p.analyse_and_reject_enable = True
-p.apodize_enable = True
-p.apodize_damping_hz = 10
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.calibrate_POI_range_ppm = [1.8, 2.3]
-p.analyse_snr_range_ppm = [1.8, 2.2]
-p.analyse_snr_n_range_ppm = [-4, -3]
+p.jobs["data-rejecting"]["auto"] = True
+p.data_process_only_this_data_index = []
+p.run()
+p.save()
 
-p.data_process_only_this_data_index = [0]
-s, s_ref = p.run_pipeline_std()
-
-fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
-fit_metabolites = fit_metabolites_prefit + [
-    xxx.m_Cho_CH2,
-    xxx.m_Cr_CH2,
-    xxx.m_NAA_CH2,
-    xxx.m_mI]
-
-# %% 05/11/2019 - 328-af-p1-moelle - Anne :(
+# %% 05/11/2019 - 328-af-p1-moelle - Anne
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -781,18 +697,28 @@ p.display_legends = """
 sLASER 20:1 (TWIX)
 """
 
-p.analyse_and_reject_enable = True
-p.apodize_enable = True
-p.apodize_damping_hz = 10
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-s, s_ref = p.run_pipeline_std()
 
-fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
-fit_metabolites = fit_metabolites_prefit + [
-    xxx.m_Cho_CH2,
-    xxx.m_Cr_CH2,
-    xxx.m_NAA_CH2,
-    xxx.m_mI]
+p.jobs["data-rejecting"]["auto"] = True
+p.data_process_only_this_data_index = []
+p.run()
+p.save()
 
 # %% 08/11/2019 - 329-pi-p1-moelle - Pujalina
 get_ipython().magic("clear")
@@ -815,58 +741,80 @@ sLASER 20:1 (TWIX)
 sLASER 10:2 (TWIX)
 """
 
-p.analyse_and_reject_enable = True
-p.apodize_enable = True
-p.apodize_damping_hz = 10
+p.job_list = [  # p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.calibrate_POI_range_ppm = [1.8, 2.3]
-p.analyse_snr_range_ppm = [1.8, 2.2]
-p.analyse_snr_n_range_ppm = [-4, -3]
+p.analyze_job_list = [  p.jobs["channel-combining"],
+                        p.jobs["zero-filling"],
+                        p.jobs["realigning"],
+                        p.jobs["averaging"],
+                        p.jobs["calibrating"]]
 
-p.data_process_only_this_data_index = [0]
-s, s_ref = p.run_pipeline_std()
+p.jobs["calibrating"]["POI_range_ppm"] = [1.8, 2.4]
+p.jobs["data-rejecting"]["auto"] = True
+p.data_process_only_this_data_index = []
+p.run()
+p.save()
 
-fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
-fit_metabolites = fit_metabolites_prefit + [
-    xxx.m_Cho_CH2,
-    xxx.m_Cr_CH2,
-    xxx.m_NAA_CH2,
-    xxx.m_mI]
-
-# %% 26/11/2019 - 333-sc-p1-moelle - Shirley :(((
+# %% 26/11/2019 - 333-sc-p1-moelle - Shirley
 get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
 
-p.data_filepaths = """
-/home/tangir/crmbm/acq_twix/333-sc-p1-moelle/meas_MID123_slaser_R_N=20+_1_longTE_SNR++++_FID47359.dat
-/home/tangir/crmbm/acq_twix/333-sc-p1-moelle/meas_MID126_slaser_R_N=20+_1_longTE_SNR++++_FID47362.dat
-"""
+p.data_filepaths = ["/home/tangir/crmbm/acq_twix/333-sc-p1-moelle/meas_MID123_slaser_R_N=20+_1_longTE_SNR++++_FID47359.dat",
+                    "/home/tangir/crmbm/acq_twix/333-sc-p1-moelle/meas_MID126_slaser_R_N=20+_1_longTE_SNR++++_FID47362.dat",
+                    "/home/tangir/crmbm/acq/333-sc-p1-moelle/20191126/01_0008_slaser-r-n",
+                    "/home/tangir/crmbm/acq/333-sc-p1-moelle/20191126/01_0009_slaser-r-n"]
 
-p.data_ref_filepaths = """"""
+p.data_ref_filepaths = ["",
+                        "",
+                        "/home/tangir/crmbm/acq/333-sc-p1-moelle/20191126/01_0010_slaser-r-n",
+                        "/home/tangir/crmbm/acq/333-sc-p1-moelle/20191126/01_0010_slaser-r-n"]
 
 p.display_legends = """
 sLASER 20:1 (TWIX)
 sLASER 20:1 IR (TWIX)
+sLASER 20:1 (DCM)
+sLASER 20:1 IR (DCM)
 """
 
-p.analyse_and_reject_enable = False
-p.apodize_enable = True
-p.apodize_damping_hz = 10
+p.job_list = [  # p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                # p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.analyse_linewidth_range_ppm = [4, 6]
-p.analyse_snr_s_range_ppm = [4, 6]
-
-p.data_process_only_this_data_index = [1]
-s, s_ref = p.run_pipeline_std()
-
-fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
-fit_metabolites = fit_metabolites_prefit + [
-    xxx.m_Cho_CH2,
-    xxx.m_Cr_CH2,
-    xxx.m_NAA_CH2,
-    xxx.m_mI]
+p.jobs["data-rejecting"]["auto"] = True
+p.data_process_only_this_data_index = [2]  # IR seems broken
+p.analyze_enable = True
+p.run()
+p.save()
 
 # %% 09/12/2019 - 336-nb-p1-moelle - Naouelle :)
 get_ipython().magic("clear")
@@ -895,25 +843,59 @@ sLASER 20:1 (DCM)
 sLASER 20:1 IR (DCM)
 """
 
-p.display_amp_factor_list = [1e8, 1e8, 1, 1]
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.analyse_and_reject_enable = False
+p.jobs["data-rejecting"]["auto"] = True
+p.jobs["scaling"]["scaling_factor"] = 1.0
+p.jobs["cropping"]["final_npts"] = 4096
+p.data_process_only_this_data_index = [2]
+p.run()
+p.save()
 
-p.apodize_enable = True
-p.apodize_damping_hz = 10
+p.job_list = [  # p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                #p.jobs["data-rejecting"],
+                #p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                #p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.analyse_linewidth_range_ppm = [4, 6]
-p.analyse_snr_s_range_ppm = [4, 6]
+p.analyze_job_list = [  p.jobs["channel-combining"],
+                        p.jobs["zero-filling"],
+                        # p.jobs["realigning"],
+                        p.jobs["averaging"],
+                        p.jobs["calibrating"]]
 
-p.data_process_only_this_data_index = [1]
-s, s_ref = p.run_pipeline_std()
-
-fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
-fit_metabolites = fit_metabolites_prefit + [
-    xxx.m_Cho_CH2,
-    xxx.m_Cr_CH2,
-    xxx.m_NAA_CH2,
-    xxx.m_mI]
+p.jobs["data-rejecting"]["auto"] = False
+p.jobs["scaling"]["scaling_factor"] = 0.4e12 / 5000
+p.jobs["cropping"]["final_npts"] = 4096
+p.data_process_only_this_data_index = [0]
+p.run()
+p.save()
 
 # %% 10/12/2019 - 338-ro-p1-moelle - Rischa :)
 get_ipython().magic("clear")
@@ -939,27 +921,56 @@ sLASER 20:1 noWS (TWIX)
 sLASER 20:1 IR (TWIX)
 """
 
-p.analyse_snr_enable = False
-p.analyse_linewidth_enable = False
+# 1) dealing with WS data
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.apodize_enable = True
-p.apodize_damping_hz = 10
-
-p.analyse_linewidth_range_ppm = [4, 6]
-p.analyse_snr_s_range_ppm = [4, 6]
-
+p.jobs["data-rejecting"]["auto"] = True
 p.data_process_only_this_data_index = [0]
-s, s_ref = p.run_pipeline_std()
+p.run()
+p.save()
 
-fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
-fit_metabolites = fit_metabolites_prefit + [
-    xxx.m_Cho_CH2,
-    xxx.m_Cr_CH2,
-    xxx.m_NAA_CH2,
-    xxx.m_mI]
+# 2) dealing with no WS data: FID modulus
+p.job_list = [  # p.jobs["phasing"],
+                p.jobs["scaling"],
+                p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-# %% 23/01/2019 - 347-re-p1-moelle - Renaud - brain - MM
-# get_ipython().magic("clear")
+p.jobs["data-rejecting"]["auto"] = False
+p.jobs["channel-combining"]["phasing"] = False
+p.data_process_only_this_data_index = [1]
+p.analyze_enable = False
+p.run()
+p.save()
+
+# %% 23/01/2019 - 347-re-p1-moelle - Renaud
+get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
@@ -967,80 +978,43 @@ p = reco.pipeline()
 p.data_filepaths = [
     "/home/tangir/crmbm/acq_twix/347-re-p1-moelle/meas_MID216_slaser_R_N=10_2_longTE_SNR+++_FID50575.dat",
     "/home/tangir/crmbm/acq_twix/347-re-p1-moelle/meas_MID221_slaser_R_N=10_2_longTE_SNR+++_FID50580.dat",
-    "/home/tangir/crmbm/acq_twix/347-re-p1-moelle/meas_MID224_steam_shortTE_SNR+_FID50583.dat"]
+    "/home/tangir/crmbm/acq_twix/347-re-p1-moelle/meas_MID224_steam_shortTE_SNR+_FID50583.dat",
+    "/home/tangir/crmbm/acq_twix/347-re-p1-moelle/meas_MID228_slaser_R_N=10_2_longTE_SNR+++_FID50587.dat"]
 
 p.data_ref_filepaths = [
     "/home/tangir/crmbm/acq_twix/347-re-p1-moelle/meas_MID218_slaser_R_N=10_2_longTE_SNR+++_FID50577.dat",
     "/home/tangir/crmbm/acq_twix/347-re-p1-moelle/meas_MID222_slaser_R_N=10_2_longTE_SNR+++_FID50581.dat",
-    "/home/tangir/crmbm/acq_twix/347-re-p1-moelle/meas_MID226_steam_shortTE_SNR+_FID50585.dat"]
+    "/home/tangir/crmbm/acq_twix/347-re-p1-moelle/meas_MID226_steam_shortTE_SNR+_FID50585.dat",
+    "/home/tangir/crmbm/acq_twix/347-re-p1-moelle/meas_MID229_slaser_R_N=10_2_longTE_SNR+++_FID50588.dat"]
 
 p.display_legends = """
 sLASER 10:2 IR TE=40ms (TWIX)
 sLASER 10:2 IR TE=30ms (TWIX)
 STEAM IR TE=3ms (TWIX)
-"""
-
-p.phase_offset = np.pi
-p.phase_display = False
-
-p.recombine_phasing = True
-
-p.apodize_enable = True
-p.apodize_damping_hz = 10.0
-p.calibrate_POI_range_ppm = [4, 5]
-p.calibrate_POI_true_ppm = 4.7
-p.realign_enable = False
-
-p.analyse_linewidth_range_ppm = [4.0, 5.0]
-p.analyse_snr_s_range_ppm = [4.0, 5.0]
-
-p.data_process_only_this_data_index = [1]
-s_mm, s_mm_ref = p.run_pipeline_std()
-
-# %% 23/01/2019 - 347-re-p1-moelle - Renaud - brain - Metabolites :)
-get_ipython().magic("clear")
-plt.close("all")
-
-p = reco.pipeline()
-
-p.data_filepaths = [
-    "/home/tangir/crmbm/acq_twix/347-re-p1-moelle/meas_MID228_slaser_R_N=10_2_longTE_SNR+++_FID50587.dat"]
-
-p.data_ref_filepaths = [
-    "/home/tangir/crmbm/acq_twix/347-re-p1-moelle/meas_MID229_slaser_R_N=10_2_longTE_SNR+++_FID50588.dat"]
-
-p.display_legends = """
 sLASER 10:2 TE=30ms (TWIX)
 """
 
-p.phase_offset = np.pi
-p.phase_display = False
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.recombine_phasing = True
-
-p.apodize_enable = True
-p.apodize_damping_hz = 10.0
-p.calibrate_POI_range_ppm = [4, 5]
-p.calibrate_POI_true_ppm = 4.7
-p.realign_enable = False
-
-p.analyse_linewidth_range_ppm = [4.0, 5.0]
-p.analyse_snr_s_range_ppm = [4.0, 5.0]
-
-s_mb, s_mb_ref = p.run_pipeline_std()
-
-s = s_mb - s_mm
-s_ref = s_mb_ref
-
-plt.close('all')
-s_mm.display_spectrum()
-s_mb.display_spectrum()
-s.display_spectrum()
-
-fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
-fit_metabolites = fit_metabolites_prefit
-fit_metabolite_concentration_threshold = 0.5
-fit_include_MMs = False
+p.jobs["data-rejecting"]["auto"] = True
+p.data_process_only_this_data_index = [0, 1, 3]
+p.run()
+p.save()
 
 # %% 28/01/2019 - 300-pm-p2-moelle - Pelayo :)
 get_ipython().magic("clear")
@@ -1073,30 +1047,29 @@ sLASER IR 5:5 (REF with OVS)
 sLASER IR 5:5 (REF without OVS)
 """
 
-p.phase_offset = np.pi
-p.phase_display = False
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.recombine_phasing = True
+p.jobs["data-rejecting"]["auto"] = True
+p.data_process_only_this_data_index = []
+p.run()
+p.save()
 
-p.apodize_enable = True
-p.apodize_damping_hz = 10.0
-p.calibrate_POI_range_ppm = [4, 5]
-p.calibrate_POI_true_ppm = 4.7
-p.realign_enable = False
-
-p.analyse_linewidth_range_ppm = [4.0, 5.0]
-p.analyse_snr_s_range_ppm = [4.0, 5.0]
-
-p.data_process_only_this_data_index = [2]
-
-s, s_ref = p.run_pipeline_std()
-
-fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
-fit_metabolites = fit_metabolites_prefit
-fit_metabolite_concentration_threshold = 0.5
-fit_include_MMs = False
-
-# %% 06/02/2019 - 349-ap-p1-moelle - Ahmad Fajar :s
+# %% 06/02/2019 - 349-ap-p1-moelle - Ahmad Fajar
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -1115,29 +1088,25 @@ sLASER 10:2 (REF with OVS)
 sLASER 10:2 (REF without OVS)
 """
 
-p.phase_offset = np.pi
-p.phase_display = False
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.recombine_phasing = True
-
-p.analyse_and_reject_enable = True
-
-p.apodize_enable = True
-p.apodize_damping_hz = 10.0
-p.calibrate_POI_range_ppm = [4, 5]
-p.calibrate_POI_true_ppm = 4.7
-p.realign_enable = False
-
-p.analyse_linewidth_range_ppm = [4.0, 5.0]
-p.analyse_snr_s_range_ppm = [4.0, 5.0]
-
-s, s_ref = p.run_pipeline_std()
-
-fit_metabolites_prefit = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
-fit_metabolites = fit_metabolites_prefit
-fit_metabolite_concentration_threshold = 0.5
-fit_include_MMs = False
-
+p.run()
+p.save()
 
 # %% 24/02/2019 - 355-st-p1-moelle - Steven
 get_ipython().magic("clear")
@@ -1153,15 +1122,30 @@ p.display_legends = """
 sLASER TE=52ms
 """
 
-p.analyse_and_reject_enable = True
-p.analyse_and_reject_auto = False
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.apodize_enable = True
-p.apodize_damping_hz = 10.0
+p.jobs["data-rejecting"]["auto"] = True
+p.jobs["data-rejecting"]["ranges"]["chemical shift (ppm)"] = 0.17
 
-s, s_ref = p.run_pipeline_std()
+p.run()
+p.save()
 
-# %% 04/03/2020 - 304-ka-p2-moelle - Karen :((( very weird artefact
+# %% 04/03/2020 - 304-ka-p2-moelle - Karen
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -1178,45 +1162,22 @@ p.data_physio_filepaths = []
 p.display_legends = ["1st try (30-40Hz water LW)",
                      "2nd try (25Hz water LW)"]
 
-p.phase_enable = False
-p.recombine_enable = False
-p.zerofill_enable = False
-p.realign_enable = False
-p.average_enable = False
-p.apodize_enable = False
-p.calibrate_enable = False
-p.display_enable = False
-p.analyse_snr_enable = False
-p.analyse_linewidth_enable = False
-p.analyse_snr_evol = False
-p.analyse_linewidth_evol = False
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.data_process_only_this_data_index = [0]
-s, s_ref = p.run_pipeline_std()
-
-# average by channel
-s_chan = np.mean(s, axis=0)
-
-sw_list = []
-sfw_list = []
-for c in range(8):
-    s_chan[c, :].display_spectrum(1, str(c), [2, 6], 1.0, 0.0, True)
-    sw = s_chan[c, :].analyse_snr([4.5, 4.8], [-1, 0], 'real water', False, True, True, [2, 6])
-    sfw = s_chan[c, :].analyse_snr([5, 5.5], [-1, 0], 'fake water', False, True, True, [2, 6])
-    sw_list.append(sw)
-    sfw_list.append(sfw)
-
-
-sw_list = np.array(sw_list)
-sfw_list = np.array(sfw_list)
-
-sw_list_norm = sw_list / np.max(sw_list)
-sfw_list_norm = sfw_list / np.max(sw_list)
-
-plt.figure()
-plt.plot(np.arange(8), sw_list_norm, label="real water residue from VOI")
-plt.plot(np.arange(8), sfw_list_norm, label="some water selected somewhere?")
-plt.legend()
-
-plt.figure()
-plt.plot(np.arange(8), sw_list/sfw_list, label="real water / fake water")
+p.run()
+p.save()
