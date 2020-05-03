@@ -79,6 +79,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         obj : MRSData2 numpy array [averages,channels,timepoints]
             Resulting constructed MRSData2 object
         """
+
         if(data_filepath == [] and coil_nChannels == []):
             # calling the parent class' constructor
             obj = super(suspect.mrsobjects.MRSData, cls).__new__(cls, obj, dt, f0, te, ppm0, voxel_dimensions, transform, metadata)
@@ -2976,6 +2977,23 @@ class MRSData2(suspect.mrsobjects.MRSData):
         # TODO: need to add some header info
         log.debug("saving MRS signal to " + mat_filepath + "...")
         sio.savemat(mat_filepath, {'MRSdata': self})
+
+    def __reduce__(self):
+        """Reduce internal pickling method used when dumping. Modified so that MRSData2 attributes are not forgotten. See for more info: https://docs.python.org/3/library/pickle.html ."""
+        # get numpy reduce tuple
+        rd = super().__reduce__()
+        # add MRSData2 attributes
+        rd2 = rd[2] + (self.__dict__,)
+        # return the new reduce tuple version
+        return(rd[0], rd[1], rd2)
+
+    def __setstate__(self, d):
+        """Set new state to object. Internal pickling method used when loading. Modified so that MRSData2 attributes are not forgotten. See for more info: https://docs.python.org/3/library/pickle.html ."""
+        # load MRSData2 attributes
+        self.__dict__ = d[-1]
+        # load all the rest relative to numpy
+        super().__setstate__(d[0:-1])
+        return(self)
 
 
 class pipeline:
