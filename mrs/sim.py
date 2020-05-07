@@ -1114,7 +1114,7 @@ class mrs_sequence:
 
         return(j)
 
-    def simulate_signal(self, p, sigma_noise=0.0, lbl="simulated MRS signal"):
+    def simulate_signal(self, p, sigma_noise=0.0, na=1, lbl="simulated MRS signal"):
         """
         Print out the parameter values and returns the modeled signal using above member function.
 
@@ -1124,6 +1124,8 @@ class mrs_sequence:
             Array of simulation parameters
         sigma_noise : float
             Noise level
+        na : int
+            Number of averages
         lbl : string
             Label describing simulated data
 
@@ -1143,9 +1145,23 @@ class mrs_sequence:
         log.info("simulating signal...")
         s = self._model(p)
 
-        if(sigma_noise > 0.0):
+        if(sigma_noise > 0.0 and na == 1):
+            # simple noisy 1 shot simulation
             log.info("adding complex gaussian noise, std. deviation = " + str(sigma_noise))
             s = s + np.random.normal(0.0, sigma_noise, s.shape[0] * 2).view(np.complex128)
+
+        elif(sigma_noise > 0.0 and na > 1):
+            # averaged noisy simulation
+            b = log.progressbar("averaging", na)
+            s_single_shot = s.copy()
+            s_averaged = s.copy() * 0.0
+            for a in range(na):
+                s_averaged += s_single_shot + np.random.normal(0.0, sigma_noise, s.shape[0] * 2).view(np.complex128)
+                b.update(a)
+            b.finish("done")
+            s = s_averaged
+        else:
+            log.warning("ambiguous arguments: simulating a single-shot signal without noise!")
 
         # adding a few attributes
         s._te = self.te
@@ -2251,7 +2267,7 @@ class metabolite_basis_set(dict):
         # this file needs to be specifically in the package folder!
         # because we will later import it
         # (I know it is a bit ugly but so practical)
-        pkg_folder = pathlib.Path(__file__).parent.absolute()
+        pkg_folder = str(pathlib.Path(__file__).parent.absolute())
 
         with open(pkg_folder + "/aliases.py", 'w') as f:
             f.write("#!/usr/bin/env python3")
