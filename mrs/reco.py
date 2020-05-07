@@ -13,6 +13,7 @@ Three classes' definition in here.
 import suspect
 import suspect.io.twix as sit
 import numpy as np
+import pydicom
 from scipy import signal
 import scipy.io as sio
 import matplotlib.pylab as plt
@@ -28,10 +29,326 @@ import mrs.paths as default_paths
 import pdb
 
 
+class MRSData2_file_reader():
+    """A class used to scrap parameters out of DICOM and TWIX files, sometimes in a very dirty way."""
+
+    def __init__(self, data_fullfilepath):
+        """
+        Initialize by reading a DICOM or TWIX file in text mode and extracting the DICOM header with pydicom, if required.
+
+        Parameters
+        ----------
+        data_fullfilepath : string
+            Full path to the DICOM/TWIX file
+        """
+        log.debug("checking data file path and extension...")
+        data_filename, data_file_extension = os.path.splitext(data_fullfilepath)
+        if(len(data_file_extension) == 0):
+            # if empty extension, assuming the filename is not present in the path
+            # lasy-mode where I copy-pasted only the folder paths
+            # therefore, I will complete the path with the dicom name
+            # which has always been "original-primary_e09_0001.dcm" for me up to now
+            self.fullfilepath = data_fullfilepath + "/original-primary_e09_0001.dcm"
+        else:
+            self.fullfilepath = data_fullfilepath
+
+        # detect DICOM or TWIX?
+        data_filename, data_file_extension = os.path.splitext(self.fullfilepath)
+        self.file_ext = data_file_extension.lower()
+
+        # open file in text mode and save content
+        log.debug("dumping file in ASCII mode...")
+        f = open(self.fullfilepath, "r", encoding="ISO-8859-1")
+        self.file_content_str = f.read()
+        f.close()
+
+        # if DICOM, use pydicom to extract basic header (SIEMENS hidden header not extracted)
+        if(self.is_dicom()):
+            log.debug("reading DICOM header...")
+            self.dcm_header = pydicom.dcmread(self.fullfilepath)
+        else:
+            self.dcm_header = None
+
+    def is_dicom(self):
+        """
+        Return true if data is read from a DICOM file.
+
+        Returns
+        -------
+        self.file_ext == '.dcm' : boolean
+            True if dicom file
+        """
+        return(self.file_ext == '.dcm')
+
+    def read_data(self):
+        """
+        Read MRS data from file and return a suspect's MRSData object.
+
+        Returns
+        -------
+        MRSData_obj : MRSData object
+            MRS data read from DICOM/TWIX file
+        """
+        if(self.is_dicom()):
+            log.debug("reading DICOM file...")
+            MRSData_obj = suspect.io.load_siemens_dicom(self.fullfilepath)
+        elif(self.file_ext == '.dat'):
+            # try and read this TWIX file
+            try:
+                log.debug("reading TWIX file...")
+                MRSData_obj = suspect.io.load_twix(self.fullfilepath)
+            except:
+                # well maybe it is broken, maybe the acquisition was interrupted
+                # let's try to read it using this modified verion of suspect.io.load_twix
+                log.debug("reading broken TWIX file...")
+                MRSData_obj = load_broken_twix_vb(self.fullfilepath)
+        else:
+            log.error("unknown file extension!")
+
+        return(MRSData_obj)
+
+    def read_param_num(self, param_name, file_index=0):
+        """
+        Look for parameter in TWIX/DICOM data headers and return its float value.
+
+        Parameters
+        ----------
+        param_name : string
+            Name of parameter to extract
+        file_index : int
+            Index in file from where we should start searching
+
+        Returns
+        -------
+        param_val : float
+            Value of parameter
+        """
+        # scrap out parameter value
+        a = self.file_content_str.find(param_name, file_index)
+        # could not find it?
+        if(a < 0):
+            log.warning("could not find parameter [%s]! :(" % param_name)
+            return(np.nan)
+
+        a = self.file_content_str.find("=", a + 1)
+        b = self.file_content_str.find("\n", a + 1)
+        param_val_str = self.file_content_str[(a + 1):b]
+        param_val_str = param_val_str.strip()
+
+        # try to convert to float
+        try:
+            param_val_float = float(param_val_str)
+        except:
+            # that did not work, look for next occurence
+            param_val_float = self.read_param_num(param_name, b)
+
+        # return it
+        return(param_val_float)
+
+    def get_nucleus(self):
+        """
+        Return the nucleus setting used to acquire the MRS data.
+
+        Returns
+        -------
+        nucleus_str : string
+            String representing nucleus. Example: "1H"
+        """
+        a = self.file_content_str.find("Info[0].tNucleus")
+        a = self.file_content_str.find("=", a + 1)
+        b = self.file_content_str.find("\n", a + 1)
+        nucleus_str = self.file_content_str[(a + 1):b]
+        nucleus_str = nucleus_str.replace('"', '')
+        nucleus_str = nucleus_str.strip()
+
+        return(nucleus_str)
+
+    def get_patient_name(self):
+        """
+        Return the patient name field.
+
+        Returns
+        -------
+        patient_name_str : string
+            Patient name
+        """
+        if(self.is_dicom()):
+            patient_name_str = str(self.dcm_header.PatientName)
+        elif(self.file_ext == '.dat'):
+            # find patient name dirty way
+            a = self.file_content_str.find("tPatientName")
+            a = self.file_content_str.find("{", a)
+            a = self.file_content_str.find("\"", a)
+            b = self.file_content_str.find("\"", a + 1)
+            patient_name_str = self.file_content_str[(a + 1):b]
+            patient_name_str = patient_name_str.strip()
+        else:
+            log.error("unknown file extension!")
+
+        return(patient_name_str)
+
+    def get_patient_birthday(self):
+        """
+        Return the patient birthday field.
+
+        Returns
+        -------
+        patient_birthday_datetime : datetime
+            Patient birthday
+        """
+        if(self.is_dicom()):
+            patient_birthday_datetime = datetime.strptime(str(self.dcm_header.PatientBirthDate), '%Y%m%d')
+        elif(self.file_ext == '.dat'):
+            # find patient birthday dirty way
+            a = self.file_content_str.find("PatientBirthDay")
+            a = self.file_content_str.find("{", a)
+            a = self.file_content_str.find("\"", a)
+            birthday_str = self.file_content_str[(a + 1):(a + 9)]
+            birthday_str = birthday_str.strip()
+            if(birthday_str):
+                patient_birthday_datetime = datetime.strptime(birthday_str, '%Y%m%d')
+        else:
+            log.error("unknown file extension!")
+
+        return(patient_birthday_datetime)
+
+    def get_patient_sex(self):
+        """
+        Return the patient sex field.
+
+        Returns
+        -------
+        patient_sex_str : string
+            Patient sex ('M', 'F' or 'O')
+        """
+        if(self.is_dicom()):
+            patient_sex_str = str(self.dcm_header.PatientSex)
+        elif(self.file_ext == '.dat'):
+            # find patient sex dirty way
+            a = self.file_content_str.find("PatientSex")
+            a = self.file_content_str.find("{", a)
+            patient_sex_str = self.file_content_str[(a + 2):(a + 3)]
+            patient_sex_int = int(patient_sex_str.strip())
+            if(patient_sex_int == 0):
+                patient_sex_str = 'M'
+            elif(patient_sex_int == 1):
+                patient_sex_str = 'F'
+            elif(patient_sex_int == 2):
+                patient_sex_str = 'O'
+            else:
+                log.error("unknown patient sex!")
+        else:
+            log.error("unknown file extension!")
+
+        return(patient_sex_str)
+
+    def get_patient_weight(self):
+        """
+        Return the patient weight field.
+
+        Returns
+        -------
+        patient_weight_kgs : float
+            Patient weight in kg
+        """
+        if(self.is_dicom()):
+            patient_weight_kgs = float(self.dcm_header.PatientWeight)
+        elif(self.file_ext == '.dat'):
+            # find patient weight dirty way
+            a = self.file_content_str.find("flUsedPatientWeight")
+            a = self.file_content_str.find("{", a)
+            a = self.file_content_str.find(">", a)
+            b = self.file_content_str.find("}", a + 1)
+            patient_weight_str = self.file_content_str[(a + 5):(b - 2)]
+            patient_weight_kgs = float(patient_weight_str.strip())
+        else:
+            log.error("unknown file extension!")
+
+        return(patient_weight_kgs)
+
+    def get_patient_height(self):
+        """
+        Return the patient height field.
+
+        Returns
+        -------
+        patient_height_m : float
+            Patient height in meters
+        """
+        if(self.is_dicom()):
+            patient_height_m = float(self.dcm_header.PatientSize)
+        elif(self.file_ext == '.dat'):
+            # find patient height dirty way
+            a = self.file_content_str.find("flPatientHeight")
+            a = self.file_content_str.find("{", a)
+            a = self.file_content_str.find(">", a)
+            a = self.file_content_str.find(">", a + 1)
+            b = self.file_content_str.find("}", a + 1)
+            patient_height_str = self.file_content_str[(a + 6):(b - 3)]
+            patient_height_m = float(patient_height_str.strip()) / 1000.0
+        else:
+            log.error("unknown file extension!")
+
+        return(patient_height_m)
+
+    def get_sequence_name(self, file_index=0):
+        """
+        Return the acquisition sequence name.
+
+        Parameters
+        ----------
+        file_index : int
+            Index in file from where we should start searching
+
+        Returns
+        -------
+        sequence_name : string
+            Sequence used for the acquisition
+        """
+        # now some sequence-specific parameters
+        a = self.file_content_str.find('%' + "CustomerSeq" + '%', file_index)
+        # could not find it?
+        if(a < 0):
+            log.warning("could not find sequence name! :(")
+            return(None)
+
+        a = self.file_content_str.find('\\', a)
+        b = self.file_content_str.find('"', a + 1)
+        sequence_name = self.file_content_str[(a + 1):b]
+        sequence_name = sequence_name.strip()
+
+        #check we did not find a long garbage string
+        if(len(sequence_name) > 16):
+            # if so, go on searching in file
+            sequence_name = self.get_sequence_name(b)
+
+        return(sequence_name)
+
+    def get_timestamp(self):
+        """
+        Return the acquisition start timestamp.
+
+        Returns
+        -------
+        ulTimeStamp_ms : float
+            Acquisition start timestamp
+        """
+        # open TWIX file in binary mode to get MDH header
+        # we do it here and not in the __init__ because we only do that once
+        f = open(self.fullfilepath, "rb")
+        binaryDump = f.read()
+        hdr_len = struct.unpack("i", binaryDump[:4])
+        sMDH = struct.unpack("iiiii", binaryDump[hdr_len[0]:hdr_len[0] + 20])
+        # and extract timestamp
+        ulTimeStamp = sMDH[3]
+        ulTimeStamp_ms = float(ulTimeStamp * 2.5)
+        return(ulTimeStamp_ms)
+
+
 class MRSData2(suspect.mrsobjects.MRSData):
     """A class based on suspect's MRSData to store MRS data."""
 
-    def __new__(cls, data_filepath, coil_nChannels, physio_log_file, obj=[], dt=[], f0=[], te=[], ppm0=[], voxel_dimensions=[], transform=[], metadata=[], data_ref=None, label=[], offset_display=0.0, tr=[], timestamp=[], patient_name=[], patient_birthday=[], patient_sex=[], patient_weight=[], patient_height=[], vref=[], shims=[], sequence_obj=[], noise_level=[]):
+    def __new__(cls, data_filepath, coil_nChannels=8, physio_log_file=None, obj=None, dt=None, f0=None, te=None, ppm0=None, voxel_dimensions=None, transform=None, metadata=None, data_ref=None, label="", offset_display=0.0, timestamp=None, patient_name="", patient_birthday=None, patient_sex=None, patient_weight=None, patient_height=None, tr=None, vref=None, shims=None, sequence_obj=None, noise_level=None, na_pre_data_rejection=None, na_post_data_rejection=None, is_concatenated=None, is_dicom=None):
         """
         Construct a MRSData2 object that inherits of Suspect's MRSData class. In short, the MRSData2 class is a copy of MRSData + my custom methods for post-processing. To create a MRSData2 object, you need give a path that points to a SIEMENS DICOM or a SIEMENS TWIX file.
 
@@ -51,20 +368,20 @@ class MRSData2(suspect.mrsobjects.MRSData):
             Label for this signal
         offset_display : float
             Y-axis offset display
-        tr : float
-            TR in ms
         timestamp : float
             timestamp in ms
         patient_name : string
             patient name
         patient_birthday : int
             birthyear of patient
-        patient_sex : int
-            sex of patient (0:M 1:F)
+        patient_sex : string
+            sex of patient ('M', 'F' or 'O')
         patient_weight : float
             patient weight in kgs
         patient_height : float
             patient high in meters
+        tr : float
+            TR in ms
         vref : float
             reference voltage (V)
         shims : list of floats
@@ -73,15 +390,23 @@ class MRSData2(suspect.mrsobjects.MRSData):
             sequence object
         noise_level : float
             noise level measured on real FID
+        na_pre_data_rejection : int
+            number of averages when reading the data file
+        na_post_data_rejection : int
+            number of averages after data rejection
+        is_concatenated : boolean
+            was this signal the result of a concatenation?
+        is_dicom : boolean
+            was this signal read from a DICOM file?
 
         Returns
         -------
         obj : MRSData2 numpy array [averages,channels,timepoints]
             Resulting constructed MRSData2 object
         """
-
         if(data_filepath == [] and coil_nChannels == []):
             # calling the parent class' constructor
+            pdb.set_trace()
             obj = super(suspect.mrsobjects.MRSData, cls).__new__(cls, obj, dt, f0, te, ppm0, voxel_dimensions, transform, metadata)
             # adding attributes
             obj.data_ref = data_ref
@@ -98,305 +423,25 @@ class MRSData2(suspect.mrsobjects.MRSData):
             obj._shims = shims
             obj._sequence = sequence_obj
             obj._noise_level = noise_level
+            obj._na_pre_data_rejection = na_pre_data_rejection
+            obj._na_post_data_rejection = na_post_data_rejection
+            obj._is_concatenated = is_concatenated
+            obj._is_dicom = is_dicom
             # bye
             return(obj)
 
         # hello
         log.debug("creating object...")
 
-        # init
-        TR_ms = None
-        year_int = None
-        patient_name_str = None
-        patient_birthday_datetime = None
-        patient_sex_int = None
-        patient_weight_kgs = None
-        patient_height_m = None
-        vref_v = None
-        shims_values = None
-        sequence_obj = None
-        noise_level = 0.0
-        ulTimeStamp_ms = None
+        # open data file
+        log.info("reading data file...")
+        log.info(data_filepath)
+        # read header
+        mfr = MRSData2_file_reader(data_filepath)
+        # read data and get a suspect MRSData object
+        MRSData_obj = mfr.read_data()
 
-        sequence_name = None
-
-        log.debug("checking data file path...")
-        data_filename, data_file_extension = os.path.splitext(data_filepath)
-        if(len(data_file_extension) == 0):
-            # if empty extension, assuming the filename is not present in the path
-            # lasy-mode where I copy-pasted only the folder paths
-            # therefore, I will complete the path with the dicom name
-            # which has always been "original-primary_e09_0001.dcm" for me up to now
-            data_fullfilepath = data_filepath + "/original-primary_e09_0001.dcm"
-        else:
-            data_fullfilepath = data_filepath
-
-        # find out if DICOM or TWIX file
-        data_filename, data_file_extension = os.path.splitext(data_fullfilepath)
-        if(data_file_extension.lower() == '.dat'):
-            # twix!
-            log.info("reading DAT / TWIX file...")
-            log.info(data_fullfilepath)
-
-            # try and read this TWIX file
-            try:
-                MRSData_obj = suspect.io.load_twix(data_fullfilepath)
-            except:
-                # well maybe it is broken, maybe the acquisition was interrupted
-                MRSData_obj = load_broken_twix_vb(data_fullfilepath)
-
-            # open TWIX file in text mode to scrap data out (dirty!!!)
-            f = open(data_fullfilepath, "r", encoding="ISO-8859-1")
-            twix_txtdata = f.read()
-            f.close()
-
-            # find TR value
-            a = twix_txtdata.find("alTR[0]")
-            a = twix_txtdata.find("=", a)
-            b = twix_txtdata.find("\n", a)
-            TR_str_us = twix_txtdata[(a + 2):b]
-            if(TR_str_us.strip()):
-                TR_ms = float(TR_str_us) / 1000.0
-                log.debug("extracted TR value (%.0fms)" % TR_ms)
-
-            # find patient birthyear
-            a = twix_txtdata.find("PatientBirthDay")
-            a = twix_txtdata.find("{", a)
-            a = twix_txtdata.find("\"", a)
-            birthday_str = twix_txtdata[(a + 1):(a + 9)]
-            if(birthday_str.strip()):
-                patient_birthday_datetime = datetime.strptime(birthday_str, '%Y%m%d')
-                log.debug("extracted patient birthyear (" + str(patient_birthday_datetime) + ")")
-
-            # find patient sex
-            a = twix_txtdata.find("PatientSex")
-            a = twix_txtdata.find("{", a)
-            sex_str = twix_txtdata[(a + 2):(a + 3)]
-            if(sex_str.strip()):
-                patient_sex_int = int(sex_str)
-                log.debug("extracted patient sex (%d)" % patient_sex_int)
-
-            # find patient name
-            a = twix_txtdata.find("tPatientName")
-            a = twix_txtdata.find("{", a)
-            a = twix_txtdata.find("\"", a)
-            b = twix_txtdata.find("\"", a + 1)
-            patient_name_str = twix_txtdata[(a + 1):b]
-            if(patient_name_str.strip()):
-                log.debug("extracted patient name (%s)" % patient_name_str)
-
-            # find patient weight
-            a = twix_txtdata.find("flUsedPatientWeight")
-            a = twix_txtdata.find("{", a)
-            a = twix_txtdata.find(">", a)
-            b = twix_txtdata.find("}", a + 1)
-            patient_weight_str = twix_txtdata[(a + 5):(b - 2)]
-            if(patient_weight_str.strip()):
-                patient_weight_kgs = float(patient_weight_str)
-                log.debug("extracted patient weight (%.2fkg)" % patient_weight_kgs)
-
-            # find patient height
-            a = twix_txtdata.find("flPatientHeight")
-            a = twix_txtdata.find("{", a)
-            a = twix_txtdata.find(">", a)
-            a = twix_txtdata.find(">", a + 1)
-            b = twix_txtdata.find("}", a + 1)
-            patient_height_str = twix_txtdata[(a + 6):(b - 3)]
-            if(patient_height_str.strip()):
-                patient_height_m = float(patient_height_str) / 1000.0
-                log.debug("extracted patient height (%.2fm)" % patient_height_m)
-
-            # find reference voltage
-            a = twix_txtdata.find("TransmitterReferenceAmplitude")
-            a = twix_txtdata.find("{", a)
-            a = twix_txtdata.find(">", a)
-            b = twix_txtdata.find("}", a + 1)
-            vref_str = twix_txtdata[(a + 6):(b - 14)]
-            if(vref_str.strip()):
-                vref_v = float(vref_str)
-                log.debug("extracted reference voltage (%.2fV)" % vref_v)
-
-            # find 1st order shim X
-            a = twix_txtdata.find("lOffsetX")
-            a = twix_txtdata.find("{", a)
-            b = twix_txtdata.find("}", a + 1)
-            shim_1st_X_str = twix_txtdata[(a + 4):b]
-            if(shim_1st_X_str.strip()):
-                shim_1st_X = float(shim_1st_X_str)
-                log.debug("extracted 1st order shim value for X (%.2f)" % shim_1st_X)
-            else:
-                shim_1st_X = np.nan
-
-            # find 1st order shim Y
-            a = twix_txtdata.find("lOffsetY")
-            a = twix_txtdata.find("{", a)
-            b = twix_txtdata.find("}", a + 1)
-            shim_1st_Y_str = twix_txtdata[(a + 4):b]
-            if(shim_1st_Y_str.strip()):
-                shim_1st_Y = float(shim_1st_Y_str)
-                log.debug("extracted 1st order shim value for Y (%.2f)" % shim_1st_Y)
-            else:
-                shim_1st_Y = np.nan
-
-            # find 1st order shim Z
-            a = twix_txtdata.find("lOffsetZ")
-            a = twix_txtdata.find("{", a)
-            b = twix_txtdata.find("}", a + 1)
-            shim_1st_Z_str = twix_txtdata[(a + 4):b]
-            if(shim_1st_Z_str.strip()):
-                shim_1st_Z = float(shim_1st_Z_str)
-                log.debug("extracted 1st order shim value for Z (%.2f)" % shim_1st_Z)
-            else:
-                shim_1st_Z = np.nan
-
-            # find 2nd / 3rd shims
-            a = twix_txtdata.find("alShimCurrent")
-            a = twix_txtdata.find("{", a)
-            b = twix_txtdata.find("}", a + 1)
-            shims_2nd_3rd_str = twix_txtdata[(a + 12):(b - 31)]
-            if(shims_2nd_3rd_str.strip()):
-                shims_2nd_3rd_str = shims_2nd_3rd_str.split(" ")
-                shims_2nd_3rd_list = [float(s) for s in shims_2nd_3rd_str]
-                log.debug("extracted 2nd / 3rd shims (" + str(shims_2nd_3rd_list) + ")")
-            else:
-                shims_2nd_3rd_list = np.nan
-
-            # merge shims values into one vector
-            shims_values = [shim_1st_X, shim_1st_Y, shim_1st_Z] + shims_2nd_3rd_list
-
-            # now some sequence-specific parameters
-            a = twix_txtdata.find("tSequenceFileName")
-            a = twix_txtdata.find('\\', a)
-            b = twix_txtdata.find('\n', a + 1)
-            sequence_name = twix_txtdata[(a + 1):(b - 2)]
-            log.debug("extracted sequence name (%s)" % sequence_name)
-
-            # nucleus (used for sequence object)
-            a = twix_txtdata.find("Nucleus")
-            a = twix_txtdata.find("{", a)
-            a = twix_txtdata.find('"', a)
-            b = twix_txtdata.find('"', a + 1)
-            nucleus_str = twix_txtdata[(a + 1):b]
-            nucleus = nucleus_str.strip()
-            log.debug("extracted nuclei (%s)" % nucleus)
-
-            # find numer of points
-            a = twix_txtdata.find("lVectorSize")
-            a = twix_txtdata.find("{", a)
-            b = twix_txtdata.find("}", a + 1)
-            npts_str = twix_txtdata[(a + 4):b]
-            if(npts_str.strip()):
-                npts = int(npts_str)
-                log.debug("extracted number of points (%d)" % npts)
-            else:
-                npts = np.nan
-
-            # open TWIX file in binary mode to get MDH header
-            f = open(data_fullfilepath, "rb")
-            binaryDump = f.read()
-            hdr_len = struct.unpack("i", binaryDump[:4])
-            sMDH = struct.unpack("iiiii", binaryDump[hdr_len[0]:hdr_len[0] + 20])
-            # and extract timestamp
-            ulTimeStamp = sMDH[3]
-            ulTimeStamp_ms = float(ulTimeStamp * 2.5)
-            log.debug("extracted timestamp (%.0fms)" % ulTimeStamp_ms)
-
-            if(sequence_name == "eja_svs_slaser"):
-                log.debug("this a semi-LASER acquisition, let's extract some specific parameters!")
-
-                # find afp pulse (fake) flip angle
-                a = twix_txtdata.find("FlipAngleDeg2")
-                a = twix_txtdata.find('>', a)
-                a = twix_txtdata.find('>', a + 1)
-                b = twix_txtdata.find('}', a + 1)
-                pulse_laser_rfc_fa_str = twix_txtdata[(a + 4):b]
-                if(pulse_laser_rfc_fa_str.strip()):
-                    pulse_laser_rfc_fa = float(pulse_laser_rfc_fa_str)
-                    log.debug("extracted LASER AFP refocussing pulse flip angle (%.2f)" % pulse_laser_rfc_fa)
-
-                # find afp pulse length
-                a = twix_txtdata.find("sWiPMemBlock.alFree[1]")
-                a = twix_txtdata.find('=', a)
-                b = twix_txtdata.find('\n', a + 1)
-                pulse_laser_rfc_length_str = twix_txtdata[(a + 2):b]
-                if(pulse_laser_rfc_length_str.strip()):
-                    pulse_laser_rfc_length = float(pulse_laser_rfc_length_str)
-                    log.debug("extracted LASER AFP refocussing pulse duration (%.2f)" % pulse_laser_rfc_length)
-
-                # find afp pulse R
-                a = twix_txtdata.find("sWiPMemBlock.alFree[49]")
-                a = twix_txtdata.find('=', a)
-                b = twix_txtdata.find('\n', a + 1)
-                pulse_laser_rfc_r_str = twix_txtdata[(a + 2):b]
-                if(pulse_laser_rfc_r_str.strip()):
-                    pulse_laser_rfc_r = float(pulse_laser_rfc_r_str)
-                    log.debug("extracted LASER AFP refocussing pulse R (%.2f)" % pulse_laser_rfc_r)
-
-                # find afp pulse N
-                a = twix_txtdata.find("sWiPMemBlock.alFree[48]")
-                a = twix_txtdata.find('=', a)
-                b = twix_txtdata.find('\n', a + 1)
-                pulse_laser_rfc_n_str = twix_txtdata[(a + 2):b]
-                if(pulse_laser_rfc_n_str.strip()):
-                    pulse_laser_rfc_n = float(pulse_laser_rfc_n_str)
-                    log.debug("extracted LASER AFP refocussing pulse N (%.2f)" % pulse_laser_rfc_n)
-
-                # find afp pulse voltage
-                a = twix_txtdata.find("aRFPULSE[1].flAmplitude")
-                a = twix_txtdata.find('=', a)
-                b = twix_txtdata.find('\n', a + 1)
-                pulse_laser_rfc_voltage_str = twix_txtdata[(a + 2):b]
-                if(pulse_laser_rfc_voltage_str.strip()):
-                    pulse_laser_rfc_voltage = float(pulse_laser_rfc_voltage_str)
-                    log.debug("extracted LASER AFP refocussing pulse voltage (%.2f)" % pulse_laser_rfc_voltage)
-
-                # find exc pulse duration
-                a = twix_txtdata.find("sWiPMemBlock.alFree[24]")
-                a = twix_txtdata.find('=', a)
-                b = twix_txtdata.find('\n', a + 1)
-                pulse_laser_exc_length_str = twix_txtdata[(a + 2):b]
-                if(pulse_laser_exc_length_str.strip()):
-                    pulse_laser_exc_length = float(pulse_laser_exc_length_str)
-                    log.debug("extracted LASER exc. pulse length (%.2f)" % pulse_laser_exc_length)
-
-                # find exc pulse voltage
-                a = twix_txtdata.find("aRFPULSE[0].flAmplitude")
-                a = twix_txtdata.find('=', a)
-                b = twix_txtdata.find('\n', a + 1)
-                pulse_laser_exc_voltage_str = twix_txtdata[(a + 2):b]
-                if(pulse_laser_exc_voltage_str.strip()):
-                    pulse_laser_exc_voltage = float(pulse_laser_exc_voltage_str)
-                    log.debug("extracted LASER excitation pulse voltage (%.2f)" % pulse_laser_exc_voltage)
-
-                # find spoiler length
-                a = twix_txtdata.find("sWiPMemBlock.alFree[12]")
-                a = twix_txtdata.find('=', a)
-                b = twix_txtdata.find('\n', a + 1)
-                spoiler_length_str = twix_txtdata[(a + 2):b]
-                if(spoiler_length_str.strip()):
-                    spoiler_length = float(spoiler_length_str)
-                    log.debug("extracted spoiler length (%.2f)" % spoiler_length)
-
-            elif(sequence_name == "svs_st_vapor_643"):
-                log.debug("this is CMRR's STEAM sequence, let's extract some specific parameters!")
-
-                # find TR value
-                a = twix_txtdata.find("alTD[0]")
-                a = twix_txtdata.find("=", a)
-                b = twix_txtdata.find("\n", a)
-                TM_str_us = twix_txtdata[(a + 2):b]
-                if(TM_str_us.strip()):
-                    TM_ms = float(TM_str_us) / 1000.0
-                    log.debug("extracted TM value (%.0fms)" % TM_ms)
-
-        elif(data_file_extension.lower() == '.dcm' or data_file_extension.lower() == '.ima'):
-            # dicom!
-            log.info("reading DICOM file...")
-            log.info(data_fullfilepath)
-            MRSData_obj = suspect.io.load_siemens_dicom(data_fullfilepath)
-        else:
-            # unknown!
-            raise Exception(' > ouch unknown file extension!')
+        # --- reshape data ---
 
         # add dimensions if needed
         if(MRSData_obj.ndim == 1):
@@ -426,44 +471,169 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         log.info("read a " + str(MRSData_obj.shape) + " vector")
 
+        # --- build MRSData object ---
         # calling the parent class' constructor
         obj = super(suspect.mrsobjects.MRSData, cls).__new__(cls, MRSData_obj, MRSData_obj.dt, MRSData_obj.f0, MRSData_obj.te, MRSData_obj.ppm0, MRSData_obj.voxel_dimensions, MRSData_obj.transform, MRSData_obj.metadata)
 
-        # create sequence object now we have all the parameters
+        # --- get extra parameters ---
+
+        # patient birthyear
+        patient_birthday_datetime = mfr.get_patient_birthday()
+        log.debug("extracted patient birthyear (" + str(patient_birthday_datetime) + ")")
+
+        # patient sex
+        patient_sex_str = mfr.get_patient_sex()
+        log.debug("extracted patient sex (%s)" % patient_sex_str)
+
+        # patient name
+        patient_name_str = mfr.get_patient_name()
+        log.debug("extracted patient name (%s)" % patient_name_str)
+
+        # patient weight
+        patient_weight_kgs = mfr.get_patient_weight()
+        log.debug("extracted patient weight (%.2fkg)" % patient_weight_kgs)
+
+        # patient height
+        patient_height_m = mfr.get_patient_height()
+        log.debug("extracted patient height (%.2fm)" % patient_height_m)
+
+        # TR
+        TR_ms = mfr.read_param_num("alTR[0]") / 1000.0
+        if(TR_ms is not None):
+            log.debug("extracted TR value (%.0fms)" % TR_ms)
+
+        # reference voltage
+        vref_v = mfr.read_param_num("flReferenceAmplitude")
+        log.debug("extracted reference voltage (%.2fV)" % vref_v)
+
+        # 1st order shim X
+        shim_1st_X = mfr.read_param_num("lOffsetX")
+        log.debug("extracted 1st order shim value for X (%.2f)" % shim_1st_X)
+
+        # 1st order shim Y
+        shim_1st_Y = mfr.read_param_num("lOffsetY")
+        log.debug("extracted 1st order shim value for Y (%.2f)" % shim_1st_Y)
+
+        # 1st order shim Z
+        shim_1st_Z = mfr.read_param_num("lOffsetZ")
+        log.debug("extracted 1st order shim value for Z (%.2f)" % shim_1st_Z)
+
+        # 2nd / 3rd shims
+        shims_2nd_3rd_list = []
+        for i_shim in range(5):
+            this_shim_val = mfr.read_param_num("alShimCurrent[%d]" % i_shim)
+            shims_2nd_3rd_list.append(this_shim_val)
+        log.debug("extracted 2nd/3rd shims (" + str(shims_2nd_3rd_list) + ")")
+
+        # merge shims values into one vector
+        shims_values = [shim_1st_X, shim_1st_Y, shim_1st_Z] + shims_2nd_3rd_list
+
+        # nucleus (used for sequence object)
+        nucleus = mfr.get_nucleus()
+        log.debug("extracted nuclei (%s)" % nucleus)
+
+        # number of points
+        npts = int(mfr.read_param_num("lVectorSize"))
+        log.debug("extracted number of points (%d)" % npts)
+
+        # special timestamp
+        ulTimeStamp_ms = mfr.get_timestamp()
+        log.debug("resulting in a timestamp (%.0fms)" % ulTimeStamp_ms)
+
+        # --- sequence-specific parameters ---
+        sequence_name = mfr.get_sequence_name()
+        log.debug("extracted sequence name (%s)" % sequence_name)
+
         if(sequence_name == "eja_svs_slaser"):
+            log.debug("this a semi-LASER acquisition, let's extract some specific parameters!")
+
+            # afp pulse (fake) flip angle
+            pulse_laser_rfc_fa = mfr.read_param_num("adFlipAngleDegree[1]")
+            log.debug("extracted LASER AFP refocussing pulse flip angle (%.2f)" % pulse_laser_rfc_fa)
+
+            # afp pulse length
+            pulse_laser_rfc_length = mfr.read_param_num("sWiPMemBlock.alFree[1]")
+            log.debug("extracted LASER AFP refocussing pulse duration (%.2f)" % pulse_laser_rfc_length)
+
+            # afp pulse R
+            pulse_laser_rfc_r = mfr.read_param_num("sWiPMemBlock.alFree[49]")
+            log.debug("extracted LASER AFP refocussing pulse R (%.2f)" % pulse_laser_rfc_r)
+
+            # afp pulse N
+            pulse_laser_rfc_n = mfr.read_param_num("sWiPMemBlock.alFree[48]")
+            log.debug("extracted LASER AFP refocussing pulse N (%.2f)" % pulse_laser_rfc_n)
+
+            # afp pulse voltage
+            pulse_laser_rfc_voltage = mfr.read_param_num("aRFPULSE[1].flAmplitude")
+            log.debug("extracted LASER AFP refocussing pulse voltage (%.2f)" % pulse_laser_rfc_voltage)
+
+            # exc pulse duration
+            pulse_laser_exc_length = mfr.read_param_num("sWiPMemBlock.alFree[24]")
+            log.debug("extracted LASER exc. pulse length (%.2f)" % pulse_laser_exc_length)
+
+            # exc pulse voltage
+            pulse_laser_exc_voltage = mfr.read_param_num("aRFPULSE[0].flAmplitude")
+            log.debug("extracted LASER excitation pulse voltage (%.2f)" % pulse_laser_exc_voltage)
+
+            # spoiler length
+            spoiler_length = mfr.read_param_num("sWiPMemBlock.alFree[12]")
+            log.debug("extracted spoiler length (%.2f)" % spoiler_length)
+
+            # build sequence object
             sequence_obj = sim.mrs_seq_eja_svs_slaser(obj.te, obj.tr, nucleus, npts, 1.0 / obj.dt, obj.f0, 1.0, pulse_laser_exc_length / 1000.0, pulse_laser_exc_voltage, pulse_laser_rfc_length / 1000.0, pulse_laser_rfc_fa, pulse_laser_rfc_r, pulse_laser_rfc_n, pulse_laser_rfc_voltage, vref_v, spoiler_length / 1000.0)
+
         elif(sequence_name == "eja_svs_press"):
             sequence_obj = sim.mrs_seq_eja_svs_press(obj.te, obj.tr, nucleus, npts, 1.0 / obj.dt, obj.f0, 1.0)
+
         elif(sequence_name == "eja_svs_steam"):
             sequence_obj = sim.mrs_seq_eja_svs_steam(obj.te, obj.tr, nucleus, npts, 1.0 / obj.dt, obj.f0, 1.0)
+
         elif(sequence_name == "fid"):
             sequence_obj = sim.mrs_seq_fid(obj.te, obj.tr, nucleus, npts, 1.0 / obj.dt, obj.f0, 1.0)
+
         elif(sequence_name == "svs_st"):
             sequence_obj = sim.mrs_seq_svs_st(obj.te, obj.tr, nucleus, npts, 1.0 / obj.dt, obj.f0, 1.0)
+
         elif(sequence_name == "svs_st_vapor_643"):
+            log.debug("this is CMRR's STEAM sequence, let's extract some specific parameters!")
+
+            # TM value
+            TM_ms = mfr.read_param_num("alTD[0]") / 1000.0
+            log.debug("extracted TM value (%.0fms)" % TM_ms)
+
+            # build sequence object
             sequence_obj = sim.mrs_seq_svs_st_vapor_643(obj.te, obj.tr, nucleus, npts, 1.0 / obj.dt, obj.f0, 1.0, TM_ms)
+
         elif(sequence_name == "bow_isis_15"):
             # TODO : create a sequence implementation for ISIS?
             sequence_obj = sim.mrs_seq_fid(obj.te, obj.tr, nucleus, npts, 1.0 / obj.dt, obj.f0, 1.0)
+
         elif(sequence_name is None):
             sequence_obj = None
+
         else:
             # unknown!
             log.error("ouch unknown sequence!")
 
-        # adding attributes
+        # --- build MRSData2 object ---
+        # adding MRSData2 attributes
         obj.data_ref = data_ref
-        obj._tr = TR_ms
         obj._patient_name = patient_name_str
         obj._patient_birthday = patient_birthday_datetime
-        obj._patient_sex = patient_sex_int
+        obj._patient_sex = patient_sex_str
         obj._patient_weight = patient_weight_kgs
         obj._patient_height = patient_height_m
+        obj._tr = TR_ms
         obj._vref = vref_v
         obj._shims = shims_values
         obj._sequence = sequence_obj
         obj._noise_level = 0.0
         obj._timestamp = ulTimeStamp_ms
+        obj._na_pre_data_rejection = obj.shape[1]
+        obj._na_post_data_rejection = obj.shape[1]
+        obj._is_concatenated = False
+        obj._is_dicom = mfr.is_dicom()
+
         # those need to be called now, because they the attributes above
         obj.set_display_label()
         obj.set_display_offset()
@@ -603,20 +773,24 @@ class MRSData2(suspect.mrsobjects.MRSData):
         """
         super().__array_finalize__(obj)
         self.data_ref = getattr(obj, 'data_ref', None)
-        self._tr = getattr(obj, 'tr', None)
+        self._resp_trace = getattr(obj, 'resp_trace', None)
         self._display_label = getattr(obj, 'display_label', None)
         self._display_offset = getattr(obj, 'display_offset', 0.0)
         self._patient_birthday = getattr(obj, 'patient_birthday', None)
         self._patient_sex = getattr(obj, 'patient_sex', None)
-        self._resp_trace = getattr(obj, 'resp_trace', None)
         self._patient_name = getattr(obj, 'patient_name', None)
         self._patient_weight = getattr(obj, 'patient_weight', None)
         self._patient_height = getattr(obj, 'patient_height', None)
+        self._tr = getattr(obj, 'tr', None)
         self._vref = getattr(obj, 'vref', None)
         self._shims = getattr(obj, 'shims', None)
         self._timestamp = getattr(obj, 'timestamp', None)
         self._sequence = getattr(obj, 'sequence', None)
         self._noise_level = getattr(obj, 'noise_level', 0.0)
+        self._na_pre_data_rejection = getattr(obj, 'na_pre_data_rejection', 0.0)
+        self._na_post_data_rejection = getattr(obj, 'na_post_data_rejection', 0.0)
+        self._is_concatenated = getattr(obj, 'is_concatenated', 0.0)
+        self._is_dicom = getattr(obj, 'is_dicom', 0.0)
 
     def inherit(self, obj):
         """
@@ -643,6 +817,10 @@ class MRSData2(suspect.mrsobjects.MRSData):
         obj2._timestamp = getattr(self, 'timestamp', None)
         obj2._sequence = getattr(self, 'sequence', None)
         obj2._noise_level = getattr(self, 'noise_level', 0.0)
+        obj2._na_pre_data_rejection = getattr(self, 'na_pre_data_rejection', 0.0)
+        obj2._na_post_data_rejection = getattr(self, 'na_post_data_rejection', 0.0)
+        obj2._is_concatenated = getattr(self, 'is_concatenated', 0.0)
+        obj2._is_dicom = getattr(self, 'is_dicom', 0.0)
         return(obj2)
 
     @property
@@ -701,18 +879,6 @@ class MRSData2(suspect.mrsobjects.MRSData):
         self._display_offset = ofs
 
     @property
-    def tr(self):
-        """
-        Property get function for TR (ms).
-
-        Returns
-        -------
-        self._tr : float
-            TR in (ms)
-        """
-        return(self._tr)
-
-    @property
     def patient_name(self):
         """
         Property get function for patient_name.
@@ -743,8 +909,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         Returns
         -------
-        self._patient_sex : int
-            Sex of patient (0:M 1:F)
+        self._patient_sex : string
+            sex of patient ('M', 'F' or 'O')
         """
         return(self._patient_sex)
 
@@ -771,6 +937,18 @@ class MRSData2(suspect.mrsobjects.MRSData):
             height of patient in meters
         """
         return(self._patient_height)
+
+    @property
+    def tr(self):
+        """
+        Property get function for TR (ms).
+
+        Returns
+        -------
+        self._tr : float
+            TR in (ms)
+        """
+        return(self._tr)
 
     @property
     def vref(self):
@@ -831,6 +1009,54 @@ class MRSData2(suspect.mrsobjects.MRSData):
             Timestamp in (ms)
         """
         return(self._timestamp)
+
+    @property
+    def na_pre_data_rejection(self):
+        """
+        Property get function for na_pre_data_rejection.
+
+        Returns
+        -------
+        self._na_pre_data_rejection : int
+            Original number of averages
+        """
+        return(self._na_pre_data_rejection)
+
+    @property
+    def na_post_data_rejection(self):
+        """
+        Property get function for na_post_data_rejection.
+
+        Returns
+        -------
+        self._na_post_data_rejection : int
+            Number of averages after data rejection
+        """
+        return(self._na_post_data_rejection)
+
+    @property
+    def is_concatenated(self):
+        """
+        Property get function for is_concatenated.
+
+        Returns
+        -------
+        self._is_concatenated : boolean
+            True if this current signal is a result of a concatenation
+        """
+        return(self._is_concatenated)
+
+    @property
+    def is_dicom(self):
+        """
+        Property get function for is_dicom.
+
+        Returns
+        -------
+        self._is_dicom : boolean
+            True if this current signal was originally read from a DCM file
+        """
+        return(self._is_dicom)
 
     @property
     def resp_trace(self):
@@ -1358,6 +1584,10 @@ class MRSData2(suspect.mrsobjects.MRSData):
         s_concatenated = np.concatenate((self, data))
         s_concatenated = s.inherit(s_concatenated)
         log.debug("obtained a dataset shape " + str(s_concatenated.shape))
+
+        # update some attributes
+        s_concatenated._is_concatenated = True
+
         return(s_concatenated)
 
     def _build_moving_average_data_2d(self, nAvgWindow=5):
@@ -1788,10 +2018,10 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         # init
         s = self.copy()
+        s._na_pre_data_rejection = s.shape[0]
         if(s.shape[0] == 1):
             log.warning("single-shot signal, nothing to analyze!")
             return(s)
-
         ppm = s.frequency_axis_ppm()
 
         # build moving averaged data
@@ -2068,6 +2298,9 @@ class MRSData2(suspect.mrsobjects.MRSData):
         # wait, are we removing all data ???
         if(mask_reject_data_sumup.sum() == s.shape[0]):
             log.error("all data is rejected! You need to readjust your rejection bounds...")
+
+        # keep the amount of data we reject in mind
+        s_cor._na_post_data_rejection = s_cor.shape[0]
 
         return(s_cor)
 
@@ -2978,6 +3211,19 @@ class MRSData2(suspect.mrsobjects.MRSData):
         log.debug("saving MRS signal to " + mat_filepath + "...")
         sio.savemat(mat_filepath, {'MRSdata': self})
 
+    def save_pkl(self, pkl_filepath):
+        """
+        Save the whole object to a pickle file.
+
+        Parameters
+        ----------
+        pkl_filepath: string
+            Full absolute file path pointing to pkl file
+        """
+        log.debug("saving MRS signal to " + pkl_filepath + "...")
+        with open(pkl_filepath, 'wb') as f:
+            pickle.dump(self, f)
+
     def __reduce__(self):
         """Reduce internal pickling method used when dumping. Modified so that MRSData2 attributes are not forgotten. See for more info: https://docs.python.org/3/library/pickle.html ."""
         # get numpy reduce tuple
@@ -3836,11 +4082,7 @@ class pipeline:
                 pkl_data_dict[d.patient_name] = {}
             # add/update with the dataset
             log.debug("adding/updating dataset [%s]/[%s]..." % (d.patient_name, d.display_label))
-            pkl_data_dict[d.patient_name][d.display_label] = {"data": d, "pipeline": self, "patient_name": d.patient_name, "patient_weight": d.patient_weight, "patient_height": d.patient_height, "vref": d.vref, "te": d.te}
-            if(d.sequence is not None and d.sequence.name == "eja_svs_slaser"):
-                pkl_data_dict[d.patient_name][d.display_label].update({"r": d.sequence.pulse_rfc_r, "n": d.sequence.pulse_rfc_n, "te2": d.sequence.te})
-            else:
-                pkl_data_dict[d.patient_name][d.display_label].update({"r": None, "n": None, "te2": None})
+            pkl_data_dict[d.patient_name][d.display_label] = {"data": d, "pipeline": self}
 
         # write back pkl file
         with open(reco_data_db_file, 'wb') as f:
@@ -4143,7 +4385,6 @@ def _build_legend_list_from_filepath_list(filepath_list):
                 # no idea what we are dealing with
                 f_a, f_b = os.path.split(f.lower())
                 legend_list.append(f_b)
-
 
 def load_broken_twix_vb(filename):
     """
