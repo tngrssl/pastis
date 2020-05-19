@@ -35,9 +35,9 @@ if(fit_metabolite_concentration_threshold is not None):
 # %% prefit data
 prefittool = fit.prefit_pipeline(data, seq)
 prefittool.display_fig_index = 500
-prefittool.area_integration_peakwidth = 25.0
 prefittool.area_integration_peak_search_range = 0.1
 prefittool.area_integration_peaks = fit_metabolites_prefit
+prefittool.initialize()
 params_prefit = prefittool.run()
 
 # %% prefit ref. data if any

@@ -16,7 +16,10 @@ import numpy as np
 get_ipython().magic("matplotlib auto")
 plt.rcParams['figure.dpi'] = 100
 plt.rcParams['figure.max_open_warning'] = 1000
+plt.rcParams['font.size'] = 9
 log.setLevel(log.DEBUG)
+
+rdb = reco.data_db()
 
 # %% 27/02/2019 - spinal cord phantom - nice WS STEAM, testing TWIX reco
 get_ipython().magic("clear")

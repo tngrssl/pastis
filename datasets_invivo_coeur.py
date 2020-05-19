@@ -117,9 +117,9 @@ plt.close('all')
 # p.phase_enable = True
 # p.phase_POI_range_ppm = [1, 2]
 
-# p.analyse_and_reject_enable = False
-# p.analyse_linewidth_enable = False
-# p.analyse_snr_enable = False
+# p.analyze_and_reject_enable = False
+# p.analyze_linewidth_enable = False
+# p.analyze_snr_enable = False
 
 # p.realign_enable = False
 # p.apodize_enable = True
@@ -360,10 +360,10 @@ p.data_coil_nChannels = 1
 p.phase_enable = True
 p.phase_weak_ws_mode = True
 # let's estimate water linewidth to have an idea of the shim
-p.analyse_linewidth_enable = True
-p.analyse_linewidth_range_ppm = [4, 5.5]
+p.analyze_linewidth_enable = True
+p.analyze_linewidth_range_ppm = [4, 5.5]
 # no SNR estimation
-p.analyse_snr_enable = False
+p.analyze_snr_enable = False
 # no spectrum realignment
 p.realign_enable = True
 # let's denoize a little (5Hz exponential apodization)
@@ -386,28 +386,28 @@ p.display_legends = display_legends
 # we are using a single channel RF coil
 p.data_coil_nChannels = 1
 # reject bad data
-p.analyse_and_reject_enable = True
-p.analyse_and_reject_auto = True
-p.analyse_and_reject_moving_averages = 1
-p.analyse_and_reject_POI_range_ppm = [4, 5.5]
+p.analyze_and_reject_enable = True
+p.analyze_and_reject_auto = True
+p.analyze_and_reject_moving_averages = 1
+p.analyze_and_reject_POI_range_ppm = [4, 5.5]
 #                       amp, lnwdth, freq, phase
-p.analyse_and_reject_min = [-100, 0, -0.2, -0.24]
-p.analyse_and_reject_max = [100, 100, 0.2, 0.24]
+p.analyze_and_reject_min = [-100, 0, -0.2, -0.24]
+p.analyze_and_reject_max = [100, 100, 0.2, 0.24]
 # self-phasing the WS spectrum using the the big lipid peak at ~1.5ppm
 #  (Here you can choose btw Lipid and Cr for phasing)
 p.phase_enable = True
 p.phase_POI_range_ppm = [1, 1.5]  # find this peak in this ppm range
 # linewidth estimation here (Cr)
-p.analyse_linewidth_enable = False
-p.analyse_linewidth_range_ppm = [1, 1.5]
+p.analyze_linewidth_enable = False
+p.analyze_linewidth_range_ppm = [1, 1.5]
 # but let's estimate the SNR of the Cr peak at 3ppm just to have a rough idea of the quality of the data
-p.analyse_snr_enable = False
-p.analyse_snr_s_range_ppm = [2.9, 3.1]  # signal ppm range
-p.analyse_snr_n_range_ppm = [-3, -1]  # noise ppm range
+p.analyze_snr_enable = False
+p.analyze_snr_s_range_ppm = [2.9, 3.1]  # signal ppm range
+p.analyze_snr_n_range_ppm = [-3, -1]  # noise ppm range
 # but let's estimate the SNR of the lipid peak at 1.2ppm just to have a rough idea of the quality of the data
-# p.analyse_snr_enable = False
-# p.analyse_snr_s_range_ppm = [1, 1.5]  # signal ppm range
-# p.analyse_snr_n_range_ppm = [-3, -1]  # noise ppm range
+# p.analyze_snr_enable = False
+# p.analyze_snr_s_range_ppm = [1, 1.5]  # signal ppm range
+# p.analyze_snr_n_range_ppm = [-3, -1]  # noise ppm range
 # no spectrum realignment for now
 p.realign_enable = False
 p.realign_POI_range_ppm = [1., 1.7]

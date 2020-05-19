@@ -30,20 +30,20 @@ p.phase_display = False
 p.recombine_phasing = True
 p.realign_enable = False
 
-p.analyse_and_reject_enable = True
-p.analyse_and_reject_moving_averages = 1
-p.analyse_and_reject_min = [-100, 0, -1, -3.14]
-p.analyse_and_reject_max = [100, 50, 1, 3.14]
+p.analyze_and_reject_enable = True
+p.analyze_and_reject_moving_averages = 1
+p.analyze_and_reject_min = [-100, 0, -1, -3.14]
+p.analyze_and_reject_max = [100, 50, 1, 3.14]
 
 p.apodize_enable = False
 p.apodize_damping_hz = 15
 p.calibrate_enable = True
 
-p.analyse_linewidth_enable = True
-p.analyse_linewidth_magnitude_mode = False
+p.analyze_linewidth_enable = True
+p.analyze_linewidth_magnitude_mode = False
 
-p.analyse_snr_enable = True
-p.analyse_snr_magnitude_mode = False
+p.analyze_snr_enable = True
+p.analyze_snr_magnitude_mode = False
 
 p.remove_water_enable = False
 p.data_process_only_this_data_index = [0]
@@ -78,22 +78,22 @@ p.realign_enable = False
 p.realign_POI_range_ppm = [4.5, 4.8]
 p.realign_moving_averages = 1
 
-p.analyse_and_reject_enable = False
-p.analyse_and_reject_moving_averages = 1
-p.analyse_and_reject_min = [-100, 0, -1, -3.14]
-p.analyse_and_reject_max = [100, 20, 1, 3.14]
-p.analyse_and_reject_POI_range_ppm = [4.5, 4.8]
+p.analyze_and_reject_enable = False
+p.analyze_and_reject_moving_averages = 1
+p.analyze_and_reject_min = [-100, 0, -1, -3.14]
+p.analyze_and_reject_max = [100, 20, 1, 3.14]
+p.analyze_and_reject_POI_range_ppm = [4.5, 4.8]
 
 p.apodize_enable = True
 p.apodize_damping_hz = 5
 
 p.calibrate_enable = False
 
-p.analyse_linewidth_enable = True
-p.analyse_linewidth_range_ppm = [4.5, 4.8]
+p.analyze_linewidth_enable = True
+p.analyze_linewidth_range_ppm = [4.5, 4.8]
 
-p.analyse_snr_enable = True
-p.analyse_snr_s_range_ppm = [4.5, 4.8]
+p.analyze_snr_enable = True
+p.analyze_snr_s_range_ppm = [4.5, 4.8]
 
 p.remove_water_enable = False
 
@@ -145,18 +145,18 @@ p.zerofill_enable = True
 p.zerofill_npts = 4096*2
 
 p.realign_enable = False
-p.analyse_physio_enable = True
-p.analyse_physio_POI_range_ppm = [4, 5]
-p.analyse_physio_delta_time_ms = 40000.0
+p.analyze_physio_enable = True
+p.analyze_physio_POI_range_ppm = [4, 5]
+p.analyze_physio_delta_time_ms = 40000.0
 
-p.analyse_and_reject_moving_averages = 1
-p.analyse_and_reject_min = [-50, 0, -0.1, -0.5]
-p.analyse_and_reject_max = [50, 50, 0.1, 0.5]
+p.analyze_and_reject_moving_averages = 1
+p.analyze_and_reject_min = [-50, 0, -0.1, -0.5]
+p.analyze_and_reject_max = [50, 50, 0.1, 0.5]
 
 p.apodize_enable = False
 p.calibrate_enable = False
-p.analyse_linewidth_enable = False
-p.analyse_snr_enable = False
+p.analyze_linewidth_enable = False
+p.analyze_snr_enable = False
 p.remove_water_enable = False
 
 s = p.run_pipeline_std()
@@ -191,25 +191,25 @@ p.realign_enable = False
 p.realign_POI_range_ppm = [4.5, 4.8]
 p.realign_moving_averages = 9
 
-p.analyse_physio_enable = True
-p.analyse_physio_POI_range_ppm = [4, 5]
-p.analyse_physio_delta_time_ms = 40000.0
+p.analyze_physio_enable = True
+p.analyze_physio_POI_range_ppm = [4, 5]
+p.analyze_physio_delta_time_ms = 40000.0
 
-p.analyse_and_reject_enable = True
-p.analyse_and_reject_moving_averages = 1
-p.analyse_and_reject_min = [-50, 0, -0.1, -0.5]
-p.analyse_and_reject_max = [50, 50, 0.1, 0.5]
+p.analyze_and_reject_enable = True
+p.analyze_and_reject_moving_averages = 1
+p.analyze_and_reject_min = [-50, 0, -0.1, -0.5]
+p.analyze_and_reject_max = [50, 50, 0.1, 0.5]
 
 p.apodize_enable = False
 p.apodize_damping_hz = 10
 
 p.calibrate_enable = False
 
-p.analyse_linewidth_enable = False
-p.analyse_linewidth_magnitude_mode = False
+p.analyze_linewidth_enable = False
+p.analyze_linewidth_magnitude_mode = False
 
-p.analyse_snr_enable = False
-p.analyse_snr_magnitude_mode = False
+p.analyze_snr_enable = False
+p.analyze_snr_magnitude_mode = False
 
 p.remove_water_enable = False
 
@@ -243,22 +243,22 @@ p.zerofill_npts = 4096*2
 
 p.realign_enable = False
 
-p.analyse_and_reject_enable = True
+p.analyze_and_reject_enable = True
 
-p.analyse_physio_enable = True
-p.analyse_physio_POI_range_ppm = [4, 5]
-p.analyse_physio_delta_time_ms = 10000.0
+p.analyze_physio_enable = True
+p.analyze_physio_POI_range_ppm = [4, 5]
+p.analyze_physio_delta_time_ms = 10000.0
 
 p.apodize_enable = False
 p.apodize_damping_hz = 10
 
 p.calibrate_enable = False
 
-p.analyse_linewidth_enable = False
-p.analyse_linewidth_magnitude_mode = False
+p.analyze_linewidth_enable = False
+p.analyze_linewidth_magnitude_mode = False
 
-p.analyse_snr_enable = False
-p.analyse_snr_magnitude_mode = False
+p.analyze_snr_enable = False
+p.analyze_snr_magnitude_mode = False
 
 p.remove_water_enable = False
 
@@ -291,22 +291,22 @@ p.zerofill_npts = 4096*2
 
 p.realign_enable = False
 
-p.analyse_and_reject_enable = True
+p.analyze_and_reject_enable = True
 
-p.analyse_physio_enable = True
-p.analyse_physio_POI_range_ppm = [4, 5]
-p.analyse_physio_delta_time_ms = 10000.0
+p.analyze_physio_enable = True
+p.analyze_physio_POI_range_ppm = [4, 5]
+p.analyze_physio_delta_time_ms = 10000.0
 
 p.apodize_enable = False
 p.apodize_damping_hz = 10
 
 p.calibrate_enable = False
 
-p.analyse_linewidth_enable = False
-p.analyse_linewidth_magnitude_mode = False
+p.analyze_linewidth_enable = False
+p.analyze_linewidth_magnitude_mode = False
 
-p.analyse_snr_enable = False
-p.analyse_snr_magnitude_mode = False
+p.analyze_snr_enable = False
+p.analyze_snr_magnitude_mode = False
 
 p.remove_water_enable = False
 

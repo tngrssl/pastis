@@ -10,10 +10,20 @@ from IPython import get_ipython
 import matplotlib.pylab as plt
 import mrs.aliases as xxx
 import mrs.reco as reco
+import mrs.log as log
+import numpy as np
 get_ipython().magic("clear")
 plt.close("all")
 
-# %% process data before fit
+get_ipython().magic("matplotlib auto")
+plt.rcParams['figure.dpi'] = 100
+plt.rcParams['figure.max_open_warning'] = 1000
+plt.rcParams['font.size'] = 9
+log.setLevel(log.DEBUG)
+
+rdb = reco.data_db()
+
+# %% process data
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -289,121 +299,92 @@ display_legends = """
 
 # the data lists above, which data index should we process (starting from 0)
 # [] means process all
-index_to_process = 43
+index_to_process = 45
 
-# first process the non water suppressed data
-p = reco.pipeline()
-p.data_filepaths = data_ref_filepaths
-p.data_ref_filepaths = """"""
-p.data_physio_filepaths = """"""
-p.display_legends = display_legends
-
-# we are using a single channel RF coil
-p.data_coil_nChannels = 1
-# self-phasing the water spectrum using the first point of FID
-p.phase_enable = True
-p.phase_weak_ws_mode = True
-# let's estimate water linewidth to have an idea of the shim
-p.analyse_linewidth_enable = True
-p.analyse_linewidth_range_ppm = [4, 5.2]
-# no SNR estimation
-p.analyse_snr_enable = False
-# no spectrum realignment
-p.realign_enable = False
-# let's denoize a little (5Hz exponential apodization)
-p.apodize_damping_hz = 5
-# let's calibrate ppm scale so that water peak is at 4.7ppm
-p.calibrate_POI_range_ppm = [4, 5.2]
-p.calibrate_POI_true_ppm = 4.7
-# do not display final processed water spectrum, it is boring
-p.display_enable = False
-# run the process pipeline
-p.data_process_only_this_data_index = [index_to_process]
-s_ref, tmp = p.run_pipeline_std()
-
-# now process the water-suppressed (WS) data
+# --- process the water-suppressed (WS) data ---
 p = reco.pipeline()
 p.data_filepaths = data_filepaths
-p.data_ref_filepaths = """"""
-p.data_physio_filepaths = """"""
+p.data_ref_filepaths = data_ref_filepaths
+p.data_physio_filepaths = []
 p.display_legends = display_legends
 # we are using a single channel RF coil
 p.data_coil_nChannels = 1
-# reject bad data
-p.analyse_and_reject_enable = True
-p.analyse_and_reject_moving_averages = 1
-p.analyse_and_reject_POI_range_ppm = [4, 5.2]
-# rejection criteria
-p.analyse_and_reject_ranges = {"amplitude (%)": None,  # do not reject on amplitude changes
-                               "linewidth (Hz)": 20,  # max linewidth acceptable
-                               "chemical shift (ppm)": 0.5,  # +/- ppm
-                               "phase std. factor (%)": 60.0}  #  stan's phase +/- 60% of std criteria (see doi:10.1002/jmri.26802)
-# when talking about relative peak amplitude, phase changes; etc. relative to what? mean?
-p.analyse_and_reject_rel2mean = True
-# automatic adjustement of linewidth criteria
-p.analyse_and_reject_auto = True
-# minimum allowed SNR change (%) when adjusting the linewidth criteria
-p.analyse_and_reject_auto_allowed_snr_change = -10.0
+
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]
+                ]
+
+p.analyze_job_list = [  p.jobs["channel-combining"],
+                        p.jobs["zero-filling"],
+                        p.jobs["realigning"],
+                        p.jobs["averaging"],
+                        p.jobs["calibrating"]]
 
 # self-phasing the WS spectrum using the the big lipid peak at ~1.5ppm (Here you can choose btw Lipid and Cr for phasing)
-p.phase_enable = True
-p.phase_POI_range_ppm = [4, 5.2]  # find this peak in this ppm range
-# p.phase_offset = 0.5
-# linewidth estimation here (Tg)
-p.analyse_linewidth_enable = True
-p.analyse_linewidth_range_ppm = [0.5, 2]
-# but let's estimate the SNR of the Cr peak at 3ppm just to have a rough idea of the quality of the data
-p.analyse_snr_enable = True
-p.analyse_snr_s_range_ppm = [0.5, 2]  # signal ppm range
-p.analyse_snr_n_range_ppm = [-3, -1]  # noise ppm range
-# but let's estimate the SNR of the lipid peak at 1.2ppm just to have a rough idea of the quality of the data
-# p.analyse_snr_enable = False
-# p.analyse_snr_s_range_ppm = [1, 1.5]  # signal ppm range
-# p.analyse_snr_n_range_ppm = [-3, -1]  # noise ppm range
-# no spectrum realignment for now
-p.realign_enable = True
-p.realign_POI_range_ppm = [4, 5.2]
+p.jobs["phasing"]["POI_range_ppm"] = [4, 5.2]  # find this peak in this ppm range
+p.jobs["phasing"]["offset"] = 0.0  # manual phase offset
+p.jobs["phasing"]["using_ref_data"] = False
+
+# reject bad data
+p.jobs["data-rejecting"]["moving_averages"] = 1
+p.jobs["data-rejecting"]["POI_range_ppm"] = [4, 5.2]
+# rejection ranges
+p.jobs["data-rejecting"]["ranges"]["amplitude (%)"] = None  # do not reject on amplitude changes
+p.jobs["data-rejecting"]["ranges"]["linewidth (Hz)"] = 20  # max linewidth acceptable
+p.jobs["data-rejecting"]["ranges"]["chemical shift (ppm)"] = 0.5  # +/- ppm
+p.jobs["data-rejecting"]["ranges"]["phase std. factor (%)"] = 60.0  # stan's phase +/- 60% of std criteria (see doi:10.1002/jmri.26802)
+# auto rejection based on linewidth?
+p.jobs["data-rejecting"]["auto"] = True
+# minimum allowed SNR change (%) when adjusting the linewidth criteria
+p.jobs["data-rejecting"]["auto_allowed_snr_change"] = -10.0
+
+# frequency realignement
+p.jobs["realigning"]["POI_range_ppm"] = [4, 5.2]
 # select number of excitations to average
-# p.average_na = 8
+# p.jobs["averaging"]["na"] = 8
 # let's denoize a little (5Hz exponential apodization)
-p.apodize_damping_hz = 10
+p.jobs["apodizing"]["damping_hz"] = 10
 # let's calibrate ppm scale so that water residue is at 4.7ppm
-p.calibrate_POI_range_ppm = [4, 5.2]
-p.calibrate_POI_true_ppm = 4.7
+p.jobs["calibrating"]["POI_true_ppm"] = 4.7
+p.jobs["calibrating"]["POI_range_ppm"] = [4, 5.2]
 # or if the residue is too small, let's use the lipid at 1.5ppm
-# p.calibrate_POI_range_ppm = [1, 2]
-# p.calibrate_POI_true_ppm = 1.4
+# p.jobs["calibrating"]["POI_true_ppm"] = 1.4
+# p.jobs["calibrating"]["POI_range_ppm"] = [1, 2]
+
+# snr and linewidth estimation on Cr peak
+p.jobs["analyzing-snr"]["s_range_ppm"] = [2.5, 3.5]  # signal ppm range
+p.jobs["analyzing-snr"]["n_range_ppm"] = [-3, -1]  # noise ppm range
+p.jobs["analyzing-lw"]["range_ppm"] = [2.5, 3.5]
+
 # display ppm range
-p.display_range_ppm = [0, 5]
+p.jobs["displaying"]["range_ppm"] = [0, 5]
 # run the process pipeline
 p.data_process_only_this_data_index = [index_to_process]
-s, tmp = p.run_pipeline_std()
+p.run()
+# save this to db file
+p.save(rdb)
 
-# some fitting parameters
-metabolites_fit = [
-    xxx.m_Cr_CH3,
-    xxx.m_Cr_CH2,
-    xxx.m_Alcar,
-    xxx.m_Carni,
-    xxx.m_Carno]
-
-lipids_fit = [
-    xxx.m_Lip1,
-    xxx.m_Lip2,
-    xxx.m_Lip3,
-    xxx.m_Lip4]
-
-fit_result_csv_filename = "fit_results.csv"
-water_concentration = 87700.0
-
-# to run the fit, switch to the pipeline_fit_muscle.py script cell by cell
-
-# %% man phase (You can remove "2" in order to perform the fit on the new spectrum)
-s = s * np.exp(1j * 0.3)
-s.display_spectrum()
+# %% need to fix a phase problem? manual phasing
+p._data_list[0] = p._data_list[0] * np.exp(1j * 0.0)
+p._data_list[0].display_spectrum_1d()
+# save this to db file
+p.save(rdb)
 
 # %% replace
-
 "C:/Users/jsourdon/Desktop/2020_1H_MRS/200303_1HMRS_pd002/"
 # by
 "/home/tangir/desktop/200303_1HMRS_pd002"

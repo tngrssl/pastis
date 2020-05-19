@@ -17,6 +17,9 @@ try:
 except ImportError:
     GAMMA_LIB_LOADED = False
 
+# GAMMA_LIB_LOADED forced to False for debug
+# GAMMA_LIB_LOADED = False
+
 import suspect
 import numpy as np
 import math as ma
@@ -26,7 +29,6 @@ import warnings
 import pathlib
 from xlrd import open_workbook
 from termcolor import cprint
-import matplotlib._color_data as mcd
 from enum import Enum
 import mrs.reco as reco
 import mrs.aliases as xxx
@@ -34,10 +36,6 @@ import mrs.log as log
 import mrs.paths as default_paths
 
 import pdb
-
-GAMMA_metabolite_basis_set = {"1H": 42.577478518, "13C": 10.7084, "19F": 40.052, "23Na": 11.262, "31P": 17.235}
-PARS_LONG_NAMES = ["Concentration [mmol/kg]", "Linewidth factor [Hz]", "Frequency shift [Hz]", "Phase [rd]"]
-PARS_SHORT_NAMES = ["cm", "dd", "df", "dp"]
 
 
 class sequence_exc_type(Enum):
@@ -968,56 +966,66 @@ class mrs_sequence:
 
         # display
         log.info("comparing what you asked/what you got...")
-        log.info("parameter\t\tRequested\t\tObtained")
-        for this_key in list(self.__dict__.keys()):
+        cell_nchar = 20
+        log.info("parameter".ljust(cell_nchar) + " requested".ljust(cell_nchar) + " obtained".ljust(cell_nchar))
+
+        unique_key_list = list(set(list(self.__dict__.keys()) + list(optim_seq.__dict__.keys())))
+        for this_key in unique_key_list:
             my_val = self.__dict__[this_key]
-            if(len(my_val) == 1):
+            my_val_len = 1
+            try:
+                my_val_len = len(my_val)
+            except:
+                pass
+
+            if(this_key[0] != '_' and my_val_len == 1):
                 found_val = optim_seq.__dict__[this_key]
-                log.info("   " + this_key + "\t" + str(my_val) + "\t" + str(found_val))
+                # format floats
+                if(type(my_val) == float):
+                    my_val_str = "%.2f" % my_val
+                    found_val_str = "%.2f" % found_val
+                else:
+                    my_val_str = str(my_val)
+                    found_val_str = str(found_val)
+
+                # crop strings
+                this_key_str = this_key[0:cell_nchar]
+                my_val_str = my_val_str[0:cell_nchar]
+                found_val_str = found_val_str[0:cell_nchar]
+                # pretty print
+                log.info(this_key_str.ljust(cell_nchar) + " " + my_val_str.ljust(cell_nchar) + " " + found_val_str.ljust(cell_nchar))
 
         # ok well done. Now we maybe have to fix a few issues: number of samples, sampling frequency, amplification factor, this can be done with some signal processing stuff
 
-        # resampling
-        if(self.fs != optim_seq.fs or self.npts != optim_seq.npts):
-            log.info("resampling the metabolite signals to match your sampling...")
-            old_dt = 1 / optim_seq.fs
-            old_t = np.arange(0, optim_seq.npts * old_dt, old_dt)
-            new_dt = 1 / self.fs
-            new_t = np.arange(0, self.npts * new_dt, new_dt)
+        # resampling (even if not needed)
+        log.info("resampling metabolite signals: %dpts/%.2fHz to %dpts/%.2fHz..." % (optim_seq.npts, optim_seq.fs, self.npts, self.fs))
+        log.info("rescaling metabolite signals by a factor of %.2f..." % (self.scaling_factor / optim_seq.scaling_factor))
+        old_dt = 1 / optim_seq.fs
+        old_t = np.arange(0, optim_seq.npts * old_dt, old_dt)
+        new_dt = 1 / self.fs
+        new_t = np.arange(0, self.npts * new_dt, new_dt)
 
-            # resample each metabolite signal
-            new_meta_signals = []
-            for s in optim_seq._meta_signals:
-                s2_np = np.interp(new_t, old_t, s)
-                # convert to suspect
-                s_MRSData = suspect.MRSData(s2_np, new_dt, optim_seq.f0)
-                s_MRSData2 = s_MRSData.view(reco.MRSData2)
-                # and rebuild metabase
-                new_meta_signals.append(s_MRSData2)
-        else:
-            # no need in reampling?
-            new_meta_signals = optim_seq._meta_signals.copy()
+        # resample each metabolite signal
+        new_meta_signals = []
+        for s in optim_seq._meta_signals:
+            s2_np = np.interp(new_t, old_t, s)
+            # convert to suspect
+            s_MRSData = suspect.MRSData(s2_np, new_dt, optim_seq.f0)
+            s_MRSData2 = s_MRSData.view(reco.MRSData2)
+            # rescale
+            s_MRSData2 = s_MRSData2 * self.scaling_factor / optim_seq.scaling_factor
+            # and rebuild metabase
+            new_meta_signals.append(s_MRSData2)
 
-        # apply changes
-        self._meta_signals = new_meta_signals.copy()
-
-        # amplify
-        if(self.scaling_factor != optim_seq.scaling_factor):
-            # amplify each metabolite signal
-            new_meta_signals = []
-            for s in self._meta_signals:
-                s2 = s * self.scaling_factor / optim_seq.scaling_factor
-                # and rebuild metabase
-                new_meta_signals.append(s2)
-
-            # apply changes
-            self._meta_signals = new_meta_signals.copy()
-
-        # final: carefully copy attributes except private ones (_*) and seqdb_file
-        keys_not_to_copy = ["_meta_bs", "_meta_signals", "_t", "_ready"]
+        # final: carefully copy attributes except some
+        keys_not_to_copy = ["_meta_bs", "_meta_signals", "_t", "_ready", "npts", "fs"]
         for this_key in list(self.__dict__.keys()):
             if(this_key not in keys_not_to_copy):
                 self.__dict__[this_key] = optim_seq.__dict__[this_key]
+
+        # apply changes
+        self._t = new_t.copy()
+        self._meta_signals = new_meta_signals.copy()
 
         log.info("successfully imported metabolite signal basis set! :)")
 
@@ -2127,6 +2135,59 @@ class metabolite_basis_set(dict):
         # freeze
         self.__isfrozen = True
 
+    def __eq_dict(self, d1, d2):
+        """
+        Compare and return equality check for nested dictionnaries d1 and d2.
+
+        Parameters
+        ----------
+        d1 : dict
+            Dictionnary 1
+        d2 : dict
+            Dictionnary 2
+
+        Returns
+        -------
+        r : bool
+            Self if equal to other
+        """
+        # check keys
+        if(d1.keys() != d2.keys()):
+            pdb.set_trace()
+            return(False)
+        # check key values
+        for k in list(d1.keys()):
+            # check key values type
+            if(type(d1[k]) == dict and type(d2[k]) == dict):
+                r = self.__eq_dict(d1[k], d2[k])
+            elif(type(d1[k]) == np.ndarray and type(d2[k]) == np.ndarray):
+                r = (d1[k] == d2[k]).all()
+            else:
+                r = (d1[k] == d2[k])
+
+            if(not r):
+                pdb.set_trace()
+                return(False)
+
+        return(True)
+
+    def __eq__(self, other):
+        """
+        Overload of "equal to" operator so that we can compare two metabolite basis set (usefull when looking for a adequat sequence/basis set).
+
+        Returns
+        -------
+        r : bool
+            Self if equal to other
+        """
+        # check attributes
+        if(self.__dict__ != other.__dict__):
+            pdb.set_trace()
+            return(False)
+        # check dict content
+        r = self.__eq_dict(self, other)
+        return(r)
+
     @property
     def ready(self):
         """
@@ -2374,251 +2435,3 @@ class metabolite_basis_set(dict):
         self._read_xls_file()
         self._write_header_file()
         self._ready = True
-
-
-def disp_bargraph(ax, params_val_list, params_std_list, params_leg_list, colored_LLs=True, bMM=False, bWater=False, bFitMode=False, pIndex=xxx.p_cm, mIndex_list=None, width=0.3):
-    """
-    Plot a bargraph of concentrations.
-
-    Parameters
-    ----------
-    ax : matplotlib axis
-        Axis to use for plotting
-    params_val_list : list of params objects
-        List of parameter arrays to display as bars
-    params_std_list : list of params objects
-        List of parameter arrays to display as error bars
-    params_leg_list : list of params objects
-        List of legend caption for each bar
-    colored_LLs : boolean
-        Shows link-lock connections using colors (True) or not (False)
-    bMM : boolean
-        Includes macromolecular parameters (True) or not (False)
-    bWater : boolean
-        Includes water parameters (True) or not (False)
-    bFitMode : boolean
-        If (True), plot the first two bars in black (bounds), the last one with colors (fit), at the same x, no legends
-    pIndex : int
-        Parameter index to display in bargraph
-    mIndex_list : list of int
-        Metabolite indexes to display in bargraph
-    width : float (optional)
-        Bar width
-    """
-    # LLcolor_names=[name for name in mcd.XKCD_COLORS]
-    LLcolor_names = ['xkcd:grey', 'xkcd:blue', 'xkcd:red', 'xkcd:violet', 'xkcd:green',
-                     'xkcd:goldenrod', 'xkcd:crimson', 'xkcd:salmon', 'xkcd:wheat', 'xkcd:lightblue']
-
-    # init
-    lbl = PARS_LONG_NAMES[pIndex]
-
-    # build logical mask
-    meta_mask = np.full(params_val_list[0].shape, True, dtype=bool)
-
-    # filter out the fixed LLs
-    meta_mask[params_val_list[0].linklock[:, xxx.p_cm] == 1, :] = False
-
-    # filter out MMs?
-    if(not bMM):
-        meta_mask[xxx.m_All_MMs, :] = False
-
-    # filter out water?
-    if(not bWater):
-        meta_mask[xxx.m_Water, :] = False
-
-    if(mIndex_list is not None):
-        meta_mask_m = meta_mask.copy()
-        meta_mask_m[:] = False
-        meta_mask_m[mIndex_list, :] = True
-        meta_mask = np.logical_and(meta_mask, meta_mask_m)
-
-    # parameter filter
-    meta_mask_p = meta_mask.copy()
-    meta_mask_p[:] = False
-    meta_mask_p[:, pIndex] = True
-    meta_mask = np.logical_and(meta_mask, meta_mask_p)
-
-    # check that we still have something to display
-    if(np.all(meta_mask == False)):
-        log.error("nothing to display! Please check disp_bargraph parameters like pIndex, mIndex_list, bWater and bMM!")
-
-    # filter data now
-    params_val_list = [p[meta_mask] for p in params_val_list]
-    params_LL_list = [p.linklock[meta_mask] for p in params_val_list]
-    params_std_list = [p[meta_mask] for p in params_std_list]
-    meta_names = params_val_list[0].get_meta_names()
-    meta_names = [meta_names[i] for i in range(len(meta_names)) if meta_mask[i, pIndex]]
-
-    # how many metabolites to display?
-    n = np.sum(meta_mask[:])
-
-    # prepare bars
-    nBars = len(params_val_list)
-    pos_bars = np.arange(n)
-    pos_shift = np.linspace(-width * (nBars - 1) / 2.0, +width * (nBars - 1) / 2.0, nBars)
-    pv_min = params_val_list[0].min()
-    pv_max = params_val_list[0].max()
-    if(bFitMode):
-        pos_shift = pos_shift * 0.0
-
-    # iterate in lists and plot bars yeah
-    for (k, pv, pll, ps, pl, pos) in zip(range(len(params_val_list)), params_val_list, params_LL_list, params_std_list, params_leg_list, pos_shift):
-        bar_list = ax.bar(pos_bars + pos, pv, width, yerr=ps, label=pl)
-
-        # record min/max for later use
-        if(np.min(pv) < pv_min):
-            pv_min = np.min(pv)
-        if(np.max(pv) > pv_max):
-            pv_max = np.max(pv)
-
-        for im_bar, this_bar, this_LL in zip(range(len(bar_list)), bar_list, pll):
-            if(colored_LLs):
-                this_LLcolor_name = LLcolor_names[np.mod(k + int(np.abs(this_LL)), len(LLcolor_names))]
-            else:
-                this_LLcolor_name = LLcolor_names[np.mod(k, len(LLcolor_names))]
-
-            this_LLcolor = mcd.XKCD_COLORS[this_LLcolor_name].upper()
-            if(bFitMode and k < 2):
-                this_bar.set_color('grey')
-            else:
-                this_bar.set_color(this_LLcolor)
-
-    ax.set_ylabel(lbl)
-    ax.set_ylim([pv_min, pv_max])
-    ax.set_xticks(pos_bars)
-    ax.set_xticklabels(meta_names, rotation=90, fontsize=9)
-    ax.grid('on')
-    if(not bFitMode):
-        ax.legend()
-
-
-def disp_fit(ax, data, params, seq, LL_exluding=True, LL_merging=False, mIndex_list=None, display_range=[1, 5]):
-    """
-    Plot a bargraph of concentrations.
-
-    Parameters
-    ----------
-    ax : matplotlib axis
-        Axis to use for plotting
-    params : params object
-        List of parameter arrays to display as bars
-    seq : mrs_sequence
-        Virtual MRS sequence object
-    LL_excluding : boolean
-        Shows only free or master spectra (True) or not (False)
-    LL_merging : boolean
-        Shows concentration link-lock connections by merging spectra (True) or not (False)
-    display_range : list [2]
-            Range in ppm used for display
-    """
-    # dummy full>free>full conversion to apply master/slave rules
-    params_free = params.toFreeParams()
-    params_full = params.toFullParams(params_free)
-
-    # the data
-    ax.plot(data.frequency_axis_ppm(), data.spectrum().real, 'k-', linewidth=0.5, label='data')
-    # the full model
-    mod = seq._model(params_full)
-    ax.plot(mod.frequency_axis_ppm(), mod.spectrum().real, 'k-', linewidth=2, label='model')
-    # the residue
-    diff = data - mod
-    ax.plot(diff.frequency_axis_ppm(), diff.spectrum().real, 'g-', linewidth=0.25, label='residue')
-
-    # metabolite list
-    if(mIndex_list is None):
-        meta_ind_list = [*range(xxx.n_MBs)]
-    else:
-        meta_ind_list = mIndex_list
-
-    meta_names = params.get_meta_names()
-
-    # filter out fixed LL?
-    if(LL_exluding):
-        # remove fixed parameters (LL==1)
-        meta_ind_list_without_fixedLLs = []
-        for im in meta_ind_list:
-            if(params_full.linklock[im, xxx.p_cm] < 1):
-                meta_ind_list_without_fixedLLs.append(im)
-        meta_ind_list = meta_ind_list_without_fixedLLs
-
-    # calculate a nice gap
-    n_meta_to_display = len(meta_ind_list) + 1  # 1 line for MMs
-    if(LL_merging):
-        n_meta_to_display - np.unique(params_full.linklock[:, xxx.p_cm])
-    ygap = np.max(mod.spectrum().real) * (60 - n_meta_to_display) * 0.005
-
-    # init metabolite-per-metabolite plot
-    ignore_those_mLLs = []
-    p_allzeros = params_full.copy()
-    p_allzeros[:, xxx.p_cm] = 0.0
-    koffset = 0
-    for im, mLL in zip(meta_ind_list, params_full.linklock[meta_ind_list, xxx.p_cm]):
-        # check if we should plot this guy
-        mLL_abs = np.abs(mLL)
-        if(mLL_abs not in ignore_those_mLLs):
-            if(LL_merging and mLL_abs > 1):
-                # find which metabolites to merge (NAA_CH3 and NAA_CH2 for example)
-                this_params_LL_abs = np.abs(params_full.linklock[:, xxx.p_cm])
-                this_meta_mask = (this_params_LL_abs == mLL_abs)
-                this_meta_mask = np.tile(this_meta_mask, (1, 1))
-                this_meta_mask = np.transpose(this_meta_mask)
-                this_meta_mask = np.tile(this_meta_mask, (1, 4))
-                # remember for next time we meet one of those metabolites
-                ignore_those_mLLs.append(mLL_abs)
-            else:
-                this_meta_mask = np.full(params_full.shape, False, dtype=bool)
-                this_meta_mask[im, :] = True
-
-            # prepare metabolite name
-            this_meta_name = ""
-            for mName, mLL in zip(meta_names, this_meta_mask[:, xxx.p_cm]):
-                if(mLL):
-                    this_meta_name = this_meta_name + mName + " & "
-            this_meta_name = this_meta_name[:-3]
-
-            # prepare parameters
-            this_params = p_allzeros.copy()
-            this_params[this_meta_mask] = params_full[this_meta_mask]
-
-            # call model
-            s_single_meta = seq._model(this_params)
-
-            # display
-            ax.plot(s_single_meta.frequency_axis_ppm(), s_single_meta.spectrum().real - ygap * (koffset + 1), 'r-')
-            ax.text(display_range[1] - 0.5, -ygap * (koffset + 1) + ygap / 5, this_meta_name)
-            koffset = koffset + 1
-
-    # prepare macromolecules parameters
-    this_params = p_allzeros.copy()
-    this_params[xxx.m_All_MMs, :] = params_full[xxx.m_All_MMs, :]
-
-    # call model
-    s_MMs = seq._model(this_params)
-
-    # plot the final MM baseline
-    ax.plot(s_MMs.frequency_axis_ppm(), s_MMs.spectrum().real - ygap * (koffset + 2), 'r-')
-
-    # and now break down the MM baseline into the gaussian components
-    for im in xxx.m_All_MMs:
-        # prepare parameters for this MM
-        this_params = p_allzeros.copy()
-        this_params[im, :] = params_full[im, :]
-
-        # call model
-        s_single_MM = seq._model(this_params)
-
-        # plot the a single MM keeping the same offset
-        ax.plot(s_single_MM.frequency_axis_ppm(), s_single_MM.spectrum().real - ygap * (koffset + 2), 'r--')
-
-    ax.text(display_range[1] - 0.5, -ygap * (koffset + 2) + ygap / 5, 'MM baseline')
-
-    # finalize the plot
-    ax.set_xticks(np.arange(-1, 10, 0.5))
-    ax.set_xlim(display_range[1], display_range[0])
-    # ylim trick: tricky
-    ymax = np.max(mod.spectrum().real) * 1.1  # max(np.max(mod.spectrum().real), np.max(data.spectrum().real))
-    ax.set_ylim([-ygap * (koffset + 3), ymax])
-    ax.set_yticks([])
-    ax.set_xlabel('chemical shift (ppm)')
-    ax.grid('on')
-    ax.legend(loc="upper right")

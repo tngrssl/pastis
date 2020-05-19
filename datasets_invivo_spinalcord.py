@@ -17,7 +17,10 @@ plt.close("all")
 get_ipython().magic("matplotlib auto")
 plt.rcParams['figure.dpi'] = 100
 plt.rcParams['figure.max_open_warning'] = 1000
+plt.rcParams['font.size'] = 9
 log.setLevel(log.DEBUG)
+
+rdb = reco.data_db()
 
 # %% 15/03/2019 - 291-vs-moelle-spectro-p1 - concatenated STEAM #1 :(
 get_ipython().magic("clear")
@@ -68,7 +71,7 @@ p.jobs["data-rejecting"]["ranges"]["amplitude (%)"] = 50
 p.jobs["data-rejecting"]["ranges"]["phase std. factor (%)"] = 150
 p.data_process_only_this_data_index = []
 p.run()
-p.save()
+p.save(rdb)
 
 # %% 15/03/2019 - 291-vs-moelle-spectro-p1 - concatenated sLASER #1 :(
 get_ipython().magic("clear")
@@ -119,7 +122,7 @@ p.jobs["data-rejecting"]["ranges"]["amplitude (%)"] = 50
 p.jobs["data-rejecting"]["ranges"]["phase std. factor (%)"] = 150
 p.data_process_only_this_data_index = []
 p.run()
-p.save()
+p.save(rdb)
 
 # %% 15/03/2019 - 291-vs-moelle-spectro-p1 - sLASER #2 :(
 get_ipython().magic("clear")
@@ -161,7 +164,7 @@ p.jobs["data-rejecting"]["ranges"]["amplitude (%)"] = 50
 p.jobs["data-rejecting"]["ranges"]["phase std. factor (%)"] = 150
 p.data_process_only_this_data_index = []
 p.run()
-p.save()
+p.save(rdb)
 
 # %% 26/06/2019 - 296_ym_p1_brainmoelle - Yasmin
 get_ipython().magic("clear")
@@ -212,7 +215,7 @@ p.jobs["data-rejecting"]["ranges"]["amplitude (%)"] = 50
 p.jobs["data-rejecting"]["ranges"]["phase std. factor (%)"] = 150
 p.data_process_only_this_data_index = []
 p.run()
-p.save()
+p.save(rdb)
 
 # %% 16/07/2019 - 300-pm-p1-moelle - Pelayo :)
 get_ipython().magic("clear")
@@ -254,7 +257,7 @@ p.job_list = [  p.jobs["phasing"],
 p.jobs["data-rejecting"]["auto"] = True
 p.data_process_only_this_data_index = []
 p.run()
-p.save()
+p.save(rdb)
 
 # %% 14/08/2019 - 304-ka-p1-moelle - Karen :(
 get_ipython().magic("clear")
@@ -291,7 +294,7 @@ p.job_list = [  p.jobs["phasing"],
 p.jobs["data-rejecting"]["auto"] = True
 p.data_process_only_this_data_index = []
 p.run()
-p.save()
+p.save(rdb)
 
 # %% 21/08/2019 - 307-ap-p1-moelle - Ariane :)
 get_ipython().magic("clear")
@@ -354,7 +357,7 @@ p.jobs["data-rejecting"]["ranges"]["amplitude (%)"] = 25
 p.jobs["data-rejecting"]["ranges"]["phase std. factor (%)"] = 150
 p.data_process_only_this_data_index = []
 p.run()
-p.save()
+p.save(rdb)
 
 # %% 27/08/2019 - 308-rs-p1-moelle - Ocha
 get_ipython().magic("clear")
@@ -399,7 +402,7 @@ p.jobs["data-rejecting"]["ranges"]["amplitude (%)"] = 75
 p.jobs["data-rejecting"]["ranges"]["phase std. factor (%)"] = 150
 p.data_process_only_this_data_index = []
 p.run()
-p.save()
+p.save(rdb)
 
 # %% 29/08/2019 - 310-mg-p1-moelle - Maxime :(
 get_ipython().magic("clear")
@@ -439,7 +442,7 @@ p.job_list = [  p.jobs["phasing"],
 p.jobs["data-rejecting"]["auto"] = True
 p.data_process_only_this_data_index = []
 p.run()
-p.save()
+p.save(rdb)
 
 # %% 05/09/2019 - 311-sl-p1-moelle - Simon :)
 get_ipython().magic("clear")
@@ -482,7 +485,7 @@ p.job_list = [  p.jobs["phasing"],
 p.jobs["data-rejecting"]["auto"] = True
 p.data_process_only_this_data_index = []
 p.run()
-p.save()
+p.save(rdb)
 
 # %% 23/09/2019 - 313-ft-p1-moelle - Fransiska :(
 get_ipython().magic("clear")
@@ -526,7 +529,7 @@ p.jobs["data-rejecting"]["ranges"]["chemical shift (ppm)"] = 0.3
 p.jobs["data-rejecting"]["ranges"]["phase std. factor (%)"] = 100
 p.data_process_only_this_data_index = []
 p.run()
-p.save()
+p.save(rdb)
 
 # %% 25/09/2019 - 314-yt-p1-moelle - Yolanda :)))
 get_ipython().magic("clear")
@@ -569,7 +572,7 @@ p.job_list = [  p.jobs["phasing"],
                 # p.jobs["concatenate"],
                 p.jobs["zero-filling"],
                 # p.jobs["physio-analysis"],
-                # p.jobs["data-rejecting"],
+                p.jobs["data-rejecting"],
                 p.jobs["realigning"],
                 p.jobs["averaging"],
                 p.jobs["noise-estimation"],
@@ -582,7 +585,7 @@ p.job_list = [  p.jobs["phasing"],
 p.jobs["data-rejecting"]["auto"] = True
 p.data_process_only_this_data_index = []
 p.run()
-p.save()
+p.save(rdb)
 
 # %% 03/10/2019 - 316-ap-p1-moelle - Anissa :)
 get_ipython().magic("clear")
@@ -638,7 +641,7 @@ p.job_list = [  p.jobs["phasing"],
 p.jobs["data-rejecting"]["auto"] = True
 p.data_process_only_this_data_index = []
 p.run()
-p.save()
+p.save(rdb)
 
 # %% 17/10/2019 - 319-fc-p1-moelle - Fernando :)
 get_ipython().magic("clear")
@@ -677,7 +680,7 @@ p.job_list = [  p.jobs["phasing"],
 p.jobs["data-rejecting"]["auto"] = True
 p.data_process_only_this_data_index = []
 p.run()
-p.save()
+p.save(rdb)
 
 # %% 05/11/2019 - 328-af-p1-moelle - Anne
 get_ipython().magic("clear")
@@ -718,7 +721,7 @@ p.job_list = [  p.jobs["phasing"],
 p.jobs["data-rejecting"]["auto"] = True
 p.data_process_only_this_data_index = []
 p.run()
-p.save()
+p.save(rdb)
 
 # %% 08/11/2019 - 329-pi-p1-moelle - Pujalina
 get_ipython().magic("clear")
@@ -768,30 +771,29 @@ p.jobs["calibrating"]["POI_range_ppm"] = [1.8, 2.4]
 p.jobs["data-rejecting"]["auto"] = True
 p.data_process_only_this_data_index = []
 p.run()
-p.save()
+p.save(rdb)
 
-# %% 26/11/2019 - 333-sc-p1-moelle - Shirley
+# %% 26/11/2019 - 333-sc-p1-moelle - Shirley :(
+# TWIX data is corrupted ! :(
 get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
 
-p.data_filepaths = ["/home/tangir/crmbm/acq_twix/333-sc-p1-moelle/meas_MID123_slaser_R_N=20+_1_longTE_SNR++++_FID47359.dat",
-                    "/home/tangir/crmbm/acq_twix/333-sc-p1-moelle/meas_MID126_slaser_R_N=20+_1_longTE_SNR++++_FID47362.dat",
+p.data_filepaths = [#"/home/tangir/crmbm/acq_twix/333-sc-p1-moelle/meas_MID123_slaser_R_N=20+_1_longTE_SNR++++_FID47359.dat",
+                    #"/home/tangir/crmbm/acq_twix/333-sc-p1-moelle/meas_MID126_slaser_R_N=20+_1_longTE_SNR++++_FID47362.dat",
                     "/home/tangir/crmbm/acq/333-sc-p1-moelle/20191126/01_0008_slaser-r-n",
                     "/home/tangir/crmbm/acq/333-sc-p1-moelle/20191126/01_0009_slaser-r-n"]
 
-p.data_ref_filepaths = ["",
-                        "",
+p.data_ref_filepaths = [#"",
+                        #"",
                         "/home/tangir/crmbm/acq/333-sc-p1-moelle/20191126/01_0010_slaser-r-n",
                         "/home/tangir/crmbm/acq/333-sc-p1-moelle/20191126/01_0010_slaser-r-n"]
 
-p.display_legends = """
-sLASER 20:1 (TWIX)
-sLASER 20:1 IR (TWIX)
-sLASER 20:1 (DCM)
-sLASER 20:1 IR (DCM)
-"""
+p.display_legends = [#"sLASER 20:1 (TWIX)",
+                     #"sLASER 20:1 IR (TWIX)",
+                     "sLASER 20:1 (DCM)",
+                     "sLASER 20:1 IR (DCM)"]
 
 p.job_list = [  # p.jobs["phasing"],
                 p.jobs["scaling"],
@@ -800,7 +802,7 @@ p.job_list = [  # p.jobs["phasing"],
                 # p.jobs["concatenate"],
                 p.jobs["zero-filling"],
                 # p.jobs["physio-analysis"],
-                # p.jobs["data-rejecting"],
+                p.jobs["data-rejecting"],
                 p.jobs["realigning"],
                 p.jobs["averaging"],
                 p.jobs["noise-estimation"],
@@ -811,10 +813,10 @@ p.job_list = [  # p.jobs["phasing"],
                 p.jobs["displaying"]]
 
 p.jobs["data-rejecting"]["auto"] = True
-p.data_process_only_this_data_index = [2]  # IR seems broken
+p.data_process_only_this_data_index = []
 p.analyze_enable = True
 p.run()
-p.save()
+p.save(rdb)
 
 # %% 09/12/2019 - 336-nb-p1-moelle - Naouelle :)
 get_ipython().magic("clear")
@@ -863,9 +865,9 @@ p.job_list = [  p.jobs["phasing"],
 p.jobs["data-rejecting"]["auto"] = True
 p.jobs["scaling"]["scaling_factor"] = 1.0
 p.jobs["cropping"]["final_npts"] = 4096
-p.data_process_only_this_data_index = [2]
+p.data_process_only_this_data_index = []
 p.run()
-p.save()
+p.save(rdb)
 
 p.job_list = [  # p.jobs["phasing"],
                 p.jobs["scaling"],
@@ -874,7 +876,7 @@ p.job_list = [  # p.jobs["phasing"],
                 # p.jobs["concatenate"],
                 p.jobs["zero-filling"],
                 # p.jobs["physio-analysis"],
-                #p.jobs["data-rejecting"],
+                p.jobs["data-rejecting"],
                 #p.jobs["realigning"],
                 p.jobs["averaging"],
                 p.jobs["noise-estimation"],
@@ -895,7 +897,7 @@ p.jobs["scaling"]["scaling_factor"] = 0.4e12 / 5000
 p.jobs["cropping"]["final_npts"] = 4096
 p.data_process_only_this_data_index = [0]
 p.run()
-p.save()
+p.save(rdb)
 
 # %% 10/12/2019 - 338-ro-p1-moelle - Rischa :)
 get_ipython().magic("clear")
@@ -942,7 +944,7 @@ p.job_list = [  p.jobs["phasing"],
 p.jobs["data-rejecting"]["auto"] = True
 p.data_process_only_this_data_index = [0]
 p.run()
-p.save()
+p.save(rdb)
 
 # 2) dealing with no WS data: FID modulus
 p.job_list = [  # p.jobs["phasing"],
@@ -967,54 +969,7 @@ p.jobs["channel-combining"]["phasing"] = False
 p.data_process_only_this_data_index = [1]
 p.analyze_enable = False
 p.run()
-p.save()
-
-# %% 23/01/2019 - 347-re-p1-moelle - Renaud
-get_ipython().magic("clear")
-plt.close("all")
-
-p = reco.pipeline()
-
-p.data_filepaths = [
-    "/home/tangir/crmbm/acq_twix/347-re-p1-moelle/meas_MID216_slaser_R_N=10_2_longTE_SNR+++_FID50575.dat",
-    "/home/tangir/crmbm/acq_twix/347-re-p1-moelle/meas_MID221_slaser_R_N=10_2_longTE_SNR+++_FID50580.dat",
-    "/home/tangir/crmbm/acq_twix/347-re-p1-moelle/meas_MID224_steam_shortTE_SNR+_FID50583.dat",
-    "/home/tangir/crmbm/acq_twix/347-re-p1-moelle/meas_MID228_slaser_R_N=10_2_longTE_SNR+++_FID50587.dat"]
-
-p.data_ref_filepaths = [
-    "/home/tangir/crmbm/acq_twix/347-re-p1-moelle/meas_MID218_slaser_R_N=10_2_longTE_SNR+++_FID50577.dat",
-    "/home/tangir/crmbm/acq_twix/347-re-p1-moelle/meas_MID222_slaser_R_N=10_2_longTE_SNR+++_FID50581.dat",
-    "/home/tangir/crmbm/acq_twix/347-re-p1-moelle/meas_MID226_steam_shortTE_SNR+_FID50585.dat",
-    "/home/tangir/crmbm/acq_twix/347-re-p1-moelle/meas_MID229_slaser_R_N=10_2_longTE_SNR+++_FID50588.dat"]
-
-p.display_legends = """
-sLASER 10:2 IR TE=40ms (TWIX)
-sLASER 10:2 IR TE=30ms (TWIX)
-STEAM IR TE=3ms (TWIX)
-sLASER 10:2 TE=30ms (TWIX)
-"""
-
-p.job_list = [  p.jobs["phasing"],
-                p.jobs["scaling"],
-                # p.jobs["FID modulus"],
-                p.jobs["channel-combining"],
-                # p.jobs["concatenate"],
-                p.jobs["zero-filling"],
-                # p.jobs["physio-analysis"],
-                p.jobs["data-rejecting"],
-                p.jobs["realigning"],
-                p.jobs["averaging"],
-                p.jobs["noise-estimation"],
-                p.jobs["apodizing"],
-                p.jobs["cropping"],
-                # p.jobs["water-removal"],
-                p.jobs["calibrating"],
-                p.jobs["displaying"]]
-
-p.jobs["data-rejecting"]["auto"] = True
-p.data_process_only_this_data_index = [0, 1, 3]
-p.run()
-p.save()
+p.save(rdb)
 
 # %% 28/01/2019 - 300-pm-p2-moelle - Pelayo :)
 get_ipython().magic("clear")
@@ -1067,7 +1022,7 @@ p.job_list = [  p.jobs["phasing"],
 p.jobs["data-rejecting"]["auto"] = True
 p.data_process_only_this_data_index = []
 p.run()
-p.save()
+p.save(rdb)
 
 # %% 06/02/2019 - 349-ap-p1-moelle - Ahmad Fajar
 get_ipython().magic("clear")
@@ -1106,7 +1061,7 @@ p.job_list = [  p.jobs["phasing"],
                 p.jobs["displaying"]]
 
 p.run()
-p.save()
+p.save(rdb)
 
 # %% 24/02/2019 - 355-st-p1-moelle - Steven
 get_ipython().magic("clear")
@@ -1143,7 +1098,7 @@ p.jobs["data-rejecting"]["auto"] = True
 p.jobs["data-rejecting"]["ranges"]["chemical shift (ppm)"] = 0.17
 
 p.run()
-p.save()
+p.save(rdb)
 
 # %% 04/03/2020 - 304-ka-p2-moelle - Karen
 get_ipython().magic("clear")
@@ -1180,4 +1135,4 @@ p.job_list = [  p.jobs["phasing"],
                 p.jobs["displaying"]]
 
 p.run()
-p.save()
+p.save(rdb)
