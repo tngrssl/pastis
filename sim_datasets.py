@@ -18,10 +18,20 @@ from datetime import datetime
 import time
 import os
 import pickle
+import copy
+
+import pdb
+
 get_ipython().magic("clear")
 plt.close("all")
+
+get_ipython().magic("matplotlib auto")
+plt.rcParams['figure.dpi'] = 100
+plt.rcParams['figure.max_open_warning'] = 1000
+plt.rcParams['font.size'] = 9
 log.setLevel(log.DEBUG)
 
+rdb = reco.data_db()
 # %% generate sequence database
 
 # metabolite db
@@ -53,12 +63,12 @@ for this_seq in seq_list:
             this_seq.te = this_te
             this_seq.f0 = this_f0
             try:
-                # te could be too short
+                # run
                 this_seq.initialize(meta_bs)
                 # store
-                seq_big_list.append(this_seq)
+                seq_big_list.append(copy.deepcopy(this_seq))
             except:
-                Warning("* Yeah, TE=%.0fms was a bit too short for %s!" % (this_te, this_seq.name))
+                log.warning("TE = %.0fms was too short! Skipped this sequence..." % this_te)
 
 with open(pickle_file_fullpath, 'wb') as f:
     pickle.dump([seq_big_list], f)

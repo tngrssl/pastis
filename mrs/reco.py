@@ -19,7 +19,7 @@ import scipy.io as sio
 import matplotlib.pylab as plt
 import os
 from shutil import copyfile
-from datetime import datetime
+from datetime import datetime, timedelta
 import struct
 import pickle
 import mrs.sim as sim
@@ -29,8 +29,144 @@ import mrs.paths as default_paths
 import pdb
 
 
-class MRSData2_file_reader():
+class data_db():
+    """A class used to deal with storage of reconstructed signals with their respective reco pipeline in pkl files. The dumped data consist of a dict with all our processed data, sorted by patient name, dataset name. Also deals with conflicts like already existing patient name/dataset name."""
+
+    # frozen stuff: a technique to prevent creating new attributes
+    # (https://stackoverflow.com/questions/3603502/prevent-creating-new-attributes-outside-init)
+    __isfrozen = False
+
+    def __setattr__(self, key, value):
+        """Overload of __setattr__ method to check that we are not creating a new attribute."""
+        if self.__isfrozen and not hasattr(self, key):
+            raise TypeError("You are trying to dynamically create a new attribute (%s) to this object and that is not cool! I will not let you do that because I believe it is a bad habit and can lead to terrible bugs. A clean way of doing this is to initialize your attribute (%s) in the __init__ method of this class. Bisou, bye :)" % (key, key))
+        object.__setattr__(self, key, value)
+
+    def __init__(self, reco_data_db_file=default_paths.DEFAULT_RECO_DATA_DB_FILE):
+        """
+        Initialize the reconstructed data storage, basically creates an empty PKL file if nothing already exists.
+
+        Parameters
+        ----------
+        reco_data_db_file: string
+            PKL file where all the data is stored
+        """
+        # if pkl does not exist, it is our very first time :heart:
+        # let's write an empty dict
+        if(not os.path.isfile(reco_data_db_file)):
+            log.info("creating storage file [%s]..." % reco_data_db_file)
+            # write pkl file
+            with open(reco_data_db_file, 'wb') as f:
+                pickle.dump([{}], f)
+        else:
+            log.info("storage file [%s] already exists!" % reco_data_db_file)
+
+        # save filepath
+        self.db_file = reco_data_db_file
+
+    def read(self):
+        """
+        Return content of PKL file.
+
+        Returns
+        -------
+        pkl_data_dict : dict
+            Big dictionnary in PKL file
+        """
+        log.debug("reading db file [%s]..." % self.db_file)
+
+        # now open pkl file
+        with open(self.db_file, 'rb') as f:
+            [pkl_data_dict] = pickle.load(f)
+
+        return(pkl_data_dict)
+
+    def get_latest_dataset(self):
+        """
+        Return the most recent dataset saved.
+
+        Returns
+        -------
+        dataset : MRSData2 object
+            Found dataset
+        reco_pipe : pipeline object
+            Corresponding pipeline
+        """
+        log.info("looking for latest dataset in db file [%s]..." % self.db_file)
+
+        # open pkl file
+        pkl_data_dict = self.read()
+
+        # for each patient
+        ts_diff = timedelta(days=99999999)
+        for pnk in list(pkl_data_dict.keys()):
+            # each dataset
+            for dnk in list(pkl_data_dict[pnk].keys()):
+                this_ts = pkl_data_dict[pnk][dnk]["timestamp"]
+                if(ts_diff > (datetime.now() - this_ts)):
+                    ts_diff = (datetime.now() - this_ts)
+                    found_pnk = pnk
+                    found_dnk = dnk
+
+        log.info("found [%s/%s]! :)" % (found_pnk, found_dnk))
+        latest_data = pkl_data_dict[found_pnk][found_dnk]["data"]
+        latest_pipeline = pkl_data_dict[found_pnk][found_dnk]["pipeline"]
+
+        return(latest_data, latest_pipeline)
+
+    def save(self, d, p=None):
+        """
+        Save MRSData2 object and its reco pipeline and deal with conflicts.
+
+        Parameters
+        ----------
+        d: MRSData2 object
+            Reconstructed data to save
+        p: pipeline
+            Reco pipeline used to get this data
+        """
+        log.debug("saving dataset to file [%s]..." % self.db_file)
+
+        # first open pkl file
+        pkl_data_dict = self.read()
+
+        # if we reached here, that means the PKL file is not corrupted
+        # let's make a backup of it
+        copyfile(self.db_file, self.db_file + ".bak")
+
+        # we already have this patient in the db
+        if(d.patient_name in pkl_data_dict):
+            log.debug("patient name [%s] already exists!" % d.patient_name)
+            nd = len(list(pkl_data_dict[d.patient_name].keys()))
+            log.debug("already contains %d dataset(s)!" % nd)
+        else:
+            # create patient entry
+            pkl_data_dict[d.patient_name] = {}
+
+        # add/update with the dataset
+        log.debug("adding/updating dataset [%s]/[%s]..." % (d.patient_name, d.display_label))
+        ts = datetime.now()
+        pkl_data_dict[d.patient_name][d.display_label] = {"data": d, "pipeline": p, "timestamp": ts}
+
+        # write back pkl file
+        with open(self.db_file, 'wb') as f:
+            pickle.dump([pkl_data_dict], f)
+
+
+
+
+class SIEMENS_data_file_reader():
     """A class used to scrap parameters out of DICOM and TWIX files, sometimes in a very dirty way."""
+
+    # frozen stuff: a technique to prevent creating new attributes
+    # (https://stackoverflow.com/questions/3603502/prevent-creating-new-attributes-outside-init)
+    __isfrozen = False
+
+    def __setattr__(self, key, value):
+        """Overload of __setattr__ method to check that we are not creating a new attribute."""
+        if self.__isfrozen and not hasattr(self, key):
+            raise TypeError("You are trying to dynamically create a new attribute (%s) to this object and that is not cool! I will not let you do that because I believe it is a bad habit and can lead to terrible bugs. A clean way of doing this is to initialize your attribute (%s) in the __init__ method of this class. Bisou, bye :)" % (key, key))
+        object.__setattr__(self, key, value)
 
     def __init__(self, data_fullfilepath):
         """
@@ -229,11 +365,11 @@ class MRSData2_file_reader():
             a = self.file_content_str.find("{", a)
             patient_sex_str = self.file_content_str[(a + 2):(a + 3)]
             patient_sex_int = int(patient_sex_str.strip())
-            if(patient_sex_int == 0):
+            if(patient_sex_int == 2):
                 patient_sex_str = 'M'
             elif(patient_sex_int == 1):
                 patient_sex_str = 'F'
-            elif(patient_sex_int == 2):
+            elif(patient_sex_int == 3):
                 patient_sex_str = 'O'
             else:
                 log.error("unknown patient sex!")
@@ -317,7 +453,7 @@ class MRSData2_file_reader():
         sequence_name = self.file_content_str[(a + 1):b]
         sequence_name = sequence_name.strip()
 
-        #check we did not find a long garbage string
+        # check we did not find a long garbage string
         if(len(sequence_name) > 16):
             # if so, go on searching in file
             sequence_name = self.get_sequence_name(b)
@@ -437,7 +573,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         log.info("reading data file...")
         log.info(data_filepath)
         # read header
-        mfr = MRSData2_file_reader(data_filepath)
+        mfr = SIEMENS_data_file_reader(data_filepath)
         # read data and get a suspect MRSData object
         MRSData_obj = mfr.read_data()
 
@@ -629,8 +765,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
         obj._sequence = sequence_obj
         obj._noise_level = 0.0
         obj._timestamp = ulTimeStamp_ms
-        obj._na_pre_data_rejection = obj.shape[1]
-        obj._na_post_data_rejection = obj.shape[1]
+        obj._na_pre_data_rejection = None
+        obj._na_post_data_rejection = None
         obj._is_concatenated = False
         obj._is_dicom = mfr.is_dicom()
 
@@ -786,11 +922,11 @@ class MRSData2(suspect.mrsobjects.MRSData):
         self._shims = getattr(obj, 'shims', None)
         self._timestamp = getattr(obj, 'timestamp', None)
         self._sequence = getattr(obj, 'sequence', None)
-        self._noise_level = getattr(obj, 'noise_level', 0.0)
-        self._na_pre_data_rejection = getattr(obj, 'na_pre_data_rejection', 0.0)
-        self._na_post_data_rejection = getattr(obj, 'na_post_data_rejection', 0.0)
-        self._is_concatenated = getattr(obj, 'is_concatenated', 0.0)
-        self._is_dicom = getattr(obj, 'is_dicom', 0.0)
+        self._noise_level = getattr(obj, 'noise_level', None)
+        self._na_pre_data_rejection = getattr(obj, 'na_pre_data_rejection', None)
+        self._na_post_data_rejection = getattr(obj, 'na_post_data_rejection', None)
+        self._is_concatenated = getattr(obj, 'is_concatenated', None)
+        self._is_dicom = getattr(obj, 'is_dicom', None)
 
     def inherit(self, obj):
         """
@@ -1138,9 +1274,16 @@ class MRSData2(suspect.mrsobjects.MRSData):
         log.debug("intensity scaling [%s]..." % self.display_label)
         log.debug("multiplying time-domain signals by %E..." % scaling_factor)
         # make this louder
-        s = self.copy() * scaling_factor
-        s = s.inherit(s)
-        return(s)
+        s_sc = self.copy() * scaling_factor
+
+        # convert back to MRSData2
+        s_sc = self.inherit(s_sc)
+
+        # if any ref data available, we crop it too (silently)
+        if(s_sc.data_ref is not None):
+            s_sc.data_ref = s_sc.data_ref.correct_intensity_scaling_nd(scaling_factor)
+
+        return(s_sc)
 
     def correct_fidmodulus_nd(self):
         """
@@ -1159,7 +1302,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         s = self.copy()
 
         # return magnitude
-        s = s.inherit(np.abs(s))
+        s = self.inherit(np.abs(s))
         return(s)
 
     def correct_zerofill_nd(self, nPoints_final=16384, display=False, display_range=[1, 6]):
@@ -1188,7 +1331,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         nZeros = nPoints_final - s.np
         s_new_shape = list(s.shape)
         s_new_shape[-1] = nZeros
-        s_zf = s.inherit(np.concatenate((s, np.zeros(s_new_shape)), axis=s.ndim - 1))
+        s_zf = self.inherit(np.concatenate((s, np.zeros(s_new_shape)), axis=s.ndim - 1))
         log.debug("%d-pts signal + %d zeros = %d-pts zero-filled signal..." % (s.np, nZeros, nPoints_final))
 
         if(display):
@@ -1202,7 +1345,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig.clf()
             axs = fig.subplots(2, 2, sharex='row', sharey='row')
             fig.canvas.set_window_title("mrs.reco.MRSData2.correct_zerofill_nd")
-            fig.suptitle("zero-filling [%s]" % self.display_label, fontsize=11)
+            fig.suptitle("zero-filling [%s]" % self.display_label)
 
             # no time axis, we want to see the number of points
             axs[0, 0].plot(np.real(s_disp), 'k-', linewidth=1)
@@ -1230,7 +1373,11 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig.subplots_adjust()
             fig.show()
 
-        return(self.inherit(s_zf))
+        # if any ref data available, we crop it too (silently)
+        if(s_zf.data_ref is not None):
+            s_zf.data_ref = s_zf.data_ref.correct_zerofill_nd(nPoints_final, False)
+
+        return(s_zf)
 
     def correct_phase_3d(self, use_ref_data=True, peak_range=[4.5, 5], weak_ws=False, high_snr=False, phase_order=0, phase_offset=0.0, display=False, display_range=[1, 6]):
         """
@@ -1247,7 +1394,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         Parameters
         ----------
         use_ref_data : boolean
-            Use reference data (usually non water suppressed) for channel combining
+            Use reference data (usually non water suppressed) for phasing
         peak_range : list [2]
             Range in ppm used to peak-pick and estimate a phase
         weak_ws : boolean
@@ -1320,7 +1467,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig.clf()
             axs = fig.subplots(2, 3, sharex='col')
             fig.canvas.set_window_title("mrs.reco.MRSData2.correct_phase_3d")
-            fig.suptitle("phasing [%s]" % self.display_label, fontsize=11)
+            fig.suptitle("phasing [%s]" % self.display_label)
 
         # display chosen method
         log.debug("phasing using method: " + list_phase_method[phase_method])
@@ -1569,7 +1716,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         Returns
         -------
-        s.inherit(s_concatenated) : MRSData2 numpy array [averages,timepoints]
+        s_concatenated : MRSData2 numpy array [averages,timepoints]
             Resulting concatenated signal
         """
         log.debug("concatenating [%s] to [%s]..." % (self.display_label, data.display_label))
@@ -1579,10 +1726,10 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         # init
         log.debug("concatenating dataset shapes " + str(self.shape) + " and " + str(data.shape) + " ...")
-        s = self.copy()
 
         s_concatenated = np.concatenate((self, data))
-        s_concatenated = s.inherit(s_concatenated)
+        # convert back to MRSData2
+        s_concatenated = self.inherit(s_concatenated)
         log.debug("obtained a dataset shape " + str(s_concatenated.shape))
 
         # update some attributes
@@ -1872,7 +2019,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig.clf()
             axs = fig.subplots(2, 2, sharex='all')
             fig.canvas.set_window_title("mrs.reco.MRSData2.analyze_physio_2d_1")
-            fig.suptitle("analyzing physiological signals for [%s]" % self.display_label, fontsize=11)
+            fig.suptitle("analyzing physiological signals for [%s]" % self.display_label)
 
             p = 0
             for ix in range(2):
@@ -1897,7 +2044,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig.clf()
             axs = fig.subplots(2, 2, sharex='all')
             fig.canvas.set_window_title("mrs.reco.MRSData2.analyze_physio_2d_2")
-            fig.suptitle("analyzing physiological signals for [%s]" % self.display_label, fontsize=11)
+            fig.suptitle("analyzing physiological signals for [%s]" % self.display_label)
 
             p = 0
             for ix in range(2):
@@ -1930,7 +2077,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig.clf()
             axs = fig.subplots(2, 2, sharex='all')
             fig.canvas.set_window_title("mrs.reco.MRSData2.analyze_physio_2d_3")
-            fig.suptitle("analyzing physiological signals for [%s]" % self.display_label, fontsize=11)
+            fig.suptitle("analyzing physiological signals for [%s]" % self.display_label)
 
             p = 0
             for ix in range(2):
@@ -1954,7 +2101,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig.clf()
             axs = fig.subplots(2, 2, sharex='all')
             fig.canvas.set_window_title("mrs.reco.MRSData2.analyze_physio_2d_4")
-            fig.suptitle("analyzing physiological signals for [%s]" % self.display_label, fontsize=11)
+            fig.suptitle("analyzing physiological signals for [%s]" % self.display_label)
 
             p = 0
             for ix in range(2):
@@ -2164,28 +2311,28 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 ax2 = axs[0].twinx()
                 ax3 = axs[1].twinx()
                 fig.canvas.set_window_title("mrs.reco.MRSData2.correct_analyze_and_reject_2d (auto)")
-                fig.suptitle("adjusting linewidth data rejection criteria for [%s]" % self.display_label, fontsize=11)
+                fig.suptitle("adjusting linewidth data rejection criteria for [%s]" % self.display_label)
 
                 axs[0].plot(lw_range, test_snr_list, 'rx-', label='SNR')
                 axs[0].plot([optim_lw, optim_lw], [test_snr_list.min(), test_snr_list.max()], 'm--', label='Optimal linewidth')
                 axs[0].plot([lw_range.min(), lw_range.max()], [snr_threshold, snr_threshold], 'g--', label='SNR threshold')
-                axs[0].set_xlabel('Max allowed linewidth (Hz)', fontsize=9)
-                axs[0].set_ylabel('Estimated SNR (u.a)', fontsize=9)
+                axs[0].set_xlabel('Max allowed linewidth (Hz)')
+                axs[0].set_ylabel('Estimated SNR (u.a)')
                 axs[0].grid('on')
                 axs[0].legend(loc='lower left')
 
                 ax2.plot(lw_range, test_lw_list, 'bx-', label='Linewidth')
-                ax2.set_ylabel('Estimated linewidth (Hz)', fontsize=9)
+                ax2.set_ylabel('Estimated linewidth (Hz)')
                 ax2.legend(loc='lower right')
 
                 axs[1].plot(lw_range, test_nrej_list, 'ko-', label='Number of scans rejected')
-                axs[1].set_xlabel('Max allowed linewidth (Hz)', fontsize=9)
-                axs[1].set_ylabel('Number of scans rejected', fontsize=9)
+                axs[1].set_xlabel('Max allowed linewidth (Hz)')
+                axs[1].set_ylabel('Number of scans rejected')
                 axs[1].grid('on')
 
                 ax3.plot(lw_range, test_nrej_list / s_ma.shape[0] * 100, 'ko-', label='Total percentage of scans rejected')
-                ax3.set_ylabel('Estimated linewidth (Hz)', fontsize=9)
-                ax3.set_ylabel('Rejection percentage (%)', fontsize=9)
+                ax3.set_ylabel('Estimated linewidth (Hz)')
+                ax3.set_ylabel('Rejection percentage (%)')
 
                 fig.subplots_adjust()
                 fig.show()
@@ -2225,7 +2372,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig.clf()
             axs = fig.subplots(2, 3, sharex='all')
             fig.canvas.set_window_title("mrs.reco.MRSData2.correct_analyze_and_reject_2d")
-            fig.suptitle("analyzing data and rejecting some for [%s]" % self.display_label, fontsize=11)
+            fig.suptitle("analyzing data and rejecting some for [%s]" % self.display_label)
 
             k = 0
             for ix in range(2):
@@ -2240,23 +2387,23 @@ class MRSData2(suspect.mrsobjects.MRSData):
                     axs[ix, iy].axhline(y=peak_prop_max[k], color='r', linestyle='--')
                     k = k + 1
 
-            axs[0, 0].set_ylabel('Rel. amplitude change (%)', fontsize=9)
+            axs[0, 0].set_ylabel('Rel. amplitude change (%)')
             axs[0, 0].grid('on')
-            axs[0, 0].set_title("Rel. amplitude = %.2f ± %.2f %%" % (peak_prop_disp[:, 0].mean(), peak_prop_disp[:, 0].std()), fontsize=9)
+            axs[0, 0].set_title("Rel. amplitude = %.2f ± %.2f %%" % (peak_prop_disp[:, 0].mean(), peak_prop_disp[:, 0].std()))
 
-            axs[0, 1].set_ylabel('Abs. linewidth (Hz)', fontsize=9)
+            axs[0, 1].set_ylabel('Abs. linewidth (Hz)')
             axs[0, 1].grid('on')
-            axs[0, 1].set_title("Abs. linewidth = %.1f ± %.1f Hz (%.3f ± %.3f ppm)" % (peak_prop_disp[:, 1].mean(), peak_prop_disp[:, 1].std(), (peak_prop_disp[:, 1] / s_ma.f0).mean(), (peak_prop_disp[:, 1] / s_ma.f0).std()), fontsize=9)
+            axs[0, 1].set_title("Abs. linewidth = %.1f ± %.1f Hz (%.3f ± %.3f ppm)" % (peak_prop_disp[:, 1].mean(), peak_prop_disp[:, 1].std(), (peak_prop_disp[:, 1] / s_ma.f0).mean(), (peak_prop_disp[:, 1] / s_ma.f0).std()))
 
-            axs[1, 0].set_xlabel('Acq. time (s)', fontsize=9)
-            axs[1, 0].set_ylabel('Abs. frequency (ppm)', fontsize=9)
+            axs[1, 0].set_xlabel('Acq. time (s)')
+            axs[1, 0].set_ylabel('Abs. frequency (ppm)')
             axs[1, 0].grid('on')
-            axs[1, 0].set_title("Abs. frequency = %.2f ± %.2f ppm (± %.1f Hz)" % (peak_prop_disp[:, 2].mean(), peak_prop_disp[:, 2].std(), (peak_prop_disp[:, 2] * s_ma.f0).std()), fontsize=9)
+            axs[1, 0].set_title("Abs. frequency = %.2f ± %.2f ppm (± %.1f Hz)" % (peak_prop_disp[:, 2].mean(), peak_prop_disp[:, 2].std(), (peak_prop_disp[:, 2] * s_ma.f0).std()))
 
-            axs[1, 1].set_xlabel('Acq. time (s)', fontsize=9)
-            axs[1, 1].set_ylabel('Abs. phase shift (rd)', fontsize=9)
+            axs[1, 1].set_xlabel('Acq. time (s)')
+            axs[1, 1].set_ylabel('Abs. phase shift (rd)')
             axs[1, 1].grid('on')
-            axs[1, 1].set_title("Abs. phase = %.2f ± %.2f rad" % (peak_prop_disp[:, 3].mean(), peak_prop_disp[:, 3].std()), fontsize=9)
+            axs[1, 1].set_title("Abs. phase = %.2f ± %.2f rad" % (peak_prop_disp[:, 3].mean(), peak_prop_disp[:, 3].std()))
 
             # nice plot showing all raw data
             plt.subplot(1, 3, 3)
@@ -2288,8 +2435,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 plt.plot(ppm[ippm_half_peak], sf_analyze[ippm_half_peak] * ampfactor + ystep * k, 'k-', linewidth=1)
 
             plt.xlim(peak_range[1], peak_range[0])
-            plt.xlabel('chemical shift (ppm)', fontsize=9)
-            plt.ylabel('individual spectra', fontsize=9)
+            plt.xlabel('chemical shift (ppm)')
+            plt.ylabel('individual spectra')
             plt.yticks([])
             plt.grid('on')
             fig.subplots_adjust()
@@ -2389,7 +2536,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 fig.clf()
                 axs = fig.subplots(2, 3, sharex='all', sharey='all')
                 fig.canvas.set_window_title("mrs.reco.MRSData2.correct_realign_2d")
-                fig.suptitle("frequency realigning [%s]" % self.display_label, fontsize=11)
+                fig.suptitle("frequency realigning [%s]" % self.display_label)
 
                 # display original averaged spectrum
                 axs[0, 0].plot(ppm, sf_avg_abs, 'k-', linewidth=1)
@@ -2428,7 +2575,10 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 fig.subplots_adjust()
                 fig.show()
 
-        return(self.inherit(s_realigned))
+        # convert back to MRSData2
+        s_realigned = self.inherit(s_realigned)
+
+        return(s_realigned)
 
     def correct_average_2d(self, na=None, display=False, display_range=[1, 6]):
         """
@@ -2482,7 +2632,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 fig.clf()
                 axs = fig.subplots(2, 1, sharex='all', sharey='all')
                 fig.canvas.set_window_title("mrs.reco.MRSData2.correct_average_2d")
-                fig.suptitle("averaging [%s]" % self.display_label, fontsize=11)
+                fig.suptitle("averaging [%s]" % self.display_label)
 
                 axs[0].plot(ppm, s.spectrum().real.transpose(), 'k-', linewidth=1)
                 axs[0].set_xlim(display_range[1], display_range[0])
@@ -2499,7 +2649,14 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 fig.subplots_adjust()
                 fig.show()
 
-        return(self.inherit(s_mean))
+        # convert back to MRSData2
+        s_mean = self.inherit(s_mean)
+
+        # if any ref data available, we average it too (silently)
+        if(s_mean.data_ref is not None):
+            s_mean.data_ref = s_mean.data_ref.correct_average_2d(None, False)
+
+        return(s_mean)
 
     def analyze_noise_1d(self, n_pts=100):
         """
@@ -2534,7 +2691,15 @@ class MRSData2(suspect.mrsobjects.MRSData):
         noise_lev = np.std(s_analyze[-n_pts:-1])
         log.info("noise level = %.2E" % noise_lev)
 
-        return(noise_lev)
+        # changing noise level attribute
+        log.debug("updating noise level...")
+        s._noise_level = noise_lev
+
+        # if any ref data available, we crop it too (silently)
+        if(s.data_ref is not None):
+            s.data_ref = s.data_ref.analyze_noise_1d(n_pts)
+
+        return(s)
 
     def correct_apodization_1d(self, apo_factor=1.0, display=False, display_range=[1, 6]):
         """
@@ -2573,7 +2738,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig.clf()
             axs = fig.subplots(2, 2, sharex='row', sharey='row')
             fig.canvas.set_window_title("mrs.reco.MRSData2.correct_apodization")
-            fig.suptitle("apodizing [%s]" % self.display_label, fontsize=11)
+            fig.suptitle("apodizing [%s]" % self.display_label)
 
             axs[0, 0].plot(t, np.abs(s), 'k-', linewidth=1, label='fid')
             axs[0, 0].plot(t, w_apo * np.abs(s.max()), 'r-', linewidth=1, label='apodization window')
@@ -2601,7 +2766,14 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig.subplots_adjust()
             fig.show()
 
-        return(self.inherit(s_apo))
+        # convert back to MRSData2
+        s_apo = self.inherit(s_apo)
+
+        # if any ref data available, we apodize it too (silently)
+        if(s_apo.data_ref is not None):
+            s_apo.data_ref = s_apo.data_ref.correct_apodization_1d(apo_factor, False)
+
+        return(s_apo)
 
     def correct_crop_1d(self, nPoints_final=4096, display=False, display_range=[1, 6]):
         """
@@ -2653,7 +2825,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig.clf()
             axs = fig.subplots(2, 2, sharex='row', sharey='row')
             fig.canvas.set_window_title("mrs.reco.MRSData2.correct_crop_1d")
-            fig.suptitle("cropping [%s]" % self.display_label, fontsize=11)
+            fig.suptitle("cropping [%s]" % self.display_label)
 
             axs[0, 0].plot(t, np.abs(s), 'k-', linewidth=1, label='fid')
             axs[0, 0].set_xlabel('time (s)')
@@ -2680,7 +2852,14 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig.subplots_adjust()
             fig.show()
 
-        return(self.inherit(s_crop))
+        # convert back to MRSData2
+        s_crop = self.inherit(s_crop)
+
+        # if any ref data available, we crop it too (silently)
+        if(s_crop.data_ref is not None):
+            s_crop.data_ref = s_crop.data_ref.correct_crop_1d(nPoints_final, False)
+
+        return(s_crop)
 
     def correct_water_removal_1d(self, hsvd_nComponents=5, hsvd_range=[4.6, 4.8], display=False, display_range=[1, 6]):
         """
@@ -2740,7 +2919,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig.clf()
             axs = fig.subplots(2, 1, sharex='all', sharey='all')
             fig.canvas.set_window_title("mrs.reco.MRSData2.correct_water_removal_1d")
-            fig.suptitle("removing water peak for [%s]" % self.display_label, fontsize=11)
+            fig.suptitle("removing water peak for [%s]" % self.display_label)
 
             # original spectrum
             axs[0].plot(ppm, s.spectrum().real, 'k-', linewidth=1, label='original data (real part)')
@@ -2764,7 +2943,10 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         pbar.finish("done")
 
-        return(self.inherit(s_water_removed))
+        # convert back to MRSData2
+        s_water_removed = self.inherit(s_water_removed)
+
+        return(s_water_removed)
 
     def correct_freqshift_1d(self, peak_range=[4.5, 5], peak_real_ppm=4.7, display=False, display_range=[1, 6]):
         """
@@ -2818,7 +3000,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig.clf()
             axs = fig.subplots(2, 1, sharex='all', sharey='all')
             fig.canvas.set_window_title("mrs.reco.MRSData2.correct_freqshift_1d")
-            fig.suptitle("calibrating [%s]" % self.display_label, fontsize=11)
+            fig.suptitle("calibrating [%s]" % self.display_label)
 
             axs[0].plot(ppm, s.spectrum().real, 'k-', linewidth=1)
             axs[0].set_xlim(display_range[1], display_range[0])
@@ -2841,7 +3023,10 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig.subplots_adjust()
             fig.show()
 
-        return(self.inherit(s_shifted))
+        # convert back to MRSData2
+        s_shifted = self.inherit(s_shifted)
+
+        return(s_shifted)
 
     def analyze_snr_1d(self, peak_range, noise_range=[-1, 0], magnitude_mode=False, display=False, display_range=[1, 6]):
         """
@@ -2884,7 +3069,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig.clf()
             axs = fig.subplots(2, 1, sharex='all', sharey='all')
             fig.canvas.set_window_title("mrs.reco.MRSData2.analyze_snr_1d")
-            fig.suptitle("analyzing SNR for [%s]" % self.display_label, fontsize=11)
+            fig.suptitle("analyzing SNR for [%s]" % self.display_label)
 
         # find maximum peak in range and its chemical shift
         ppm = s.frequency_axis_ppm()
@@ -3014,7 +3199,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig.clf()
             axs = fig.subplots(2, 1, sharex='all', sharey='all')
             fig.canvas.set_window_title("mrs.reco.MRSData2.analyze_linewidth_1d")
-            fig.suptitle("analyzing peak linewidth for [%s]" % self.display_label, fontsize=11)
+            fig.suptitle("analyzing peak linewidth for [%s]" % self.display_label)
 
             axs[0].plot(ppm, np.real(s.spectrum()), 'k-', linewidth=1)
             axs[0].set_xlim(display_range[1], display_range[0])
@@ -3660,7 +3845,7 @@ class pipeline:
             fig.clf()
             axs = fig.subplots(2, 1, sharex='row')
             fig.canvas.set_window_title("mrs.reco.pipeline._display_analyze_results")
-            fig.suptitle("SNR/peak-linewidth results", fontsize=11)
+            fig.suptitle("SNR/peak-linewidth results")
 
             # prepare bars
             nBars = len(data_labels)
@@ -3694,7 +3879,7 @@ class pipeline:
             # lw bargraph
             axs[1].set_ylabel("Estimated linewidth (Hz)")
             axs[1].set_xticks(pos_bars)
-            axs[1].set_xticklabels(job_labels, rotation=45, fontsize=9)
+            axs[1].set_xticklabels(job_labels, rotation=45)
             axs[1].set_ylim(np.add(lw_ylim, [-3, +3]))
             axs[1].grid('on')
 
@@ -3761,6 +3946,8 @@ class pipeline:
             parsed_list = None
         elif(type(self.data_filepaths) == list):
             parsed_list = self.data_filepaths
+            parsed_list = [e.strip() for e in parsed_list]
+            parsed_list = [None if e == "" else e for e in parsed_list]
         else:
             parsed_list = _parse_string_into_list(self.data_filepaths)
 
@@ -3776,6 +3963,8 @@ class pipeline:
             parsed_list = None
         elif(type(self.data_ref_filepaths) == list):
             parsed_list = self.data_ref_filepaths
+            parsed_list = [e.strip() for e in parsed_list]
+            parsed_list = [None if e == "" else e for e in parsed_list]
         else:
             parsed_list = _parse_string_into_list(self.data_ref_filepaths)
 
@@ -3790,6 +3979,8 @@ class pipeline:
             parsed_list = None
         elif(type(self.data_physio_filepaths) == list):
             parsed_list = self.data_physio_filepaths
+            parsed_list = [e.strip() for e in parsed_list]
+            parsed_list = [None if e == "" else e for e in parsed_list]
         else:
             parsed_list = _parse_string_into_list(self.data_physio_filepaths)
 
@@ -3804,20 +3995,8 @@ class pipeline:
             parsed_list = None
         elif(type(self.display_legends) == list):
             parsed_list = self.display_legends
-        else:
-            parsed_list = _parse_string_into_list(self.display_legends)
-
-        if(parsed_list is not None):
-            self._display_legends_list = parsed_list
-        else:
-            self._display_legends_list = [""] * len(self._data_filepaths_list)
-
-        # legend captions: parse
-        log.info("parsing legend captions...")
-        if(self.display_legends == []):
-            parsed_list = None
-        elif(type(self.display_legends) == list):
-            parsed_list = self.display_legends
+            parsed_list = [e.strip() for e in parsed_list]
+            parsed_list = [None if e == "" else e for e in parsed_list]
         else:
             parsed_list = _parse_string_into_list(self.display_legends)
 
@@ -4043,50 +4222,20 @@ class pipeline:
             # run job on this dataset
             self._run_job(disp_job, d)
 
-    def save(self, reco_data_db_file=default_paths.DEFAULT_RECO_DATA_DB_FILE):
+    def save(self, rdb):
         """
-        Save each data set and the current pipeline to the big PKL file containing a dict with all our processed data, sorted by patient name, dataset name. Deal with conflicts like already existing patient name/ dataset name.
+        Save each data set and the current pipeline to the PKL data storage file.
 
         Parameters
         ----------
-        reco_data_db_file: string
-            PKL file where all the data is stored
+        rdb: data_db object
+            Data storage object
         """
-        log.info("saving %d dataset(s) to file [%s]..." % (len(self._data_list), reco_data_db_file))
-
-        # if pkl does not exist, it is our very first time :heart:
-        # let's write an empty dict
-        if(not os.path.isfile(reco_data_db_file)):
-            log.debug("%s does not exist, creating it!" % reco_data_db_file)
-            # write pkl file
-            with open(reco_data_db_file, 'wb') as f:
-                pickle.dump([{}], f)
-
-        # now open pkl file
-        with open(reco_data_db_file, 'rb') as f:
-            [pkl_data_dict] = pickle.load(f)
-
-        # if we reached here, that means the PKL file is not corrupted
-        # let's make a backup of it
-        copyfile(reco_data_db_file, reco_data_db_file + ".bak")
+        log.info("saving %d dataset(s) to file [%s]..." % (len(self._data_list), rdb.db_file))
 
         # for each dataset
         for d in self._data_list:
-            # we already have this patient in the db
-            if(d.patient_name in pkl_data_dict):
-                log.debug("patient name [%s] already exists!" % d.patient_name)
-                nd = len(list(pkl_data_dict[d.patient_name].keys()))
-                log.debug("already contains %d dataset(s)!" % nd)
-            else:
-                # create patient entry
-                pkl_data_dict[d.patient_name] = {}
-            # add/update with the dataset
-            log.debug("adding/updating dataset [%s]/[%s]..." % (d.patient_name, d.display_label))
-            pkl_data_dict[d.patient_name][d.display_label] = {"data": d, "pipeline": self}
-
-        # write back pkl file
-        with open(reco_data_db_file, 'wb') as f:
-            pickle.dump([pkl_data_dict], f)
+            rdb.save(d, self)
 
 
 class voi_pipeline:
@@ -4273,7 +4422,7 @@ class voi_pipeline:
         fig.clf()
         axs = fig.subplots(2, 3)
         fig.canvas.set_window_title("mrs.reco.voi_pipeline.run")
-        fig.suptitle("spatial selection profiles", fontsize=11)
+        fig.suptitle("spatial selection profiles")
         for (sx, sy, sz, sx_ax, sy_ax, sz_ax, leg) in zip(self._xdata, self._ydata, self._zdata, self._xdata_axis, self._ydata_axis, self._zdata_axis, self._display_legends_list):
 
             axs[0, 0].plot(sx_ax, sx, linewidth=1, label=leg)
@@ -4385,6 +4534,7 @@ def _build_legend_list_from_filepath_list(filepath_list):
                 # no idea what we are dealing with
                 f_a, f_b = os.path.split(f.lower())
                 legend_list.append(f_b)
+
 
 def load_broken_twix_vb(filename):
     """

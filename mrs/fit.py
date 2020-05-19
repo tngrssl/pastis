@@ -12,10 +12,14 @@ import mrs.log as log
 import mrs.aliases as xxx
 import matplotlib.pylab as plt
 import scipy.optimize as optimize
+import matplotlib._color_data as mcd
 from enum import Enum
 import time
 
 import pdb
+
+PARS_LONG_NAMES = ["Concentration [mmol/kg]", "Linewidth factor [Hz]", "Frequency shift [Hz]", "Phase [rd]"]
+PARS_SHORT_NAMES = ["cm", "dd", "df", "dp"]
 
 
 class fit_plot_type(Enum):
@@ -156,7 +160,7 @@ class prefit_tool:
                     meta_found_singulet = this_meta
 
             if(meta_found_singulet is None):
-                raise Exception("> one of the metabolites you chose for peak integration does not have a singlet, aborting area integration...")
+                log.error("> one of the metabolites you chose for peak integration does not have a singlet, aborting area integration...")
             else:
                 # measure linewidth of the peak
                 aipsr = self.area_integration_peak_search_range / 2.0
@@ -500,13 +504,13 @@ class fit_tool:
             axs_list = [axs[0, 2], axs[0, 3], axs[1, 2], axs[1, 3]]
             for ax, plt_type in zip(axs_list, self.display_subplots_types):
                 if(plt_type == fit_plot_type.BARGRAPH_CM):
-                    sim.disp_bargraph(ax, params_val_list, params_std_list, params_leg_list, True, True, self._water_only, True, xxx.p_cm)
+                    disp_bargraph(ax, params_val_list, params_std_list, params_leg_list, True, True, self._water_only, True, xxx.p_cm)
                 elif(plt_type == fit_plot_type.BARGRAPH_DD):
-                    sim.disp_bargraph(ax, params_val_list, params_std_list, params_leg_list, True, True, self._water_only, True, xxx.p_dd)
+                    disp_bargraph(ax, params_val_list, params_std_list, params_leg_list, True, True, self._water_only, True, xxx.p_dd)
                 elif(plt_type == fit_plot_type.BARGRAPH_DF):
-                    sim.disp_bargraph(ax, params_val_list, params_std_list, params_leg_list, True, True, self._water_only, True, xxx.p_df)
+                    disp_bargraph(ax, params_val_list, params_std_list, params_leg_list, True, True, self._water_only, True, xxx.p_df)
                 elif(plt_type == fit_plot_type.BARGRAPH_DP):
-                    sim.disp_bargraph(ax, params_val_list, params_std_list, params_leg_list, True, True, self._water_only, True, xxx.p_dp)
+                    disp_bargraph(ax, params_val_list, params_std_list, params_leg_list, True, True, self._water_only, True, xxx.p_dp)
                 elif(plt_type == fit_plot_type.COST_FUNCTION):
                     ax.plot(self._cost_function, 'k-')
                     ax.set_xlabel('iterations')
@@ -523,13 +527,14 @@ class fit_tool:
                     ax.grid('on')
 
             ax = plt.subplot(1, 2, 1)
-            sim.disp_fit(ax, self.data, params, self.seq, True, True, None, self.display_range_ppm)
+            disp_fit(ax, self.data, params, self.seq, True, True, None, self._water_only, self.display_range_ppm)
             current_fit_time = time.time() - self._fit_time
             if(fit_terminated):
                 ax.set_title("Fit terminated! %ds elapsed | iteration #%d | residue = %.2E" % (current_fit_time, self._model_call_count, current_err))
             else:
                 ax.set_title("Running fit... %ds elapsed | iteration #%d | residue = %.2E" % (current_fit_time, self._model_call_count, current_err))
-            fig.subplots_adjust()
+            fig.subplots_adjust(left=0.02, bottom=0.1, right=0.98, top=0.95, wspace=0.2, hspace=None)
+            plt.pause(0.01)
 
             # save PNG
             # plt.savefig("%0.4d.png" % self._model_call_count)
@@ -562,20 +567,20 @@ class fit_tool:
             for c in range(self.params_init.shape[1]):
                 # min vs max
                 if(self.params_min[l, c] >= self.params_max[l, c] and self.params_init.linklock[l, c] != 1):
-                    raise Exception(" One lower bound (%f) is equal/greater than a upper bound (%f) for [%s] at index (%d,%d)!" % (
+                    log.error(" One lower bound (%f) is equal/greater than a upper bound (%f) for [%s] at index (%d,%d)!" % (
                         self.params_min[l, c], self.params_max[l, c], self.params_init.get_meta_names()[l], l, c))
                 # min vs init
                 if(self.params_min[l, c] >= self.params_init[l, c] and self.params_init.linklock[l, c] != 1):
-                    raise Exception(" One initial value (%f) is equal/lower than the lower bound value (%f) for [%s] at index (%d,%d)!" % (
+                    log.error(" One initial value (%f) is equal/lower than the lower bound value (%f) for [%s] at index (%d,%d)!" % (
                         self.params_init[l, c], self.params_min[l, c], self.params_init.get_meta_names()[l], l, c))
                 # max vs init
                 if(self.params_max[l, c] <= self.params_init[l, c] and self.params_init.linklock[l, c] != 1):
-                    raise Exception(" One initial value (%f) is equal/greater than the upper bound value (%f) for [%s] at index (%d,%d)!" % (
+                    log.error(" One initial value (%f) is equal/greater than the upper bound value (%f) for [%s] at index (%d,%d)!" % (
                         self.params_init[l, c], self.params_max[l, c], self.params_init.get_meta_names()[l], l, c))
 
         # checking if LL is not broken
         if(not self.params_init.check()):
-            raise Exception("> the link-lock vector looks broken!")
+            log.error("> the link-lock vector looks broken!")
 
         # checking if we are dealing with a reference scan fit (water only)
         where_LL = np.where(self.params_init.linklock[:, 0] == 0)
@@ -597,7 +602,7 @@ class fit_tool:
         params_CRBs_abs : params object
             Estimated absolute Cramér-Rao Lower Bounds for each parameter
         params_CRBs_rel : params object
-            Estimated relative Cramér-Rao Lower Bounds for each parameter
+            Estimated relative Cramér-Rao Lower Bounds for each parameter (%)
         optim_result : 'OptimizeResult' object returned by scipy.optimize.least_squares
             Numerical optimization parameters
         """
@@ -607,7 +612,7 @@ class fit_tool:
 
         # ready or not, here I come
         if(not self.ready):
-            raise Exception("> This fit_tool object was not initialized!")
+            log.error("> This fit_tool object was not initialized!")
 
         # dummy full>free>full>free conversion to apply master/slave rules
         params_free = self.params_init.toFreeParams()
@@ -733,12 +738,12 @@ class fit_tool:
         cor_labels = []
         meta_names = params.get_meta_names()
         for i, m in enumerate(meta_names):
-            for j, p in enumerate(sim.PARS_SHORT_NAMES):
+            for j, p in enumerate(PARS_SHORT_NAMES):
                 if(mat_linklock_mask[i, j]):
                     cor_labels.append(m + "|" + p)
 
-        if(np.all(mat_linklock_mask==False)):
-            raise Exception(">> mrs.fit_tool.disp_CorrMat: nothing to display, please adjust the mIndex_list/pIndex_list parameters!")
+        if(np.all(mat_linklock_mask == False)):
+            log.error(">> mrs.fit_tool.disp_CorrMat: nothing to display, please adjust the mIndex_list/pIndex_list parameters!")
 
         # reducing it to free params
         j_free = j_full[mat_linklock_mask, :]
@@ -760,9 +765,274 @@ class fit_tool:
         im = ax.imshow(params_cor, clim=(-1, +1))
         ax.set_xticks(np.arange(len(cor_labels)))
         ax.set_yticks(np.arange(len(cor_labels)))
-        ax.set_xticklabels(cor_labels, rotation=90, fontsize=9)
-        ax.set_yticklabels(cor_labels, fontsize=9)
+        ax.set_xticklabels(cor_labels, rotation=90, fontsize=6)
+        ax.set_yticklabels(cor_labels, fontsize=6)
         if(color_bar):
             plt.colorbar(im)
 
         return(params_cor)
+
+
+def disp_bargraph(ax, params_val_list, params_std_list, params_leg_list, colored_LLs=True, bMM=False, bWater=False, bFitMode=False, pIndex=xxx.p_cm, mIndex_list=None, width=0.3):
+    """
+    Plot a bargraph of concentrations.
+
+    Parameters
+    ----------
+    ax : matplotlib axis
+        Axis to use for plotting
+    params_val_list : list of params objects
+        List of parameter arrays to display as bars
+    params_std_list : list of params objects
+        List of parameter arrays to display as error bars
+    params_leg_list : list of params objects
+        List of legend caption for each bar
+    colored_LLs : boolean
+        Shows link-lock connections using colors (True) or not (False)
+    bMM : boolean
+        Includes macromolecular parameters (True) or not (False)
+    bWater : boolean
+        Includes water parameters (True) or not (False)
+    bFitMode : boolean
+        If (True), plot the first two bars in black (bounds), the last one with colors (fit), at the same x, no legends
+    pIndex : int
+        Parameter index to display in bargraph
+    mIndex_list : list of int
+        Metabolite indexes to display in bargraph
+    width : float (optional)
+        Bar width
+    """
+    # LLcolor_names=[name for name in mcd.XKCD_COLORS]
+    LLcolor_names = ['xkcd:grey', 'xkcd:blue', 'xkcd:red', 'xkcd:violet', 'xkcd:green',
+                     'xkcd:goldenrod', 'xkcd:crimson', 'xkcd:salmon', 'xkcd:wheat', 'xkcd:lightblue']
+
+    # init
+    lbl = PARS_LONG_NAMES[pIndex]
+
+    # build logical mask
+    meta_mask = np.full(params_val_list[0].shape, True, dtype=bool)
+
+    # filter out the fixed LLs
+    meta_mask[params_val_list[0].linklock[:, xxx.p_cm] == 1, :] = False
+
+    # filter out MMs?
+    if(not bMM):
+        meta_mask[xxx.m_All_MMs, :] = False
+
+    # filter out water?
+    if(not bWater):
+        meta_mask[xxx.m_Water, :] = False
+
+    if(mIndex_list is not None):
+        meta_mask_m = meta_mask.copy()
+        meta_mask_m[:] = False
+        meta_mask_m[mIndex_list, :] = True
+        meta_mask = np.logical_and(meta_mask, meta_mask_m)
+
+    # parameter filter
+    meta_mask_p = meta_mask.copy()
+    meta_mask_p[:] = False
+    meta_mask_p[:, pIndex] = True
+    meta_mask = np.logical_and(meta_mask, meta_mask_p)
+
+    # check that we still have something to display
+    if(np.all(meta_mask == False)):
+        log.error("nothing to display! Please check disp_bargraph parameters like pIndex, mIndex_list, bWater and bMM!")
+
+    # filter data now
+    params_val_list = [p[meta_mask] for p in params_val_list]
+    params_LL_list = [p.linklock[meta_mask] for p in params_val_list]
+    params_std_list = [p[meta_mask] for p in params_std_list]
+    meta_names = params_val_list[0].get_meta_names()
+    meta_names = [meta_names[i] for i in range(len(meta_names)) if meta_mask[i, pIndex]]
+
+    # how many metabolites to display?
+    n = np.sum(meta_mask[:])
+
+    # prepare bars
+    nBars = len(params_val_list)
+    pos_bars = np.arange(n)
+    pos_shift = np.linspace(-width * (nBars - 1) / 2.0, +width * (nBars - 1) / 2.0, nBars)
+    pv_min = params_val_list[0].min()
+    pv_max = params_val_list[0].max()
+    if(bFitMode):
+        pos_shift = pos_shift * 0.0
+
+    # iterate in lists and plot bars yeah
+    for (k, pv, pll, ps, pl, pos) in zip(range(len(params_val_list)), params_val_list, params_LL_list, params_std_list, params_leg_list, pos_shift):
+        bar_list = ax.bar(pos_bars + pos, pv, width, yerr=ps, label=pl)
+
+        # record min/max for later use
+        if(np.min(pv) < pv_min):
+            pv_min = np.min(pv)
+        if(np.max(pv) > pv_max):
+            pv_max = np.max(pv)
+
+        for im_bar, this_bar, this_LL in zip(range(len(bar_list)), bar_list, pll):
+            if(colored_LLs):
+                this_LLcolor_name = LLcolor_names[np.mod(k + int(np.abs(this_LL)), len(LLcolor_names))]
+            else:
+                this_LLcolor_name = LLcolor_names[np.mod(k, len(LLcolor_names))]
+
+            this_LLcolor = mcd.XKCD_COLORS[this_LLcolor_name].upper()
+            if(bFitMode and k < 2):
+                this_bar.set_color('grey')
+            else:
+                this_bar.set_color(this_LLcolor)
+
+    ax.set_ylabel(lbl)
+    ax.set_ylim([pv_min, pv_max])
+    ax.set_xticks(pos_bars)
+    ax.set_xticklabels(meta_names, rotation=90)
+    ax.grid('on')
+    if(not bFitMode):
+        ax.legend()
+
+
+def disp_fit(ax, data, params, seq, LL_exluding=True, LL_merging=False, mIndex_list=None, water_only=False, display_range=[1, 5]):
+    """
+    Plot a bargraph of concentrations.
+
+    Parameters
+    ----------
+    ax : matplotlib axis
+        Axis to use for plotting
+    params : params object
+        List of parameter arrays to display as bars
+    seq : mrs_sequence
+        Virtual MRS sequence object
+    LL_excluding : boolean
+        Shows only free or master spectra (True) or not (False)
+    LL_merging : boolean
+        Shows concentration link-lock connections by merging spectra (True) or not (False)
+    mIndex_list : list
+        Indexes of metabolite to display
+    water_only : boolean
+        If only water is displayed
+    display_range : list [2]
+            Range in ppm used for display
+    """
+    # dummy full>free>full conversion to apply master/slave rules
+    params_free = params.toFreeParams()
+    params_full = params.toFullParams(params_free)
+
+    # the data
+    ax.plot(data.frequency_axis_ppm(), data.spectrum().real, 'k-', linewidth=0.5, label='data')
+    # the full model
+    mod = seq._model(params_full)
+    ax.plot(mod.frequency_axis_ppm(), mod.spectrum().real, 'k-', linewidth=2, label='model')
+    # the residue
+    diff = data - mod
+    ax.plot(diff.frequency_axis_ppm(), diff.spectrum().real, 'g-', linewidth=0.25, label='residue')
+
+    # trying to set ylim smart way
+    ymax = np.max(mod.spectrum().real)
+    # if not only water and water exists
+    try:
+        if(not water_only):
+            # generate a model signal, water set to 0 to set later ylim
+            params_full_nowater = params_full.copy()
+            params_full_nowater[xxx.m_Water, xxx.p_cm] = 0.0
+            mod_nowater = seq._model(params_full_nowater)
+            ymax = np.max(mod_nowater.spectrum().real) * 1.1
+    except NameError:
+        pass
+
+    # metabolite list
+    if(mIndex_list is None):
+        meta_ind_list = [*range(xxx.n_MBs)]
+    else:
+        meta_ind_list = mIndex_list
+
+    meta_names = params.get_meta_names()
+
+    # filter out fixed LL?
+    if(LL_exluding):
+        # remove fixed parameters (LL==1)
+        meta_ind_list_without_fixedLLs = []
+        for im in meta_ind_list:
+            if(params_full.linklock[im, xxx.p_cm] < 1):
+                meta_ind_list_without_fixedLLs.append(im)
+        meta_ind_list = meta_ind_list_without_fixedLLs
+
+    # calculate a nice gap
+    n_meta_to_display = len(meta_ind_list) + 1  # 1 line for MMs
+    if(LL_merging):
+        n_meta_to_display - np.unique(params_full.linklock[:, xxx.p_cm])
+    ygap = ymax * (60 - n_meta_to_display) * 0.005
+
+    # init metabolite-per-metabolite plot
+    ignore_those_mLLs = []
+    p_allzeros = params_full.copy()
+    p_allzeros[:, xxx.p_cm] = 0.0
+    koffset = 0
+    for im, mLL in zip(meta_ind_list, params_full.linklock[meta_ind_list, xxx.p_cm]):
+        # check if we should plot this guy
+        mLL_abs = np.abs(mLL)
+        if(mLL_abs not in ignore_those_mLLs):
+            if(LL_merging and mLL_abs > 1):
+                # find which metabolites to merge (NAA_CH3 and NAA_CH2 for example)
+                this_params_LL_abs = np.abs(params_full.linklock[:, xxx.p_cm])
+                this_meta_mask = (this_params_LL_abs == mLL_abs)
+                this_meta_mask = np.tile(this_meta_mask, (1, 1))
+                this_meta_mask = np.transpose(this_meta_mask)
+                this_meta_mask = np.tile(this_meta_mask, (1, 4))
+                # remember for next time we meet one of those metabolites
+                ignore_those_mLLs.append(mLL_abs)
+            else:
+                this_meta_mask = np.full(params_full.shape, False, dtype=bool)
+                this_meta_mask[im, :] = True
+
+            # prepare metabolite name
+            this_meta_name = ""
+            for mName, mLL in zip(meta_names, this_meta_mask[:, xxx.p_cm]):
+                if(mLL):
+                    this_meta_name = this_meta_name + mName + " & "
+            this_meta_name = this_meta_name[:-3]
+
+            # prepare parameters
+            this_params = p_allzeros.copy()
+            this_params[this_meta_mask] = params_full[this_meta_mask]
+
+            # call model
+            s_single_meta = seq._model(this_params)
+
+            # display
+            ax.plot(s_single_meta.frequency_axis_ppm(), s_single_meta.spectrum().real - ygap * (koffset + 1), 'r-')
+            ax.text(display_range[1] - 0.5, -ygap * (koffset + 1) + ygap / 5, this_meta_name)
+            koffset = koffset + 1
+
+    # prepare macromolecules parameters
+    this_params = p_allzeros.copy()
+    this_params[xxx.m_All_MMs, :] = params_full[xxx.m_All_MMs, :]
+
+    # call model
+    s_MMs = seq._model(this_params)
+
+    # plot the final MM baseline
+    ax.plot(s_MMs.frequency_axis_ppm(), s_MMs.spectrum().real - ygap * (koffset + 2), 'r-')
+
+    # and now break down the MM baseline into the gaussian components
+    for im in xxx.m_All_MMs:
+        # prepare parameters for this MM
+        this_params = p_allzeros.copy()
+        this_params[im, :] = params_full[im, :]
+
+        # call model
+        s_single_MM = seq._model(this_params)
+
+        # plot the a single MM keeping the same offset
+        ax.plot(s_single_MM.frequency_axis_ppm(), s_single_MM.spectrum().real - ygap * (koffset + 2), 'r--')
+
+    ax.text(display_range[1] - 0.5, -ygap * (koffset + 2) + ygap / 5, 'MM baseline')
+
+    # finalize the plot
+    ax.set_xticks(np.arange(-1, 10, 0.5))
+    ax.set_xlim(display_range[1], display_range[0])
+    # ylim trick: tricky
+    ymax = min(ymax, np.max(mod.spectrum().real) * 1.1)
+    ax.set_ylim([-ygap * (koffset + 3), ymax])
+    ax.set_yticks([])
+    ax.set_xlabel('chemical shift (ppm)')
+    ax.grid('on')
+    ax.legend(loc="upper right")
