@@ -384,6 +384,14 @@ p._data_list[0].display_spectrum_1d()
 # save this to db file
 p.save(rdb)
 
+# %% print data rejection stuff
+n_initial = p._data_list[0].na_pre_data_rejection
+n_final = p._data_list[0].na_post_data_rejection
+n_rejected = n_initial - n_final
+rejection_rate = n_rejected / n_initial * 100.0
+
+print(">>> Data rejected = %d/%d (%.2f%%)" % (n_rejected, n_initial, rejection_rate))
+
 # %% replace
 "C:/Users/jsourdon/Desktop/2020_1H_MRS/200303_1HMRS_pd002/"
 # by
