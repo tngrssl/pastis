@@ -106,7 +106,7 @@ fittool.display_range_ppm = [3, 7]
 
 # run the fit
 fittool.initialize()
-[params_ref_fit, _, _, _] = fittool.run()
+[params_ref_fit, params_ref_fit_CRBs_abs, params_ref_fit_CRBs_rel, optim_result_ref] = fittool.run()
 
 # %% fit water-suppressed data
 
@@ -218,8 +218,9 @@ fig.subplots_adjust(left=0.02, bottom=0.1, right=0.98, top=0.95, wspace=0.2, hsp
 # prepare stuff to write in csv file
 metabolites_names = np.array(params_fit_final.get_meta_names())
 data_legend_caption = data_pipeline._display_legends_list[0]
-header_line = ["Dataset"] + list(metabolites_names[np.concatenate([metabolites_fit, lipids_fit])]) + [metabolites_names[xxx.m_Water] + "(REF)"]
-data_line = [data_legend_caption] + list(params_fit_final[np.concatenate([metabolites_fit, lipids_fit]), xxx.p_cm]) + [params_ref_fit[xxx.m_Water, xxx.p_cm]]
+header_line = ["Dataset"] + list(metabolites_names[np.concatenate([metabolites_fit, lipids_fit])]) + [metabolites_names[xxx.m_Water] + "(REF)"] + [lbl +" (CRB%)" for lbl in list(metabolites_names[np.concatenate([metabolites_fit, lipids_fit])])] + [metabolites_names[xxx.m_Water] + "(REF) (CRB%)"]
+
+data_line = [data_legend_caption] + list(params_fit_final[np.concatenate([metabolites_fit, lipids_fit]), xxx.p_cm]) + [params_ref_fit[xxx.m_Water, xxx.p_cm]] + list(params_fit_CRBs_rel[np.concatenate([metabolites_fit, lipids_fit]), xxx.p_cm]) + [params_ref_fit_CRBs_rel[xxx.m_Water, xxx.p_cm]]
 
 # if csv file does not exist, create it and write header row
 if not os.path.isfile(fit_result_csv_filename):
