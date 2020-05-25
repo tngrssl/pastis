@@ -17,16 +17,26 @@ import pydicom
 from scipy import signal
 import scipy.io as sio
 import matplotlib.pylab as plt
+import matplotlib._pylab_helpers
 import os
 from shutil import copyfile
 from datetime import datetime, timedelta
 import struct
 import pickle
+from enum import Enum
 import mrs.sim as sim
 import mrs.log as log
 import mrs.paths as default_paths
 
 import pdb
+
+
+class suspect_phasing_method(Enum):
+    """The enum suspect_phasing_method describes the type of phasing method to use (phasing method from the suspect package."""
+
+    MATCH_MAGNITUDE_REAL = 1
+    MIN_IMAG_INTEGRAL = 2
+    ACME = 3
 
 
 class data_db():
@@ -1319,6 +1329,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             Range in ppm used for display
 
         * Works with multi-dimensional signals.
+        * Returns a multi-dimensional signal.
 
         Returns
         -------
@@ -1708,6 +1719,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         Concatenate current signal with another one along the averages axis.
 
         * Works only with a 2D [averages,timepoints] signal.
+        * Returns a 2D [averages,timepoints] signal.
 
         Parameters
         ----------
@@ -1742,6 +1754,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         Build moving average data in the average dimension. Usefull for the analyze_peak and correct_realign_2d functions.
 
         * Works only with a 2D [averages,timepoints] signal.
+        * Returns a 2D [averages,timepoints] signal.
 
         Parameters
         ----------
@@ -2131,6 +2144,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         Analyze peak in each average in terms intensity, linewidth, chemical shift and phase and reject data if one of these parameters goes out of the min / max bounds. Usefull to understand what the hell went wrong during your acquisition when you have the raw data (TWIX) and to try to improve things a little...
 
         * Works only with a 2D [averages,timepoints] signal.
+        * Returns a 2D [averages,timepoints] signal.
 
         Parameters
         ----------
@@ -2456,6 +2470,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         Realign each signal of interest in frequency by taking as a reference the first spectra in absolute mode.
 
         * Works only with a 2D [averages,timepoints] signal.
+        * Returns a 2D [averages,timepoints] signal.
 
         Parameters
         ----------
@@ -2585,6 +2600,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         Average all averages data into one 1D MRS signal.
 
         * Works only with a 2D [averages,timepoints] signal.
+        * Returns a 1D [timepoints] signal.
 
         Parameters
         ----------
@@ -2658,11 +2674,93 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         return(s_mean)
 
+    def correct_phase_1d(self, suspect_method=suspect_phasing_method.MATCH_MAGNITUDE_REAL, ppm_range=[0, 6], display=False, display_range=[1, 6]):
+        """
+        Phase signal using suspect's (hidden) phasing functions. You can choose between 3 different types of phasing methods. See suspect/processing/phase.py file.
+
+        * Works only with a 1D [timepoints] signal.
+        * Returns a 1D [timepoints] signal.
+
+        Parameters
+        ----------
+        suspect_method : suspect_phasing_method
+            Suspect phasing method to use here
+        ppm_range : list [2]
+            Range in ppm when analyzing spectra for phasing
+        display : boolean
+            Display correction process (True) or not (False)
+        display_range : list [2]
+            Range in ppm used for display
+
+        Returns
+        -------
+        s_phased : MRSData2 numpy array [timepoints]
+            Resulting phased data stored in a MRSData2 object
+        """
+        log.debug("phasing using suspect functions [%s]..." % self.display_label)
+        # dimensions check
+        if(self.ndim != 1):
+            log.error("this method only works for 1D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
+
+        # init
+        s = self.copy()
+
+        # estimate phases
+        if(suspect_method == suspect_phasing_method.MATCH_MAGNITUDE_REAL):
+            phi0, phi1 = suspect.processing.phase.mag_real(s, range_ppm=ppm_range)
+        elif(suspect_method == suspect_phasing_method.MIN_IMAG_INTEGRAL):
+            phi0, phi1 = suspect.processing.phase.ernst(s)
+        elif(suspect_method == suspect_phasing_method.ACME):
+            phi0, phi1 = suspect.processing.phase.acme(s, range_ppm=ppm_range)
+        else:
+            log.error("hey, I do not know this suspect phasing method!?")
+
+        # apply phase corrections
+        s_phased = s.adjust_phase(phi0, phi1)
+
+        # convert back to MRSData2
+        s_phased = self.inherit(s_phased)
+
+        if(display):
+            fig = plt.figure(160)
+            fig.clf()
+            axs = fig.subplots(2, 1, sharex='all', sharey='all')
+            fig.canvas.set_window_title("mrs.reco.MRSData2.correct_bandpass_filtering_1d")
+            fig.suptitle("filtering [%s]" % self.display_label)
+
+            axs[0].plot(s.frequency_axis_ppm(), s.spectrum().real, 'k-', linewidth=1)
+            axs[0].set_xlim(display_range[1], display_range[0])
+            axs[0].set_xlabel('chemical shift (ppm)')
+            axs[0].set_ylabel('original')
+            axs[0].grid('on')
+            # add low/high cuts
+            axs[0].axvline(x=ppm_range[0], color='r', linestyle='--')
+            axs[0].axvline(x=ppm_range[1], color='r', linestyle='--')
+
+            axs[1].plot(s_phased.frequency_axis_ppm(), s_phased.spectrum().real, 'b-', linewidth=1)
+            axs[1].set_xlim(display_range[1], display_range[0])
+            axs[1].set_xlabel('chemical shift (ppm)')
+            axs[1].set_ylabel('phased')
+            axs[1].grid('on')
+            # add low/high cuts
+            axs[1].axvline(x=ppm_range[0], color='r', linestyle='--')
+            axs[1].axvline(x=ppm_range[1], color='r', linestyle='--')
+
+            fig.subplots_adjust()
+            fig.show()
+
+        # if any ref data available, we phase it too (silently)
+        if(s_phased.data_ref is not None):
+            s_phased.data_ref = s_phased.data_ref.correct_phase_1d(suspect_method, ppm_range)
+
+        return(s_phased)
+
     def analyze_noise_1d(self, n_pts=100):
         """
         Measure noise level in time domain and store it in the "noise_level" attribute. This is usefull to keep track of the original noise level for later use, CRB normalization durnig quantification for example.
 
         * Works only with a 1D [timepoints] signal.
+        * Returns a 1D [timepoints] signal.
 
         Parameters
         ----------
@@ -2705,6 +2803,9 @@ class MRSData2(suspect.mrsobjects.MRSData):
         """
         Apodize signal using an exponential window adjusted by a linewidth parameter in Hz. Works only for a 1D MRSData2 object.
 
+        * Works only with a 1D [timepoints] signal.
+        * Returns a 1D [timepoints] signal.
+
         Parameters
         ----------
         apo_factor : float
@@ -2734,7 +2835,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             ppm = s.frequency_axis_ppm()
             ppm_apo = s_apo.frequency_axis_ppm()
 
-            fig = plt.figure(160)
+            fig = plt.figure(170)
             fig.clf()
             axs = fig.subplots(2, 2, sharex='row', sharey='row')
             fig.canvas.set_window_title("mrs.reco.MRSData2.correct_apodization")
@@ -2780,6 +2881,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         Crop signal in time-domain to remove last points.
 
         * Works only with a 1D [timepoints] signal.
+        * Returns a 1D [timepoints] signal.
 
         Parameters
         ----------
@@ -2821,7 +2923,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             ppm = s.frequency_axis_ppm()
             ppm_crop = s_crop.frequency_axis_ppm()
 
-            fig = plt.figure(170)
+            fig = plt.figure(180)
             fig.clf()
             axs = fig.subplots(2, 2, sharex='row', sharey='row')
             fig.canvas.set_window_title("mrs.reco.MRSData2.correct_crop_1d")
@@ -2866,6 +2968,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         Remove any water residual peak(s) within a ppm range using HSVD.
 
         * Works only with a 1D [timepoints] signal.
+        * Returns a 1D [timepoints] signal.
 
         Parameters
         ----------
@@ -2915,7 +3018,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         # display this over the data
         if(display):
-            fig = plt.figure(180)
+            fig = plt.figure(190)
             fig.clf()
             axs = fig.subplots(2, 1, sharex='all', sharey='all')
             fig.canvas.set_window_title("mrs.reco.MRSData2.correct_water_removal_1d")
@@ -2953,6 +3056,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         Shift the spectrum in frequency in order to get the right peaks at the right chemical shifts.
 
         * Works only with a 1D [timepoints] signal.
+        * Returns a 1D [timepoints] signal.
 
         Parameters
         ----------
@@ -2996,7 +3100,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         s_shifted = s.adjust_frequency(-df)
 
         if(display):
-            fig = plt.figure(190)
+            fig = plt.figure(200)
             fig.clf()
             axs = fig.subplots(2, 1, sharex='all', sharey='all')
             fig.canvas.set_window_title("mrs.reco.MRSData2.correct_freqshift_1d")
@@ -3027,6 +3131,95 @@ class MRSData2(suspect.mrsobjects.MRSData):
         s_shifted = self.inherit(s_shifted)
 
         return(s_shifted)
+
+    def correct_bandpass_filtering_1d(self, ppm_range=[0, 6], window_func=np.hanning, display=False, display_range=[1, 6]):
+        """
+        Filter the signal using FFT windowing.
+
+        * Works only with a 1D [timepoints] signal.
+        * Returns a 1D [timepoints] signal.
+
+        Parameters
+        ----------
+        ppm_range : list [2]
+            Range in ppm used for band-pass filtering
+        window_func : numpy windowing function
+            Apodization window function
+        display : boolean
+            Display correction process (True) or not (False)
+        display_range : list [2]
+            Range in ppm used for display
+
+        Returns
+        -------
+        s_filtered : MRSData2 numpy array [timepoints]
+            Resulting frequency filtered signal
+        """
+        log.debug("band-pass filtering [%s]: keeping the %.2f-%.2fppm region..." % (self.display_label, ppm_range[0], ppm_range[1]))
+        # dimensions check
+        if(self.ndim != 1):
+            log.error("this method only works for 1D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
+
+        # init
+        s = self.copy()
+        ppm = s.frequency_axis_ppm()
+
+        # build apodization window
+        ind_low = np.argmin(np.abs(ppm - ppm_range[0]))
+        ind_high = np.argmin(np.abs(ppm - ppm_range[1]))
+        n_window = ind_low - ind_high
+        window_segment = window_func(n_window)
+        window_full = ppm * 0.0
+        window_full[ind_high:ind_low] = window_segment
+
+        # apply window
+        sf = s.spectrum()
+        sf_filtered = sf * window_full
+        s_filtered = np.fft.ifft(np.fft.ifftshift(sf_filtered))
+
+        # convert back to MRSData2
+        s_filtered = self.inherit(s_filtered)
+
+        if(display):
+            fig = plt.figure(210)
+            fig.clf()
+            axs = fig.subplots(2, 2)
+            fig.canvas.set_window_title("mrs.reco.MRSData2.correct_bandpass_filtering_1d")
+            fig.suptitle("filtering [%s]" % self.display_label)
+
+            axs[0, 0].plot(s.time_axis(), np.real(s), 'k-', linewidth=1)
+            axs[0, 0].set_xlabel('time (s)')
+            axs[0, 0].set_ylabel('original')
+            axs[0, 0].grid('on')
+
+            axs[0, 1].plot(ppm, s.spectrum().real, 'k-', linewidth=1)
+            axs[0, 1].plot(ppm, window_full * np.max(s.spectrum().real), 'r-', linewidth=1)
+            axs[0, 1].set_xlim(display_range[1], display_range[0])
+            axs[0, 1].set_xlabel('chemical shift (ppm)')
+            axs[0, 1].set_ylabel('original')
+            axs[0, 1].grid('on')
+            # add low/high cuts
+            axs[0, 1].axvline(x=ppm_range[0], color='r', linestyle='--')
+            axs[0, 1].axvline(x=ppm_range[1], color='r', linestyle='--')
+
+            axs[1, 0].plot(s.time_axis(), np.real(s_filtered), 'k-', linewidth=1)
+            axs[1, 0].set_xlabel('time (s)')
+            axs[1, 0].set_ylabel('filtered')
+            axs[1, 0].grid('on')
+
+            axs[1, 1].plot(ppm, s_filtered.spectrum().real, 'b-', linewidth=1)
+            axs[1, 1].set_xlim(display_range[1], display_range[0])
+            axs[1, 1].set_xlabel('chemical shift (ppm)')
+            axs[1, 1].set_ylabel('filtered')
+            axs[1, 1].grid('on')
+            # add low/high cuts
+            axs[1, 1].axvline(x=ppm_range[0], color='r', linestyle='--')
+            axs[1, 1].axvline(x=ppm_range[1], color='r', linestyle='--')
+
+            fig.subplots_adjust()
+            fig.show()
+
+        return(s_filtered)
 
     def analyze_snr_1d(self, peak_range, noise_range=[-1, 0], magnitude_mode=False, display=False, display_range=[1, 6]):
         """
@@ -3065,7 +3258,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         s = self.copy()
         # display
         if(display):
-            fig = plt.figure(200)
+            fig = plt.figure(220)
             fig.clf()
             axs = fig.subplots(2, 1, sharex='all', sharey='all')
             fig.canvas.set_window_title("mrs.reco.MRSData2.analyze_snr_1d")
@@ -3195,7 +3388,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         log.info("LW = %0.2f Hz!" % lw)
 
         if(display):
-            fig = plt.figure(210)
+            fig = plt.figure(230)
             fig.clf()
             axs = fig.subplots(2, 1, sharex='all', sharey='all')
             fig.canvas.set_window_title("mrs.reco.MRSData2.analyze_linewidth_1d")
@@ -3603,6 +3796,18 @@ class pipeline:
                                    "display_range_ppm": self.jobs["displaying"]["range_ppm"]
                                    }
 
+        # --- job: automatic data frequency realignment ---
+        self.jobs["filtering"] = {0:
+                                  {"func": MRSData2.correct_bandpass_filtering_1d, "name": "FFT filtering"},
+                                  # ppm range to keep
+                                  "ppm_range": [0, 6],
+                                  # type of apodization window (take it from numpy/scipy)
+                                  "window_func": signal.tukey,
+                                  # display all this process to check what the hell is going on
+                                  "display": True,
+                                  "display_range_ppm": self.jobs["displaying"]["range_ppm"]
+                                  }
+
         # --- job: data averaging ---
         self.jobs["averaging"] = {0:
                                   {"func": MRSData2.correct_average_2d, "name": "averaging"},
@@ -3612,6 +3817,18 @@ class pipeline:
                                   "display": True,
                                   "display_range_ppm": self.jobs["displaying"]["range_ppm"]
                                   }
+
+        # --- job: phasing using suspect ---
+        self.jobs["phasing (suspect)"] = {0:
+                                          {"func": MRSData2.correct_phase_1d, "name": "phasing (suspect)"},
+                                          # phasing method
+                                          "suspect_method": suspect_phasing_method.MATCH_MAGNITUDE_REAL,
+                                          # ppm range to analyze phase
+                                          "ppm_range": [0, 6],
+                                          # display all this process to check what the hell is going on
+                                          "display": True,
+                                          "display_range_ppm": self.jobs["displaying"]["range_ppm"]
+                                          }
 
         # --- job: noise level analysis ---
         self.jobs["noise-estimation"] = {0:
@@ -4680,3 +4897,12 @@ def load_broken_twix_vb(filename):
             fin.seek(start_position + DMA_length)
 
     return(builder.build_mrsdata())
+
+
+def remove_grids_from_all_figs():
+    """Remove the grid in all axes for all open figures."""
+    figs=[manager.canvas.figure for manager in matplotlib._pylab_helpers.Gcf.get_all_fig_managers()]
+
+    for f in figs:
+        for a in f.axes:
+            a.grid(False)

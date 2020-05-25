@@ -340,6 +340,8 @@ class fit_tool:
         self._cost_function = []
         # time
         self._fit_time = None
+        # FQN noise region
+        self.fqn_noise_range = [-2, -1]
 
         # --- display options ---
         self.display_enable = True
@@ -466,6 +468,10 @@ class fit_tool:
         # and the difference with the data
         diff = mod - self.data
 
+        # fit criteria
+        rsq_t, rsq_f = self.get_Rsq(params)
+        fqn = self.get_FQN(params)
+
         # cost
         current_err = np.sum(np.abs(np.power(diff, 2)))
         self._cost_function.append(current_err)
@@ -530,9 +536,9 @@ class fit_tool:
             disp_fit(ax, self.data, params, self.seq, True, True, None, self._water_only, self.display_range_ppm)
             current_fit_time = time.time() - self._fit_time
             if(fit_terminated):
-                ax.set_title("Fit terminated! %ds elapsed | iteration #%d | residue = %.2E" % (current_fit_time, self._model_call_count, current_err))
+                ax.set_title("Fit terminated! %ds elapsed \n iteration #%d | residue = %.2E | R2 = %.2f/%.2f | FQN = %.2f" % (current_fit_time, self._model_call_count, current_err, rsq_t, rsq_f, fqn))
             else:
-                ax.set_title("Running fit... %ds elapsed | iteration #%d | residue = %.2E" % (current_fit_time, self._model_call_count, current_err))
+                ax.set_title("Running fit... %ds elapsed \n iteration #%d | residue = %.2E | R2 = %.2f/%.2f | FQN = %.2f" % (current_fit_time, self._model_call_count, current_err, rsq_t, rsq_f, fqn))
             fig.subplots_adjust(left=0.02, bottom=0.1, right=0.98, top=0.95, wspace=0.2, hspace=None)
             plt.pause(0.01)
 
@@ -604,7 +610,7 @@ class fit_tool:
         params_CRBs_rel : params object
             Estimated relative Cramér-Rao Lower Bounds for each parameter (%)
         optim_result : 'OptimizeResult' object returned by scipy.optimize.least_squares
-            Numerical optimization parameters
+            Numerical optimization parameters, includes the R^2 coefficients [rsq_t and rsq_f] and the FQN coefficient [fqn]
         """
         log.info_line________________________()
         log.info("running fit...")
@@ -647,6 +653,15 @@ class fit_tool:
         params_fit = params_fit.toFullParams(optim_result.x)
         # final CRBs
         params_CRBs_abs, params_CRBs_rel = self.get_CRBs(params_fit)
+
+        # add fit criteria to optim_result
+        rsq_t, rsq_f = self.get_Rsq(params_fit)
+        optim_result.rsq_t = rsq_t
+        optim_result.rsq_f = rsq_f
+        optim_result.fqn = self.get_FQN(params_fit)
+
+        # switch back to not ready
+        self._ready = False
 
         return(params_fit, params_CRBs_abs, params_CRBs_rel, optim_result)
 
@@ -701,6 +716,74 @@ class fit_tool:
         params_CRBs_rel = params_CRBs_rel.toFullParams(CRBs_rel)
 
         return(params_CRBs_abs, params_CRBs_rel)
+
+    def get_Rsq(self, params):
+        """
+        Return the R^2 coefficient in time and frequency domain.
+
+        Parameters
+        ----------
+        params : params object
+            Array of simulation parameters
+
+        Returns
+        -------
+        r2_t : float
+            R^2 correlation coefficient between data and fit in TIME DOMAIN
+        r2_f: float
+            R^2 correlation coefficient between data and fit in FREQUENCY DOMAIN
+        """
+        # the model
+        mod = self.seq._model(params)
+
+        # and the R coeff in TIME DOMAIN
+        c = np.corrcoef(self.data, mod)
+        r_t = c[0, 1]
+        r2_t = r_t**2
+
+        # and the R coeff in FREQUENCY DOMAIN
+        c = np.corrcoef(self.data.spectrum(), mod.spectrum())
+        r_f = c[0, 1]
+        r2_f = r_f**2
+
+        return(r2_t, r2_f)
+
+    def get_FQN(self, params):
+        """
+        Return the FQN coefficient. See https://doi.org/10.1002/nbm.4257 : Quantitatively, this can be expressed using the fit quality number (FQN), which is the ratio of the variance in the fit residual divided by the variance in the pure spectral noise. For an ideal fit, the FQN should be close to 1.0, and the FQN/SNR ratio should be much less than 1.
+
+        Parameters
+        ----------
+        params : params object
+            Array of simulation parameters
+
+        Returns
+        -------
+        fqn : float
+            FQN coefficient of the fit
+        """
+        # residue
+        mod = self.seq._model(params)
+        diff = mod - self.data
+
+        # our model is in TIME DOMAIN
+        # but FQN only makes sense in FREQUENCY DOMAIN
+        # because the time domain data here is very probalby apodized
+        # the pure noise variance is therefore impossible to estimate
+        # that's fine with me, let's do it FREQUENCY DOMAIN
+
+        # estimate noise variance in user specified spectral region
+        ppm = self.data.frequency_axis_ppm()
+        sf = self.data.spectrum()
+        sf_analyze = np.real(sf)
+        ippm_noise_range = (self.fqn_noise_range[0] < ppm) & (ppm < self.fqn_noise_range[1])
+        data_noise_var = np.var(sf_analyze[ippm_noise_range])
+
+        # variance of fit residual
+        residue_var = np.var(diff.spectrum())
+
+        fqn = residue_var / data_noise_var
+        return(fqn)
 
     def disp_corr_mat(self, ax, params, mIndex_list=None, pIndex_list=[xxx.p_cm], color_bar=False):
         """

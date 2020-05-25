@@ -18,7 +18,7 @@ except ImportError:
     GAMMA_LIB_LOADED = False
 
 # GAMMA_LIB_LOADED forced to False for debug
-# GAMMA_LIB_LOADED = False
+GAMMA_LIB_LOADED = False
 
 import suspect
 import numpy as np
@@ -694,6 +694,9 @@ class mrs_sequence:
         self._meta_signals = None
         # time vector
         self._t = []
+        # last parameter call
+        self._last_params = None
+        self._last_model = None
 
         # initialized or not
         self._ready = False
@@ -1018,7 +1021,7 @@ class mrs_sequence:
             new_meta_signals.append(s_MRSData2)
 
         # final: carefully copy attributes except some
-        keys_not_to_copy = ["_meta_bs", "_meta_signals", "_t", "_ready", "npts", "fs"]
+        keys_not_to_copy = ["_meta_bs", "_meta_signals", "_t", "_ready", "_last_params", "_last_model", "npts", "fs"]
         for this_key in list(self.__dict__.keys()):
             if(this_key not in keys_not_to_copy):
                 self.__dict__[this_key] = optim_seq.__dict__[this_key]
@@ -1059,6 +1062,10 @@ class mrs_sequence:
             # ops, so let's try to load the simulations from a pkl file
             self._load_from_seqdb_file()
 
+        # initialize the model persistent memory
+        self._last_params = None
+        self._last_model = None
+
         self._ready = True
 
     def _model(self, p):
@@ -1079,11 +1086,21 @@ class mrs_sequence:
         if(not self.ready):
             log.error("this mrs_sequence object was not initialized!")
 
+        # check last call
+        if(self._last_params is not None and np.all(self._last_params == p)):
+            # we are asking for the same model than last time
+            # calling back persistent momery
+            return(self._last_model)
+
         # time MRS model
         s_MRSData = suspect.MRSData(np.zeros([self.npts, ]), 1 / self.fs, self.f0)
         s_MRSData2 = s_MRSData.view(reco.MRSData2)
         for k, s_meta in enumerate(self._meta_signals):
             s_MRSData2 = s_MRSData2 + s_meta * p[k, 0] * np.exp((-p[k, 1] + 2.0 * np.pi * 1j * p[k, 2]) * self._t + 1j * (p[k, 3] + self.additional_phi0))
+
+        # remember
+        self._last_params = p
+        self._last_model = s_MRSData2
 
         return(s_MRSData2)
 
