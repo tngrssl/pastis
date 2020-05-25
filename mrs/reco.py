@@ -1352,7 +1352,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 s_disp = np.mean(s_disp, axis=0)
                 s_zf_disp = np.mean(s_zf_disp, axis=0)
 
-            fig = plt.figure(110)
+            fig = plt.figure(100)
             fig.clf()
             axs = fig.subplots(2, 2, sharex='row', sharey='row')
             fig.canvas.set_window_title("mrs.reco.MRSData2.correct_zerofill_nd")
@@ -1474,7 +1474,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         if(display):
             # prepare subplots
-            fig = plt.figure(100)
+            fig = plt.figure(110)
             fig.clf()
             axs = fig.subplots(2, 3, sharex='col')
             fig.canvas.set_window_title("mrs.reco.MRSData2.correct_phase_3d")
@@ -4058,7 +4058,7 @@ class pipeline:
 
         # display SNR/LW evolution for all data and all jobs
         if(self.analyze_display):
-            fig = plt.figure(220)
+            fig = plt.figure(300)
             fig.clf()
             axs = fig.subplots(2, 1, sharex='row')
             fig.canvas.set_window_title("mrs.reco.pipeline._display_analyze_results")
