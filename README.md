@@ -49,7 +49,5 @@ SHRIMP can be used to process and quantify single-voxel Magnetic Resonance SPect
 - HDF5 format save/load: for now, only save the MRS signal with a few attributes. If needed, will complete implementation
 - Implement partial volume stuff for absolute quantification
 - Merge with Yasmin's code for DW MRS
-- implement FQN fit criteria + real-time indicator
 - peak-linewidth for prefit
-- adapt reco/fit pipelines for heart
 + check # TODO tags in the code :)
