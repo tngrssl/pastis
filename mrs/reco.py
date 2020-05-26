@@ -91,6 +91,70 @@ class data_db():
 
         return(pkl_data_dict)
 
+    def _dummy_check_func(self, d, p):
+        """
+        Return true if you want to select this dataset/pipeline when getting data from database using the get_datasets method. This is only a dummy example. Please feel free to recode a function with the same prototype to select for example only 3T scans, or short-TE scans, etc.
+
+        Parameters
+        ----------
+        d : MRSData2 object
+            Function with two arguments (MRSData2 object, pipeline object) that you should code and which returns True if you want to get it this dataset/pipeline out of the database.
+        p : pipeline object
+
+        Returns
+        -------
+        r : boolean
+            True if we keep this dataset/pipeline
+        """
+        r = (d.te > 0.0 and
+             p.data_coil_nChannels > 1)  # that is stupid, just an example
+        return(r)
+
+    def get_datasets(self, check_func=None):
+        """
+        Return datasets which passes the check function. If no function, return all datasets/pipelines.
+
+        Parameters
+        ----------
+        check_func : function
+            Function with two arguments (MRSData2 object, pipeline object) that you should code and which returns True if you want to get it this dataset/pipeline out of the database.
+
+        Returns
+        -------
+        dataset_list : list of MRSData2 objects
+            Datasets
+        pipeline_list : list of pipeline objects
+            Pipelines
+        """
+        if(check_func is None):
+            log.info("getting all datasets/pipelines...")
+        else:
+            log.info("getting datasets/pipelines using check function...")
+
+        # init
+        dataset_list = []
+        pipeline_list = []
+
+        # open pkl file
+        pkl_data_dict = self.read()
+
+        # for each patient
+        for pnk in list(pkl_data_dict.keys()):
+            # each dataset
+            for dnk in list(pkl_data_dict[pnk].keys()):
+                d = pkl_data_dict[pnk][dnk]["data"]
+                p = pkl_data_dict[pnk][dnk]["pipeline"]
+                if(check_func is None):
+                    # no check? return everything
+                    dataset_list.append(d)
+                    pipeline_list.append(p)
+                elif(check_func(d, p)):
+                    # return only if passes check coded by user
+                    dataset_list.append(d)
+                    pipeline_list.append(p)
+
+        return(dataset_list, pipeline_list)
+
     def get_latest_dataset(self):
         """
         Return the most recent dataset saved.

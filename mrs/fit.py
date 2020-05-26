@@ -774,7 +774,7 @@ class fit_tool:
 
         # estimate noise variance in user specified spectral region
         ppm = self.data.frequency_axis_ppm()
-        sf = self.data.spectrum()
+        sf = np.squeeze(self.data.spectrum())
         sf_analyze = np.real(sf)
         ippm_noise_range = (self.fqn_noise_range[0] < ppm) & (ppm < self.fqn_noise_range[1])
         data_noise_var = np.var(sf_analyze[ippm_noise_range])
