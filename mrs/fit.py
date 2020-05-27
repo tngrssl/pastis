@@ -75,7 +75,7 @@ class prefit_tool:
         self._meta_bs = self.seq.meta_bs
 
         # metabolites to integrate
-        self.area_integration_peaks = [xxx.m_Cho_CH3, xxx.m_Cr_CH3, xxx.m_NAA_CH3]
+        self.area_integration_peaks = [xxx.m_Water]
         # ppm range to look for peak maximum
         self.area_integration_peak_search_range = 0.4  # ppm
         # internal parameters
@@ -89,7 +89,7 @@ class prefit_tool:
         # display options
         self.display_enable = True
         self.display_fig_index = 1000
-        self.display_range_ppm = [1, 6]  # ppm
+        self.display_range_ppm = [0, 6]  # ppm
 
         # to know if the object is initialized
         self._ready = False
@@ -141,7 +141,6 @@ class prefit_tool:
         self._peak_names = []
         self._peak_ppms = []
         self._peak_nprots = []
-        self._peak_base_width = []
 
         # first find chemical shifts for those peaks
         meta_keys = list(self.meta_bs.keys())
@@ -162,22 +161,25 @@ class prefit_tool:
             if(meta_found_singulet is None):
                 log.error("> one of the metabolites you chose for peak integration does not have a singlet, aborting area integration...")
             else:
-                # measure linewidth of the peak
-                aipsr = self.area_integration_peak_search_range / 2.0
-                this_lw = self.data.analyze_linewidth([this_meta_ppm - aipsr / 2.0, this_meta_ppm + aipsr / 2.0], this_meta_name, False, True)
                 # store
                 self._peak_names.append(this_meta_name)
                 self._peak_ppms.append(this_meta_ppm)
                 self._peak_nprots.append(this_meta_nprots)
-                # according to https://doi.org/10.1002/nbm.4257
-                # peak integration area should be 2 * peak linewidth
-                self._peak_base_width.append(this_lw * 2.0)
 
         # I am ready now
         self._ready = True
 
     def run(self):
-        """Run the area integration pipeline."""
+        """
+        Run the area integration pipeline.
+
+        Returns
+        -------
+        pars : params object
+            Estimated relative metabolic concentration using area integration
+        pars_norm : params object
+            Estimated relative metabolic concentration using area integration, normalized by proton number
+        """
         log.info_line________________________()
         log.info("running peak integration...")
         log.info_line________________________()
@@ -193,7 +195,6 @@ class prefit_tool:
         # find maximum peak in range and its chemical shift
         sf = s.spectrum()
         sf_real = np.real(sf)
-        sf_abs = np.abs(sf)
 
         if(self.display_enable):
             fig = plt.figure(self.display_fig_index)
@@ -205,25 +206,27 @@ class prefit_tool:
         # now for each peak, integrate the area
         self._peak_areas = []
         self._peak_areas_norm = []
-        p = sim.params(self.meta_bs)
-        p[:] = 0.0
+        pars = sim.params(self.meta_bs)
+        pars[:] = 0.0
+        pars_pnorm = sim.params(self.meta_bs)
+        pars_pnorm[:] = 0.0
 
         log.info("integrating peak for...")
         log.info_line________________________()
-        for (this_peak_index, this_peak_name, this_peak_ppm, this_peak_np, this_peak_basewidth) in zip(self.area_integration_peaks, self._peak_names, self._peak_ppms, self._peak_nprots, self._peak_base_width):
+        for (this_peak_index, this_peak_name, this_peak_ppm, this_peak_np) in zip(self.area_integration_peaks, self._peak_names, self._peak_ppms, self._peak_nprots):
             log.info("[%s] theoretically at %.2fppm in theory" % (this_peak_name, this_peak_ppm))
+
             # first find closest peak in range
-            peakwidth_ppm = this_peak_basewidth / self.data.f0
-            ippm_peak_range = ((this_peak_ppm - self.area_integration_peak_search_range) > ppm) | (ppm > (this_peak_ppm + self.area_integration_peak_search_range))
-            sf_masked = sf_abs.copy()
-            sf_masked[ippm_peak_range] = 0
-            ippm_peak = np.argmax(sf_masked)
-            if(ippm_peak == 0):
-                log.error("no peak found in specified ppm range or badly phased data!")
-            log.debug("found it in the spectrum at %.2fppm" % ppm[ippm_peak])
+            this_peak_search_range = [this_peak_ppm - self.area_integration_peak_search_range, this_peak_ppm + self.area_integration_peak_search_range]
+            _, this_peak_ppm, _, this_peak_lw_hz, _, _ = self.data._analyze_peak_1d(this_peak_search_range)
+            log.debug("found it in the spectrum at %.2fppm" % this_peak_ppm)
 
             # integrate area
-            ippm_peak_range = (ppm > (ppm[ippm_peak] - peakwidth_ppm / 2)) & (ppm < (ppm[ippm_peak] + peakwidth_ppm / 2))
+
+            # according to https://doi.org/10.1002/nbm.4257
+            # peak integration area should be 2 * peak linewidth
+            this_peak_lw_ppm = this_peak_lw_hz / self.data.f0
+            ippm_peak_range = (ppm > (this_peak_ppm - this_peak_lw_ppm)) & (ppm < (this_peak_ppm + this_peak_lw_ppm))
             sf_to_integrate = sf_real[ippm_peak_range]
             ppm_to_integrate = ppm[ippm_peak_range]
             sf_to_integrate = sf_to_integrate[::-1]
@@ -236,7 +239,8 @@ class prefit_tool:
             # store
             self._peak_areas.append(this_peak_area)
             self._peak_areas_norm.append(this_peak_area / this_peak_np)
-            p[this_peak_index, 0] = this_peak_area / this_peak_np
+            pars[this_peak_index, 0] = this_peak_area
+            pars_pnorm[this_peak_index, 0] = this_peak_area / this_peak_np
 
             # display the area
             if(self.display_enable):
@@ -251,8 +255,8 @@ class prefit_tool:
             axs.legend()
             plt.pause(0.5)
 
-        # return a params vector
-        return(p)
+        # return a param vectors
+        return(pars, pars_pnorm)
 
 
 class fit_tool:

@@ -1305,6 +1305,136 @@ class MRSData2(suspect.mrsobjects.MRSData):
         """
         return(self._resp_trace)
 
+    def _analyze_peak_1d(self, ppm_range):
+        """
+        Find peak in specific ppm range using magnitude mode and return stuff.
+
+        * Works only with a 1D [timepoints] signal.
+
+        Parameters
+        ----------
+        ppm_range : list [2]
+            Range in ppm used for peak searching
+
+        Returns
+        -------
+        peak_index : float
+            Index position of the peak
+        peak_ppm : float
+            Position in PPM of the peak
+        peak_val : np.complex128
+            Peak value
+        peak_lw : float
+            Peak linewidth in Hz
+        peak_seg_ppm : numpy array
+            Peak segment ppm axis
+        peak_seg_val : numpy complex array
+            Peak segment value
+        """
+        ppm = self.frequency_axis_ppm()
+        sf = self.spectrum()
+        sf_abs = np.abs(sf)
+
+        # mask outside range
+        ippm_peak_outside_range = (ppm_range[0] > ppm) | (ppm > ppm_range[1])
+        sf_abs[ippm_peak_outside_range] = 0
+
+        # max
+        peak_index = np.argmax(sf_abs)
+
+        # check
+        if(peak_index == 0):
+            log.error("no peak found in specified ppm range or badly phased data!")
+
+        # ppm
+        peak_ppm = ppm[peak_index]
+
+        # complex value
+        peak_val = sf[peak_index]
+
+        # lw
+        sf_real = np.real(sf)
+        amp_peak = np.real(peak_val)
+        ippm_max = peak_index + np.argmax(sf_real[peak_index:] < amp_peak / 2)
+        ippm_min = peak_index - np.argmax(sf_real[peak_index::-1] < amp_peak / 2)
+        dppm = np.abs(ppm[ippm_max] - ppm[ippm_min])
+        peak_lw = dppm * self.f0
+
+        # peak segment
+        ippm_half_peak = np.arange(ippm_min, ippm_max)
+        ppm_seg = ppm[ippm_half_peak]
+        peak_seg = sf[ippm_half_peak]
+
+        return(peak_index, peak_ppm, peak_val, peak_lw, ppm_seg, peak_seg)
+
+    def _analyze_peak_2d(self, peak_range=[4.5, 5]):
+        """
+        Analyze a peak in the spectrum by estimating its amplitude, linewidth, frequency shift and phase for each average.
+
+        * Works only with a 2D [averages,timepoints] signal.
+
+        Parameters
+        ----------
+        peak_range : array [2]
+            Range in ppm used to analyze peak phase when no reference signal is specified
+
+        Returns
+        -------
+        peak_trace : numpy array [averages,4]
+            Peak changes (amplitude, linewidth, frequency and phase) for each average in raw data
+        peak_trace_rel2mean : numpy array [averages,4]
+            Peak changes (amplitude, linewidth, frequency and phase) for each average in raw data relative to mean value
+        peak_trace_rel2firstpt : numpy array [averages,4]
+            Peak relative changes (amplitude, linewidth, frequency and phase) for each average in raw data relative to 1st point
+        """
+        log.debug("analyzing peak for [%s]..." % self.display_label)
+        # dimensions check
+        if(self.ndim != 2):
+            log.error("this method only works for 2D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
+
+        # first, find peak of interest in range, just to check
+        s_avg = np.mean(self, axis=0)
+        _, peak_ppm, _, _, _, _ = s_avg._analyze_peak_1d(peak_range)
+        log.debug("found peak of interest at %0.2fppm!" % peak_ppm)
+
+        # for each average in moving averaged data
+        peak_trace = np.zeros([self.shape[0], 4])
+        pbar = log.progressbar("analyzing", self.shape[0])
+        for a in range(0, self.shape[0]):
+
+            # call 1D peak analysis
+            peak_index, peak_ppm, peak_val, peak_lw, _, _ = self[a, :]._analyze_peak_1d(peak_range)
+
+            # shift in ppm
+            peak_trace[a, 2] = peak_ppm
+            # amplitude
+            peak_trace[a, 0] = np.real(peak_val)
+            # linewidth in Hz
+            peak_trace[a, 1] = peak_lw
+            # phase in rad
+            peak_trace[a, 3] = np.angle(peak_val)
+
+            pbar.update(a)
+
+        # normalize stuff
+
+        # relative to mean
+        peak_trace_rel2mean = np.zeros([self.shape[0], 4])
+        peak_trace_rel2mean[:, 0] = peak_trace[:, 0] / peak_trace[:, 0].mean() * 100 - 100
+        peak_trace_rel2mean[:, 1] = peak_trace[:, 1] - peak_trace[:, 1].mean()
+        peak_trace_rel2mean[:, 2] = peak_trace[:, 2] - peak_trace[:, 2].mean()
+        peak_trace_rel2mean[:, 3] = peak_trace[:, 3] - peak_trace[:, 3].mean()
+
+        # relative to 1st pt
+        peak_trace_rel2firstpt = np.zeros([self.shape[0], 4])
+        peak_trace_rel2firstpt[:, 0] = peak_trace[:, 0] / peak_trace[0, 0] * 100 - 100
+        peak_trace_rel2firstpt[:, 1] = peak_trace[:, 1] - peak_trace[0, 1]
+        peak_trace_rel2firstpt[:, 2] = peak_trace[:, 2] - peak_trace[0, 2]
+        peak_trace_rel2firstpt[:, 3] = peak_trace[:, 3] - peak_trace[0, 3]
+
+        pbar.finish("done")
+        return(peak_trace, peak_trace_rel2mean, peak_trace_rel2firstpt)
+
     def analyze_cs_displacement(self):
         """
         Calculate chemical shift displacement in three directions.
@@ -1612,19 +1742,13 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
             elif(phase_method == 5):
                 # phase of peak in averaged spectrum
-                sf_avg = s[:, c, :].mean(axis=0).spectrum()
+                s_avg = s[:, c, :].mean(axis=0)
 
                 # find maximum peak in range and its phase
-                ippm_peak_range = (peak_range[0] > ppm) | (ppm > peak_range[1])
-                sf_avg_abs_masked = np.abs(sf_avg)
-                sf_avg_abs_masked[ippm_peak_range] = 0
-                ippm_peak = np.argmax(sf_avg_abs_masked)
-                ppm_peak = ppm[ippm_peak]
-                phase_peak_avg = np.angle(sf_avg[ippm_peak])
-                if(ippm_peak == 0):
-                    log.error("no peak found in specified ppm range or badly phased data!")
+                _, peak_ppm, peak_val, _, _, _ = s_avg._analyze_peak_1d(peak_range)
+                phase_peak_avg = np.angle(peak_val)
                 if(c == 0):
-                    log.debug("measuring phase at %0.2fppm on 1st channel!" % ppm_peak)
+                    log.debug("measuring phase at %0.2fppm on 1st channel!" % peak_ppm)
 
             # late init progress bar
             if(c == 0):
@@ -1634,45 +1758,43 @@ class MRSData2(suspect.mrsobjects.MRSData):
             for a in range(0, s.shape[0]):
 
                 # this spectrum
-                sf = s[a, c, :].spectrum()
+                this_s = s[a, c, :]
+                this_sf = this_s.spectrum()
 
                 if(phase_method == 0):
                     # correct phase using reference time-domain phase estimation
-                    s_phased[a, c, :] = s[a, c, :] * np.exp(-1j * (sp_ref + phase_offset))
+                    this_s_phased = this_s * np.exp(-1j * (sp_ref + phase_offset))
                 elif(phase_method == 1):
                     # correct phase using first point of reference time-domain phase estimation
-                    s_phased[a, c, :] = s[a, c, :] * np.exp(-1j * (sp_ref[0] + phase_offset))
+                    this_s_phased = this_s * np.exp(-1j * (sp_ref[0] + phase_offset))
                 elif(phase_method == 2):
                     # phase of first point of this fid
-                    phase_fid = np.angle(s[a, c, 0])
+                    phase_fid = np.angle(this_s[0])
                     # and apply it to correct the spectrum
-                    s_phased[a, c, :] = s[a, c, :] * np.exp(-1j * (phase_fid + phase_offset))
+                    this_s_phased = this_s * np.exp(-1j * (phase_fid + phase_offset))
                 elif(phase_method == 3):
                     # apply to correct the spectrum
-                    s_phased[a, c, :] = s[a, c, :] * np.exp(-1j * (phase_fid_avg + phase_offset))
+                    this_s_phased = this_s * np.exp(-1j * (phase_fid_avg + phase_offset))
                 elif(phase_method == 4):
                     # find maximum peak in range and its phase
-                    ippm_peak_range = (peak_range[0] > ppm) | (ppm > peak_range[1])
-                    sf_abs_masked = np.abs(sf)
-                    sf_abs_masked[ippm_peak_range] = 0
-                    ippm_peak = np.argmax(sf_abs_masked)
-                    phase_peak = np.angle(sf[ippm_peak])
+                    _, peak_ppm, peak_val, _, _, _ = this_s._analyze_peak_1d(peak_range)
+                    phase_peak = np.angle(peak_val)
 
                     # apply phase to spectrum
-                    sf_phased = s[a, c, :].spectrum() * np.exp(-1j * (phase_peak + phase_offset))
+                    this_sf_phased = this_sf * np.exp(-1j * (phase_peak + phase_offset))
                     # ifft back
-                    s_phased[a, c, :] = np.fft.ifft(np.fft.ifftshift(sf_phased))
+                    this_s_phased = np.fft.ifft(np.fft.ifftshift(this_sf_phased))
                 elif(phase_method == 5):
                     # apply phase to spectrum
-                    sf_phased = s[a, c, :].spectrum() * np.exp(-1j * (phase_peak_avg + phase_offset))
+                    this_sf_phased = this_sf * np.exp(-1j * (phase_peak_avg + phase_offset))
                     # ifft back
-                    s_phased[a, c, :] = np.fft.ifft(np.fft.ifftshift(sf_phased))
+                    this_s_phased = np.fft.ifft(np.fft.ifftshift(this_sf_phased))
 
                 if(display):
                     # display original meta FID
                     axs[0, 1].cla()
-                    axs[0, 1].plot(t, np.real(s[a, c, :]), linewidth=1, label='real part')
-                    axs[0, 1].plot(t, np.imag(s[a, c, :]), linewidth=1, label='imag part')
+                    axs[0, 1].plot(t, np.real(this_s), linewidth=1, label='real part')
+                    axs[0, 1].plot(t, np.imag(this_s), linewidth=1, label='imag part')
                     axs[0, 1].set_xlabel('time (s)')
                     axs[0, 1].set_ylabel('original')
                     axs[0, 1].grid('on')
@@ -1681,14 +1803,10 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
                     # display original meta spectrum
                     axs[0, 2].cla()
-                    axs[0, 2].plot(ppm, np.real(
-                        s[a, c, :].spectrum()), linewidth=1, label='real part')
-                    if(phase_method == 3):
-                        axs[0, 2].plot(ppm[ippm_peak], np.real(sf[ippm_peak]), 'ro')
-                        axs[0, 2].axvline(x=ppm[ippm_peak], color='r', linestyle='--')
-                    if(phase_method == 4):
-                        axs[0, 2].plot(ppm[ippm_peak], np.real(sf[ippm_peak]), 'ro')
-                        axs[0, 2].axvline(x=ppm[ippm_peak], color='r', linestyle='--')
+                    axs[0, 2].plot(ppm, np.real(this_sf), linewidth=1, label='real part')
+                    if(phase_method == 4 or phase_method == 5):
+                        axs[0, 2].plot(peak_ppm, np.real(peak_val), 'ro')
+                        axs[0, 2].axvline(x=peak_ppm, color='r', linestyle='--')
                     axs[0, 2].set_xlim(display_range[1], display_range[0])
                     axs[0, 2].set_xlabel('time (s)')
                     axs[0, 2].set_ylabel('original')
@@ -1698,7 +1816,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
                     # display corrected meta FID
                     axs[1, 1].cla()
-                    axs[1, 1].plot(t, np.real(s_phased[a, c, :]), 'b-', linewidth=1, label='real part')
+                    axs[1, 1].plot(t, np.real(this_s_phased), 'b-', linewidth=1, label='real part')
                     axs[1, 1].set_xlabel('time (s)')
                     axs[1, 1].set_ylabel('corrected')
                     axs[1, 1].grid('on')
@@ -1706,7 +1824,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
                     # display corrected meta spectrum
                     axs[1, 2].cla()
-                    axs[1, 2].plot(ppm, s_phased[a, c, :].spectrum().real, 'b-', linewidth=1, label='real part')
+                    axs[1, 2].plot(ppm, this_s_phased.spectrum().real, 'b-', linewidth=1, label='real part')
                     axs[1, 2].set_xlim(display_range[1], display_range[0])
                     axs[1, 2].set_xlabel('frequency (ppm)')
                     axs[1, 2].set_ylabel('corrected')
@@ -1715,6 +1833,9 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
                     fig.subplots_adjust()
                     fig.show()
+
+                # store
+                s_phased[a, c, :] = this_s_phased
 
                 pbar.update(c * s.shape[0] + a + 1)
 
@@ -1883,101 +2004,6 @@ class MRSData2(suspect.mrsobjects.MRSData):
             s_ma[a, :] = np.mean(s[ia:ib, :], axis=0)
 
         return(s_ma)
-
-    def _analyze_peak_2d(self, peak_range=[4.5, 5]):
-        """
-        Analyze a peak in the spectrum by estimating its amplitude, linewidth, frequency shift and phase for each average.
-
-        * Works only with a 2D [averages,timepoints] signal.
-
-        Parameters
-        ----------
-        peak_range : array [2]
-            Range in ppm used to analyze peak phase when no reference signal is specified
-
-        Returns
-        -------
-        peak_trace : numpy array [averages,4]
-            Peak changes (amplitude, linewidth, frequency and phase) for each average in raw data
-        peak_trace_rel2mean : numpy array [averages,4]
-            Peak changes (amplitude, linewidth, frequency and phase) for each average in raw data relative to mean value
-        peak_trace_rel2firstpt : numpy array [averages,4]
-            Peak relative changes (amplitude, linewidth, frequency and phase) for each average in raw data relative to 1st point
-        """
-        log.debug("analyzing peak for [%s]..." % self.display_label)
-        # dimensions check
-        if(self.ndim != 2):
-            log.error("this method only works for 2D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
-
-        # first, find peak of interest in range
-        ppm = self.frequency_axis_ppm()
-        s_avg = np.mean(self, axis=0)
-        sf_avg_abs = np.abs(s_avg.spectrum())
-        ippm_peak_range = (peak_range[0] > ppm) | (ppm > peak_range[1])
-        sf_masked = sf_avg_abs.copy()
-        sf_masked[ippm_peak_range] = 0
-        ippm_peak_avg = np.argmax(sf_masked, axis=0)
-        if(ippm_peak_avg == 0):
-            log.error("no peak found in specified ppm range or badly phased data!")
-        ppm_peak_avg = ppm[ippm_peak_avg]
-        log.debug("found peak of interest at %0.2fppm!" % ppm_peak_avg)
-
-        # for each average in moving averaged data
-        peak_trace = np.zeros([self.shape[0], 4])
-        pbar = log.progressbar("analyzing", self.shape[0])
-        for a in range(0, self.shape[0]):
-
-            # first, measure shift in ppm
-            sf_masked_abs = np.abs(self[a, :].spectrum())
-            sf_masked_abs[ippm_peak_range] = 0
-            ippm_peak = np.argmax(sf_masked_abs)
-            if(ippm_peak == 0):
-                log.error("no peak found in specified ppm range or badly phased data!")
-            ppm_peak = ppm[ippm_peak]
-            peak_trace[a, 2] = ppm_peak
-
-            # estimate amplitude
-            sf_masked_real = np.real(self[a, :].spectrum())
-            sf_masked_real[ippm_peak_range] = 0
-            ippm_peak = np.argmax(sf_masked_real)
-            if(ippm_peak == 0):
-                log.error("no peak found in specified ppm range or badly phased data!")
-            ppm_peak = ppm[ippm_peak]
-            amp_peak = sf_masked_real[ippm_peak]
-            peak_trace[a, 0] = amp_peak
-
-            # estimate linewidth in Hz
-            sf_real = np.real(self[a, :].spectrum())
-            ippm_max = ippm_peak + np.argmax(sf_real[ippm_peak:] < amp_peak / 2)
-            ippm_min = ippm_peak - np.argmax(sf_real[ippm_peak::-1] < amp_peak / 2)
-            dppm = np.abs(ppm[ippm_max] - ppm[ippm_min])
-            lw = dppm * self.f0
-            peak_trace[a, 1] = lw
-
-            # estimate phase in rad
-            sf_cmplx = self[a, :].spectrum()
-            peak_trace[a, 3] = np.angle(sf_cmplx[ippm_peak])
-
-            pbar.update(a)
-
-        # normalize stuff
-
-        # relative to mean
-        peak_trace_rel2mean = np.zeros([self.shape[0], 4])
-        peak_trace_rel2mean[:, 0] = peak_trace[:, 0] / peak_trace[:, 0].mean() * 100 - 100
-        peak_trace_rel2mean[:, 1] = peak_trace[:, 1] - peak_trace[:, 1].mean()
-        peak_trace_rel2mean[:, 2] = peak_trace[:, 2] - peak_trace[:, 2].mean()
-        peak_trace_rel2mean[:, 3] = peak_trace[:, 3] - peak_trace[:, 3].mean()
-
-        # relative to 1st pt
-        peak_trace_rel2firstpt = np.zeros([self.shape[0], 4])
-        peak_trace_rel2firstpt[:, 0] = peak_trace[:, 0] / peak_trace[0, 0] * 100 - 100
-        peak_trace_rel2firstpt[:, 1] = peak_trace[:, 1] - peak_trace[0, 1]
-        peak_trace_rel2firstpt[:, 2] = peak_trace[:, 2] - peak_trace[0, 2]
-        peak_trace_rel2firstpt[:, 3] = peak_trace[:, 3] - peak_trace[0, 3]
-
-        pbar.finish("done")
-        return(peak_trace, peak_trace_rel2mean, peak_trace_rel2firstpt)
 
     def analyze_physio_2d(self, peak_range=[4.5, 5], delta_time_range=1000.0, display=False):
         """
@@ -2529,19 +2555,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
                     plt.plot(ppm, s_ma[k, :].spectrum().real * ampfactor + ystep * k, 'g-', linewidth=1)
 
                 # build lineshape segment
-                sf_analyze = np.real(s_ma[k, :].spectrum())
-                sf_analyze_cropped = sf_analyze.copy()
-                sf_analyze_cropped[ippm_peak_range] = 0
-                ippm_peak = np.argmax(sf_analyze_cropped)
-                if(ippm_peak == 0):
-                    log.error("no peak found in specified ppm range or badly phased data!")
-
-                # estimate linewidth in Hz
-                amp_peak = sf_analyze[ippm_peak]
-                ippm_max = ippm_peak + np.argmax(sf_analyze[ippm_peak:] < amp_peak / 2)
-                ippm_min = ippm_peak - np.argmax(sf_analyze[ippm_peak::-1] < amp_peak / 2)
-                ippm_half_peak = np.arange(ippm_min, ippm_max)
-                plt.plot(ppm[ippm_half_peak], sf_analyze[ippm_half_peak] * ampfactor + ystep * k, 'k-', linewidth=1)
+                _, _, _, _, peak_seg_ppm, peak_seg_val = s_ma[k, :]._analyze_peak_1d(peak_range)
+                plt.plot(peak_seg_ppm, np.real(peak_seg_val) * ampfactor + ystep * k, 'k-', linewidth=1)
 
             plt.xlim(peak_range[1], peak_range[0])
             plt.xlabel('chemical shift (ppm)')
@@ -2601,14 +2616,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
             # find peak in average spectrum absolute mode
             s_avg = np.mean(s, axis=0)
-            sf_avg_abs = np.abs(s_avg.spectrum())
-            ippm_peak_range = (peak_range[0] > ppm) | (ppm > peak_range[1])
-            sf_masked = sf_avg_abs.copy()
-            sf_masked[ippm_peak_range] = 0
-            ippm_peak_avg = np.argmax(sf_masked, axis=0)
-            if(ippm_peak_avg == 0):
-                raise Exception(" > no peak found in specified ppm range or badly phased data!")
-            ppm_peak_avg = ppm[ippm_peak_avg]
+            ippm_peak_avg, ppm_peak_avg, peak_val, _, _, _ = s_avg._analyze_peak_1d(peak_range)
             log.debug("measuring peak properties at %0.2fppm!" % ppm_peak_avg)
 
             # for each average in moving averaged data
@@ -2618,12 +2626,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             for a in range(0, s_ma.shape[0]):
 
                 # measure shift on moving average data
-                sf_masked = np.abs(s_ma[a, :].spectrum())
-                sf_masked[ippm_peak_range] = 0
-                ippm_peak = np.argmax(sf_masked)
-                if(ippm_peak == 0):
-                    log.error("no peak found in specified ppm range or badly phased data!")
-                ppm_peak = ppm[ippm_peak]
+                ippm_peak, ppm_peak, _, _, _, _ = s_ma[a, :]._analyze_peak_1d(peak_range)
 
                 # estimate frequency shift in Hz compared to average spectrum
                 dppm = -(ppm_peak_avg - ppm_peak)
@@ -2649,12 +2652,12 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 fig.suptitle("frequency realigning [%s]" % self.display_label)
 
                 # display original averaged spectrum
-                axs[0, 0].plot(ppm, sf_avg_abs, 'k-', linewidth=1)
+                axs[0, 0].plot(ppm, np.abs(s_avg.spectrum()), 'k-', linewidth=1)
                 axs[0, 0].set_xlim(display_range[1], display_range[0])
                 axs[0, 0].set_ylabel('averaged')
                 axs[0, 0].grid('on')
                 # add peak position
-                axs[0, 0].plot(ppm_peak_avg, sf_avg_abs[ippm_peak_avg], 'ro')
+                axs[0, 0].plot(ppm_peak_avg, np.abs(peak_val), 'ro')
                 axs[0, 0].axvline(x=ppm_peak_avg, color='r', linestyle='--')
 
                 # display original data
@@ -3179,13 +3182,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         ppm = s.frequency_axis_ppm()
 
         # find maximum peak in range and its chemical shift
-        ippm_peak_range = (peak_range[0] > ppm) | (ppm > peak_range[1])
-        sf_abs_masked = np.real(s.spectrum())
-        sf_abs_masked[ippm_peak_range] = 0
-        ippm_peak = np.argmax(sf_abs_masked)
-        if(ippm_peak == 0):
-            log.error("no peak found in specified ppm range or badly phased data!")
-        ppm_peak = ppm[ippm_peak]
+        _, ppm_peak, peak_val, _, _, _ = s._analyze_peak_1d(peak_range)
         log.debug("peak detected at %0.2fppm -> %0.2fppm!" % (ppm_peak, peak_real_ppm))
 
         # estimate frequency shift in Hz
@@ -3207,7 +3204,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             axs[0].set_ylabel('original')
             axs[0].grid('on')
             # add peak position
-            axs[0].plot(ppm_peak, s.spectrum()[ippm_peak].real, 'ro')
+            axs[0].plot(ppm_peak, np.real(peak_val), 'ro')
             axs[0].axvline(x=ppm_peak, color='r', linestyle='--')
 
             axs[1].plot(ppm, s_shifted.spectrum().real, 'b-', linewidth=1)
@@ -3216,7 +3213,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             axs[1].set_ylabel('shifted')
             axs[1].grid('on')
             # add new peak position
-            axs[1].plot(peak_real_ppm, s.spectrum()[ippm_peak].real, 'ro')
+            axs[1].plot(peak_real_ppm, np.real(peak_val), 'ro')
             axs[1].axvline(x=peak_real_ppm, color='r', linestyle='--')
 
             fig.subplots_adjust()
@@ -3359,41 +3356,32 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig.canvas.set_window_title("mrs.reco.MRSData2.analyze_snr_1d")
             fig.suptitle("analyzing SNR for [%s]" % self.display_label)
 
-        # find maximum peak in range and its chemical shift
-        ppm = s.frequency_axis_ppm()
+        # find maximum peak in range
         sf = s.spectrum()
+        _, ppm_peak, peak_val, _, _, _ = s._analyze_peak_1d(peak_range)
         if(magnitude_mode):
-            sf_analyze = np.abs(sf)
-            log.debug("going to analyze the MAGNITUDE spectrum...")
+            log.debug("measuring the MAGNITUDE intensity at %0.2fppm!" % ppm_peak)
+            snr_signal = np.abs(peak_val)
+            sf_noise = np.abs(sf)
         else:
-            sf_analyze = np.real(sf)
-            log.debug("going to analyze the REAL spectrum...")
-
-        ippm_peak_range = (peak_range[0] > ppm) | (ppm > peak_range[1])
-        sf_analyze2 = sf_analyze.copy()
-        sf_analyze2[ippm_peak_range] = 0
-        ippm_peak = np.argmax(sf_analyze2)
-        if(ippm_peak == 0):
-            log.warning("no peak found in specified ppm range or badly phased data!")
-            return(np.nan, np.nan, np.nan)
-
-        ppm_peak = ppm[ippm_peak]
-        log.debug("by measuring the intensity at %0.2fppm!" % ppm_peak)
-        snr_signal = sf_analyze[ippm_peak]
+            log.debug("measuring the REAL intensity at %0.2fppm!" % ppm_peak)
+            snr_signal = np.real(peak_val)
+            sf_noise = np.real(sf)
 
         # estimate noise in user specified spectral region
+        ppm = s.frequency_axis_ppm()
         log.debug("estimating noise from %0.2f to %0.2fppm region!" % (noise_range[0], noise_range[1]))
         ippm_noise_range = (noise_range[0] < ppm) & (ppm < noise_range[1])
-        snr_noise = np.std(sf_analyze[ippm_noise_range])
+        snr_noise = np.std(sf_noise[ippm_noise_range])
 
         if(display):
-            axs[0].plot(ppm, np.real(s.spectrum()), 'k-', linewidth=1)
+            axs[0].plot(ppm, np.real(sf), 'k-', linewidth=1)
             axs[0].set_xlim(display_range[1], display_range[0])
             axs[0].set_xlabel('chemical shift (ppm)')
             axs[0].set_ylabel('real part')
             axs[0].grid('on')
 
-            axs[1].plot(ppm, np.abs(s.spectrum()), 'k-', linewidth=1)
+            axs[1].plot(ppm, np.abs(sf), 'k-', linewidth=1)
             axs[1].set_xlim(display_range[1], display_range[0])
             axs[1].set_xlabel('chemical shift (ppm)')
             axs[1].set_ylabel('magnitude mode')
@@ -3405,10 +3393,10 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 ax = axs[0]
 
             # show peak of interest
-            ax.plot(ppm[ippm_peak], sf_analyze[ippm_peak], 'ro')
-            ax.axvline(x=ppm[ippm_peak], color='r', linestyle='--')
+            ax.plot(ppm_peak, snr_signal, 'ro')
+            ax.axvline(x=ppm_peak, color='r', linestyle='--')
             # show noise region
-            ax.plot(ppm[ippm_noise_range], sf_analyze[ippm_noise_range], 'bo')
+            ax.plot(ppm[ippm_noise_range], sf_noise[ippm_noise_range], 'bo')
 
         # finish display
         if(display):
@@ -3451,63 +3439,43 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         # init
         s = self.copy()
-        ppm = s.frequency_axis_ppm()
 
-        # find maximum peak in range and its chemical shift
-        sf = s.spectrum()
+        # call 1D peak analysis
+        _, ppm_peak, _, lw, peak_seg_ppm, peak_seg_val = s._analyze_peak_1d(peak_range)
         if(magnitude_mode):
-            sf_analyze = np.abs(sf)
-            log.debug("going to analyze the MAGNITUDE spectrum...")
+            log.debug("estimating the MAGNITUDE peak linewidth at %0.2fppm!" % ppm_peak)
         else:
-            sf_analyze = np.real(sf)
-            log.debug("going to analyze the REAL spectrum...")
+            log.debug("estimating the REAL peak linewidth at %0.2fppm!" % ppm_peak)
 
-        # find peak in range
-        ippm_peak_range = (peak_range[0] > ppm) | (ppm > peak_range[1])
-        sf_analyze_cropped = sf_analyze.copy()
-        sf_analyze_cropped[ippm_peak_range] = 0
-        ippm_peak = np.argmax(sf_analyze_cropped)
-        if(ippm_peak == 0):
-            log.error("no peak found in specified ppm range or badly phased data!")
-        ppm_peak = ppm[ippm_peak]
-        log.debug("estimating the peak linewidth at %0.2fppm!" % ppm_peak)
-
-        # estimate linewidth in Hz
-        amp_peak = sf_analyze[ippm_peak]
-        ippm_max = ippm_peak + np.argmax(sf_analyze[ippm_peak:] < amp_peak / 2)
-        ippm_min = ippm_peak - np.argmax(sf_analyze[ippm_peak::-1] < amp_peak / 2)
-        ippm_half_peak = np.arange(ippm_min, ippm_max)
-        dppm = np.abs(ppm[ippm_max] - ppm[ippm_min])
-        lw = dppm * s.f0
         log.info("results for [" + s.display_label + "] coming...")
         log.info("LW = %0.2f Hz!" % lw)
 
         if(display):
+            ppm = s.frequency_axis_ppm()
+            sf = s.spectrum()
+
             fig = plt.figure(230)
             fig.clf()
             axs = fig.subplots(2, 1, sharex='all', sharey='all')
             fig.canvas.set_window_title("mrs.reco.MRSData2.analyze_linewidth_1d")
             fig.suptitle("analyzing peak linewidth for [%s]" % self.display_label)
 
-            axs[0].plot(ppm, np.real(s.spectrum()), 'k-', linewidth=1)
+            axs[0].plot(ppm, np.real(sf), 'k-', linewidth=1)
             axs[0].set_xlim(display_range[1], display_range[0])
             axs[0].set_xlabel('chemical shift (ppm)')
             axs[0].set_ylabel('real part')
             axs[0].grid('on')
 
-            axs[1].plot(ppm, np.abs(s.spectrum()), 'k-', linewidth=1)
+            axs[1].plot(ppm, np.abs(sf), 'k-', linewidth=1)
             axs[1].set_xlim(display_range[1], display_range[0])
             axs[1].set_xlabel('chemical shift (ppm)')
             axs[1].set_ylabel('magnitude mode')
             axs[1].grid('on')
 
             if(magnitude_mode):
-                ax = axs[1]
+                axs[1].plot(peak_seg_ppm, np.abs(peak_seg_val), 'r-')
             else:
-                ax = axs[0]
-
-            # show noise region
-            ax.plot(ppm[ippm_half_peak], sf_analyze[ippm_half_peak], 'r-')
+                axs[0].plot(peak_seg_ppm, np.real(peak_seg_val), 'r-')
 
             fig.subplots_adjust()
             fig.show()
