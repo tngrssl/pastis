@@ -516,7 +516,11 @@ class SIEMENS_data_file_reader():
             a = self.file_content_str.find(">", a + 1)
             b = self.file_content_str.find("}", a + 1)
             patient_height_str = self.file_content_str[(a + 6):(b - 3)]
-            patient_height_m = float(patient_height_str.strip()) / 1000.0
+            try:
+                patient_height_m = float(patient_height_str.strip()) / 1000.0
+            except:
+                patient_height_m = np.nan
+
         else:
             log.error("unknown file extension!")
 
