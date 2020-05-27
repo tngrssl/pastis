@@ -1542,7 +1542,7 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
         # margins/threshold parameters to estimate optimal RF power. By default:
         # [0] 10% last points (for higher power) used for plateau estimation
         # [1] 10% change allowed
-        # [2] 30% power increase to be sure to be in adiabatic regime
+        # [2] 100% power increase to be sure to be in adiabatic regime
         self.pulse_rfc_optim_power_margins = [10.0, 10.0, 100.0]  # %
         # display all this in a nice fig
         self.pulse_rfc_optim_power_display = True
@@ -1729,8 +1729,8 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
                 meta_key = meta_bs_keys[im]
                 meta_dict_entry = self.meta_bs[meta_key]["metabolites"][meta_key]
                 # acquire
-                s = self._run_sequence(meta_dict_entry, True)
-                s = s._correct_apodization(10.0)  # silent apodization
+                s = self._run_sequence(meta_dict_entry)
+                s = s.correct_apodization_1d(10.0)  # silent apodization
                 acquired_signals.append(s)
                 # analyze
                 sf = s.spectrum()
