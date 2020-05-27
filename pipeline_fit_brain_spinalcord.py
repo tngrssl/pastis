@@ -69,8 +69,7 @@ meta_bs.initialize()
 
 # sequence
 seq = data.sequence
-seq.pulse_rfc_real_shape_enable = True
-seq.pulse_rfc_r = 50.0
+seq.pulse_rfc_real_shape_enable = False
 seq.initialize(meta_bs)
 
 # %% fit non water-suppressed data
@@ -81,7 +80,7 @@ fittool.params_min = fittool.params_min.set_default_water_min()
 fittool.params_max = fittool.params_max.set_default_water_max()
 # water concentration parameter
 fittool.params_min[xxx.m_Water, xxx.p_cm] = 0
-fittool.params_max[xxx.m_Water, xxx.p_cm] = 100000.0
+fittool.params_max[xxx.m_Water, xxx.p_cm] = 1000000.0
 # water linewidth
 fittool.params_min[xxx.m_Water, xxx.p_dd] = 10.0
 fittool.params_max[xxx.m_Water, xxx.p_dd] = 500.0

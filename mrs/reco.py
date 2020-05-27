@@ -39,6 +39,26 @@ class suspect_phasing_method(Enum):
     ACME = 3
 
 
+def _dummy_check_func(d, p):
+    """
+    Return true if you want to select this dataset/pipeline when getting data from database using the get_datasets method. This is only a dummy example. Please feel free to recode a function with the same prototype to select for example only 3T scans, or short-TE scans, etc.
+
+    Parameters
+    ----------
+    d : MRSData2 object
+        Function with two arguments (MRSData2 object, pipeline object) that you should code and which returns True if you want to get it this dataset/pipeline out of the database.
+    p : pipeline object
+
+    Returns
+    -------
+    r : boolean
+        True if we keep this dataset/pipeline
+    """
+    r = (d.te > 0.0 and
+         p.data_coil_nChannels > 1)  # that is stupid, just an example
+    return(r)
+
+
 class data_db():
     """A class used to deal with storage of reconstructed signals with their respective reco pipeline in pkl files. The dumped data consist of a dict with all our processed data, sorted by patient name, dataset name. Also deals with conflicts like already existing patient name/dataset name."""
 
@@ -91,28 +111,9 @@ class data_db():
 
         return(pkl_data_dict)
 
-    def _dummy_check_func(self, d, p):
+    def get_datasets(self, check_func=_dummy_check_func):
         """
-        Return true if you want to select this dataset/pipeline when getting data from database using the get_datasets method. This is only a dummy example. Please feel free to recode a function with the same prototype to select for example only 3T scans, or short-TE scans, etc.
-
-        Parameters
-        ----------
-        d : MRSData2 object
-            Function with two arguments (MRSData2 object, pipeline object) that you should code and which returns True if you want to get it this dataset/pipeline out of the database.
-        p : pipeline object
-
-        Returns
-        -------
-        r : boolean
-            True if we keep this dataset/pipeline
-        """
-        r = (d.te > 0.0 and
-             p.data_coil_nChannels > 1)  # that is stupid, just an example
-        return(r)
-
-    def get_datasets(self, check_func=None):
-        """
-        Return datasets which passes the check function. If no function, return all datasets/pipelines.
+        Return datasets which passes the check function.
 
         Parameters
         ----------
@@ -126,10 +127,7 @@ class data_db():
         pipeline_list : list of pipeline objects
             Pipelines
         """
-        if(check_func is None):
-            log.info("getting all datasets/pipelines...")
-        else:
-            log.info("getting datasets/pipelines using check function...")
+        log.info("getting datasets/pipelines using check function [%s]..." % check_func)
 
         # init
         dataset_list = []
@@ -187,6 +185,29 @@ class data_db():
         latest_pipeline = pkl_data_dict[found_pnk][found_dnk]["pipeline"]
 
         return(latest_data, latest_pipeline)
+
+    def print(self):
+        """Print a summary of the database content."""
+        # init
+        pn_list = []
+        dn_list = []
+        pn_max_len = 0
+
+        # open pkl file
+        pkl_data_dict = self.read()
+
+        # for each patient
+        for pnk in list(pkl_data_dict.keys()):
+            # each dataset
+            for dnk in list(pkl_data_dict[pnk].keys()):
+                pn_list.append(pnk)
+                dn_list.append(dnk)
+                if(len(pnk) > pn_max_len):
+                    pn_max_len = len(pnk)
+
+        print("[Patient name]".ljust(pn_max_len) + " [Dataset name]")
+        for pnk, dnk in zip(pn_list, dn_list):
+            print(pnk.ljust(pn_max_len) + " " + dnk)
 
     def save(self, d, p=None):
         """
@@ -1406,8 +1427,14 @@ class MRSData2(suspect.mrsobjects.MRSData):
         nZeros = nPoints_final - s.np
         s_new_shape = list(s.shape)
         s_new_shape[-1] = nZeros
-        s_zf = self.inherit(np.concatenate((s, np.zeros(s_new_shape)), axis=s.ndim - 1))
         log.debug("%d-pts signal + %d zeros = %d-pts zero-filled signal..." % (s.np, nZeros, nPoints_final))
+        s_zf = self.inherit(np.concatenate((s, np.zeros(s_new_shape)), axis=s.ndim - 1))
+
+        # sequence npts
+        if(s_zf.sequence is not None):
+            log.debug("updating sequence.npts...")
+            s_zf.sequence.npts = nPoints_final
+            s_zf.sequence._ready = False
 
         if(display):
             s_disp = s.copy()
@@ -2973,10 +3000,10 @@ class MRSData2(suspect.mrsobjects.MRSData):
         if(nPoints_final < s.shape[0]):
             log.debug("cropping data from %d to %d points..." % (s.shape[0], nPoints_final))
             s_crop = s[0:nPoints_final]
-            if(self.sequence is not None):
+            if(s_crop.sequence is not None):
                 log.debug("updating sequence.npts...")
-                self.sequence.npts = nPoints_final
-                self.sequence._ready = False
+                s_crop.sequence.npts = nPoints_final
+                s_crop.sequence._ready = False
         else:
             s_crop = self.copy()
             log.debug("no cropping needed, getting bored...")

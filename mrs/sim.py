@@ -18,7 +18,7 @@ except ImportError:
     GAMMA_LIB_LOADED = False
 
 # GAMMA_LIB_LOADED forced to False for debug
-GAMMA_LIB_LOADED = False
+# GAMMA_LIB_LOADED = False
 
 import suspect
 import numpy as np
