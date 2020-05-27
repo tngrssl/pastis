@@ -573,16 +573,13 @@ class fit_tool:
             for c in range(self.params_init.shape[1]):
                 # min vs max
                 if(self.params_min[l, c] >= self.params_max[l, c] and self.params_init.linklock[l, c] != 1):
-                    log.error(" One lower bound (%f) is equal/greater than a upper bound (%f) for [%s] at index (%d,%d)!" % (
-                        self.params_min[l, c], self.params_max[l, c], self.params_init.get_meta_names()[l], l, c))
+                    log.error(" One lower bound (%f) is equal/greater than a upper bound (%f) for [%s] at index (%d,%d)!" % (self.params_min[l, c], self.params_max[l, c], self.params_init.get_meta_names()[l], l, c))
                 # min vs init
                 if(self.params_min[l, c] >= self.params_init[l, c] and self.params_init.linklock[l, c] != 1):
-                    log.error(" One initial value (%f) is equal/lower than the lower bound value (%f) for [%s] at index (%d,%d)!" % (
-                        self.params_init[l, c], self.params_min[l, c], self.params_init.get_meta_names()[l], l, c))
+                    log.error(" One initial value (%f) is equal/lower than the lower bound value (%f) for [%s] at index (%d,%d)!" % (self.params_init[l, c], self.params_min[l, c], self.params_init.get_meta_names()[l], l, c))
                 # max vs init
                 if(self.params_max[l, c] <= self.params_init[l, c] and self.params_init.linklock[l, c] != 1):
-                    log.error(" One initial value (%f) is equal/greater than the upper bound value (%f) for [%s] at index (%d,%d)!" % (
-                        self.params_init[l, c], self.params_max[l, c], self.params_init.get_meta_names()[l], l, c))
+                    log.error(" One initial value (%f) is equal/greater than the upper bound value (%f) for [%s] at index (%d,%d)!" % (self.params_init[l, c], self.params_max[l, c], self.params_init.get_meta_names()[l], l, c))
 
         # checking if LL is not broken
         if(not self.params_init.check()):
@@ -777,10 +774,10 @@ class fit_tool:
         sf = np.squeeze(self.data.spectrum())
         sf_analyze = np.real(sf)
         ippm_noise_range = (self.fqn_noise_range[0] < ppm) & (ppm < self.fqn_noise_range[1])
-        data_noise_var = np.var(sf_analyze[ippm_noise_range])
+        data_noise_var = np.std(sf_analyze[ippm_noise_range])
 
         # variance of fit residual
-        residue_var = np.var(diff.spectrum())
+        residue_var = np.std(np.real(diff.spectrum()))
 
         fqn = residue_var / data_noise_var
         return(fqn)

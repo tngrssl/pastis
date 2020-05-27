@@ -2851,8 +2851,64 @@ p.jobs["analyzing-lw"]["range_ppm"] = [2.5, 3.5]
 p.data_process_only_this_data_index = [2]
 data_list = p.run()
 
-# turn off realistic simulations because of non adiabatic pulses here
-s = data_list[0]
-s.sequence.pulse_rfc_real_shape_enable = False
+# %% 26/05/2020 - Checking sLASER in vitro data fit
+plt.close('all')
 
-fit_metabolites = [xxx.m_Cr_CH3, xxx.m_Cr_CH2]
+p = reco.pipeline()
+
+p.data_filepaths = ["/home/tangir/crmbm/acq_twix/test-slaser-ethanol/meas_MID95_steam_shortTE_SNR+_FID54187.dat",
+                    "/home/tangir/crmbm/acq_twix/test-slaser-ethanol/meas_MID102_slaser_R_N=20+_1_longTE_SNR++++_FID54194.dat",
+                    "/home/tangir/crmbm/acq_twix/test-slaser-ethanol/meas_MID105_slaser_R_N=20+_1_longTE_SNR++++_FID54197.dat",
+                    "/home/tangir/crmbm/acq_twix/test-slaser-ethanol/meas_MID107_slaser_R_N=20+_1_longTE_SNR++++_FID54199.dat",
+                    "/home/tangir/crmbm/acq_twix/test-slaser-ethanol/meas_MID109_slaser_R_N=20+_1_longTE_SNR++++_FID54201.dat"]
+
+p.data_ref_filepaths = ["/home/tangir/crmbm/acq_twix/test-slaser-ethanol/meas_MID96_steam_shortTE_SNR+_FID54188.dat",
+                        "/home/tangir/crmbm/acq_twix/test-slaser-ethanol/meas_MID103_slaser_R_N=20+_1_longTE_SNR++++_FID54195.dat",
+                        "/home/tangir/crmbm/acq_twix/test-slaser-ethanol/meas_MID106_slaser_R_N=20+_1_longTE_SNR++++_FID54198.dat",
+                        "/home/tangir/crmbm/acq_twix/test-slaser-ethanol/meas_MID108_slaser_R_N=20+_1_longTE_SNR++++_FID54200.dat",
+                        "/home/tangir/crmbm/acq_twix/test-slaser-ethanol/meas_MID110_slaser_R_N=20+_1_longTE_SNR++++_FID54202.dat"]
+
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["phasing (suspect)"],
+                p.jobs["displaying"]]
+
+p.analyze_job_list = [  p.jobs["channel-combining"],
+                        p.jobs["zero-filling"],
+                        p.jobs["realigning"],
+                        p.jobs["averaging"],
+                        p.jobs["calibrating"]
+                        ]
+
+p.display_legends = """
+Ethanol - STEAM
+Ethanol - sLASER 50/1 TE=50ms
+Ethanol - sLASER 50/1 TE=90ms
+Ethanol - sLASER 50/1 TE=130ms
+Ethanol - sLASER 20/1 TE=130ms
+"""
+
+p.jobs["phasing"]["order"] = 1
+p.jobs["zero-filling"]["npts"] = 16384 + 1024
+p.jobs["cropping"]["final_npts"] = 16384 + 1024
+p.jobs["apodizing"]["damping_hz"] = 15
+p.jobs["calibrating"]["POI_range_ppm"] = [4, 5]
+p.jobs["calibrating"]["POI_true_ppm"] = 4.7
+
+p.analyze_enable = False
+p.data_process_only_this_data_index = []
+p.run()
+p.save(rdb)
