@@ -1,22 +1,31 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-2019
+A user script used to store calls for the reconstruction of physio data.
+
 @author: Tangi Roussel
 """
 # %% init
 from IPython import get_ipython
 import matplotlib.pylab as plt
+import mrs.aliases as xxx
 import mrs.reco as reco
-get_ipython().magic("clear")
-plt.close("all")
+import mrs.log as log
+import numpy as np
+
+get_ipython().magic("matplotlib auto")
+plt.rcParams['figure.dpi'] = 100
+plt.rcParams['figure.max_open_warning'] = 1000
+plt.rcParams['font.size'] = 9
+log.setLevel(log.DEBUG)
+
+rdb = reco.data_db()
 
 # %% 27/08/2019 - 308-rs-p1-moelle - Ocha - short TR resp test
 get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChannels = 8
 p.data_filepaths = """
 /home/tangir/crmbm/acq_twix/308-rs-p1-moelle/meas_MID177_steam_shortTE_SNR+_FID38922.dat
 """
@@ -25,35 +34,31 @@ p.display_legends = """
 sLASER 20/1 SC short TR
 """
 
-p.phase_enable = True
-p.phase_display = False
-p.recombine_phasing = True
-p.realign_enable = False
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                # p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.analyze_and_reject_enable = True
-p.analyze_and_reject_moving_averages = 1
-p.analyze_and_reject_min = [-100, 0, -1, -3.14]
-p.analyze_and_reject_max = [100, 50, 1, 3.14]
-
-p.apodize_enable = False
-p.apodize_damping_hz = 15
-p.calibrate_enable = True
-
-p.analyze_linewidth_enable = True
-p.analyze_linewidth_magnitude_mode = False
-
-p.analyze_snr_enable = True
-p.analyze_snr_magnitude_mode = False
-
-p.remove_water_enable = False
-p.data_process_only_this_data_index = [0]
-
-s = p.run_pipeline_std()
-
+p.analyze_enable = False
+p.run()
 
 # %% 05/09/2019 - 311-sl-p1-moelle - Simon, test respiration
-p = reco.pipeline()
+get_ipython().magic("clear")
+plt.close("all")
 
+p = reco.pipeline()
 p.data_filepaths = """
 /home/tangir/crmbm/acq_twix/311-sl-p1-moelle/meas_MID90_steam_shortTE_SNR+_FID39702.dat
 /home/tangir/crmbm/acq_twix/311-sl-p1-moelle/meas_MID91_steam_shortTE_SNR+_FID39703.dat
@@ -72,59 +77,43 @@ STEAM noWS resp trig 10%
 STEAM noWS resp trig 30%
 """
 
-p.zerofill_npts = 4096*8
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.realign_enable = False
-p.realign_POI_range_ppm = [4.5, 4.8]
-p.realign_moving_averages = 1
+p.analyze_job_list = [  p.jobs["channel-combining"],
+                        p.jobs["zero-filling"],
+                        # p.jobs["realigning"],
+                        p.jobs["averaging"],
+                        # p.jobs["calibrating"]
+                        ]
 
-p.analyze_and_reject_enable = False
-p.analyze_and_reject_moving_averages = 1
-p.analyze_and_reject_min = [-100, 0, -1, -3.14]
-p.analyze_and_reject_max = [100, 20, 1, 3.14]
-p.analyze_and_reject_POI_range_ppm = [4.5, 4.8]
+p.jobs["zero-filling"]["npts"] = 4096 * 8
+p.jobs["apodizing"]["damping_hz"] = 5
 
-p.apodize_enable = True
-p.apodize_damping_hz = 5
+p.jobs["analyzing-snr"]["s_range_ppm"] = [4.5, 4.8]
+p.jobs["analyzing-lw"]["range_ppm"] = [4.5, 4.8]
 
-p.calibrate_enable = False
-
-p.analyze_linewidth_enable = True
-p.analyze_linewidth_range_ppm = [4.5, 4.8]
-
-p.analyze_snr_enable = True
-p.analyze_snr_s_range_ppm = [4.5, 4.8]
-
-p.remove_water_enable = False
-
-p.data_process_only_this_data_index = [1, 2]
-s = p.run_pipeline_std()
-
-
-lbls = ['No trig.', 'No trig. post-corrected',
-        'Respiration-triggered', 'Respiration-triggered post-corrected']
-xpos = [0, 0.5, 1, 1.5]
-plt.subplot(2, 1, 1)
-plt.bar(xpos, [2101, 2163, 3227, 4309], width=0.3)
-plt.xticks(xpos, lbls)
-plt.ylabel('SNR (u.a)')
-plt.grid('on')
-
-plt.subplot(2, 1, 2)
-plt.bar(xpos, [22.97, 17.09, 17.09, 9.77], width=0.3)
-plt.xticks(xpos, lbls)
-plt.ylabel('Water peak linewidth (Hz)')
-plt.grid('on')
-plt.legend(lbls)
-
-plt.tight_layout()
+p.run()
 
 # %% 23/09/2019 - 313-ft-p1-moelle - Fransiska, test respiration
 get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChannels = 8
 p.data_filepaths = """
 /home/tangir/crmbm/acq_twix/313-ft-p1-moelle/meas_MID60_steam_shortTE_SNR+_FID41492.dat
 """
@@ -137,37 +126,34 @@ p.display_legends = """
 STEAM TR~1070ms NA=90
 """
 
-p.phase_enable = False
-p.phase_display = False
-p.recombine_phasing = True
+p.job_list = [  # p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                # p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.zerofill_enable = True
-p.zerofill_npts = 4096*2
-
-p.realign_enable = False
-p.analyze_physio_enable = True
-p.analyze_physio_POI_range_ppm = [4, 5]
-p.analyze_physio_delta_time_ms = 40000.0
-
-p.analyze_and_reject_moving_averages = 1
-p.analyze_and_reject_min = [-50, 0, -0.1, -0.5]
-p.analyze_and_reject_max = [50, 50, 0.1, 0.5]
-
-p.apodize_enable = False
-p.calibrate_enable = False
-p.analyze_linewidth_enable = False
-p.analyze_snr_enable = False
-p.remove_water_enable = False
-
-s = p.run_pipeline_std()
-
+p.jobs["zero-filling"]["npts"] = 4096 * 2
+p.jobs["physio-analysis"]["POI_range_ppm"] = [4, 5]
+p.jobs["physio-analysis"]["delta_time_ms"] = 40000.0
+p.analyze_enable = False
+p.run()
 
 # %% 25/09/2019 - 314-yt-p1-moelle - Yolanda, test physio
 get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChannels = 8
 p.data_filepaths = """
 /home/tangir/crmbm/acq_twix/314-yt-p1-moelle/meas_MID78_steam_shortTE_SNR+_FID41676.dat
 """
@@ -179,49 +165,34 @@ p.data_physio_filepaths = """
 p.display_legends = """
 sLASER 20/1 SC
 """
+p.job_list = [  # p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                # p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.phase_enable = False
-p.phase_display = False
-p.recombine_phasing = True
-
-p.zerofill_enable = True
-p.zerofill_npts = 4096*4
-
-p.realign_enable = False
-p.realign_POI_range_ppm = [4.5, 4.8]
-p.realign_moving_averages = 9
-
-p.analyze_physio_enable = True
-p.analyze_physio_POI_range_ppm = [4, 5]
-p.analyze_physio_delta_time_ms = 40000.0
-
-p.analyze_and_reject_enable = True
-p.analyze_and_reject_moving_averages = 1
-p.analyze_and_reject_min = [-50, 0, -0.1, -0.5]
-p.analyze_and_reject_max = [50, 50, 0.1, 0.5]
-
-p.apodize_enable = False
-p.apodize_damping_hz = 10
-
-p.calibrate_enable = False
-
-p.analyze_linewidth_enable = False
-p.analyze_linewidth_magnitude_mode = False
-
-p.analyze_snr_enable = False
-p.analyze_snr_magnitude_mode = False
-
-p.remove_water_enable = False
-
-s = p.run_pipeline_std()
-
+p.jobs["zero-filling"]["npts"] = 4096 * 2
+p.jobs["physio-analysis"]["POI_range_ppm"] = [4, 5]
+p.jobs["physio-analysis"]["delta_time_ms"] = 40000.0
+p.analyze_enable = False
+p.run()
 
 # %% 03/10/2019 - 316-ap-p1-moelle - Anissa, test resp
 get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChannels = 8
 p.data_filepaths = """
 /home/tangir/crmbm/acq_twix/316-ap-p1-moelle/meas_MID44_steam_shortTE_SNR+_FID42203.dat
 """
@@ -233,43 +204,34 @@ p.data_physio_filepaths = """
 p.display_legends = """
 STEAM TR=1010ms NA=256
 """
+p.job_list = [  # p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                # p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.phase_enable = False
-p.phase_display = False
-p.recombine_phasing = True
-
-p.zerofill_enable = True
-p.zerofill_npts = 4096*2
-
-p.realign_enable = False
-
-p.analyze_and_reject_enable = True
-
-p.analyze_physio_enable = True
-p.analyze_physio_POI_range_ppm = [4, 5]
-p.analyze_physio_delta_time_ms = 10000.0
-
-p.apodize_enable = False
-p.apodize_damping_hz = 10
-
-p.calibrate_enable = False
-
-p.analyze_linewidth_enable = False
-p.analyze_linewidth_magnitude_mode = False
-
-p.analyze_snr_enable = False
-p.analyze_snr_magnitude_mode = False
-
-p.remove_water_enable = False
-
-s = p.run_pipeline_std()
+p.jobs["zero-filling"]["npts"] = 4096 * 2
+p.jobs["physio-analysis"]["POI_range_ppm"] = [4, 5]
+p.jobs["physio-analysis"]["delta_time_ms"] = 10000.0
+p.analyze_enable = False
+p.run()
 
 # %% 05/11/2019 - 328-af-p1-moelle - Anne, test apnea/breath hold
 get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChannels = 8
 p.data_filepaths = """
 /home/tangir/crmbm/acq_twix/328-af-p1-moelle/meas_MID69_steam_shortTE_SNR+_FID45776.dat
 """
@@ -282,32 +244,25 @@ p.display_legends = """
 STEAM TR=1010ms NA=300
 """
 
-p.phase_enable = False
-p.phase_display = False
-p.recombine_phasing = True
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                # p.jobs["apodizing"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                # p.jobs["calibrating"],
+                p.jobs["displaying"]]
 
-p.zerofill_enable = True
-p.zerofill_npts = 4096*2
-
-p.realign_enable = False
-
-p.analyze_and_reject_enable = True
-
-p.analyze_physio_enable = True
-p.analyze_physio_POI_range_ppm = [4, 5]
-p.analyze_physio_delta_time_ms = 10000.0
-
-p.apodize_enable = False
-p.apodize_damping_hz = 10
-
-p.calibrate_enable = False
-
-p.analyze_linewidth_enable = False
-p.analyze_linewidth_magnitude_mode = False
-
-p.analyze_snr_enable = False
-p.analyze_snr_magnitude_mode = False
-
-p.remove_water_enable = False
-
-s = p.run_pipeline_std()
+p.jobs["zero-filling"]["npts"] = 4096 * 2
+p.jobs["physio-analysis"]["POI_range_ppm"] = [4, 5]
+p.jobs["physio-analysis"]["delta_time_ms"] = 40000.0
+p.analyze_enable = False
+p.run()

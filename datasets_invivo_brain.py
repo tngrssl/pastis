@@ -26,7 +26,6 @@ get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChannels = 32
 p.data_filepaths = """
 /home/tangir/crmbm/acq/296_ym_p1_brainmoelle/296-ym-p1-brainmoelle/20190619/01_0014_slaser-r-n/original-primary_e09_0001.dcm
 /home/tangir/crmbm/acq/296_ym_p1_brainmoelle/296-ym-p1-brainmoelle/20190619/01_0012_slaser-r-n/original-primary_e09_0001.dcm
@@ -80,7 +79,6 @@ get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChannels = 32
 p.data_filepaths = """
 /home/tangir/crmbm/acq_twix/296_ym_p1_brainmoelle/meas_MID73_slaser_R_N=20+_1_longTE_SNR++++_FID33872.dat
 """
@@ -140,7 +138,6 @@ get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChannels = 32
 
 p.data_filepaths = """
 /home/tangir/crmbm/acq/308-rs-p1-moelle/20190827/01_0024_slaser-r-n/original-primary_e09_0001.dcm
@@ -185,7 +182,6 @@ get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChannels = 32
 
 p.data_filepaths = [
     "/home/tangir/crmbm/acq_twix/347-re-p1-moelle/meas_MID216_slaser_R_N=10_2_longTE_SNR+++_FID50575.dat",

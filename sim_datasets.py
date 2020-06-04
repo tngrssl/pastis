@@ -127,3 +127,77 @@ sim.disp_fit(ax, ss_mod, p_human, seq, True, True)
 fig.subplots_adjust()
 
 ss_mod.display_spectrum_1d(200, [1, 5])
+
+# %% ethanol tests
+
+from mpl_toolkits.mplot3d import Axes3D
+
+# metabolite db
+meta_bs = sim.metabolite_basis_set()
+meta_bs.basis_set_xls_file = "./metabolite_basis_sets/ethanol_7T.xls"
+meta_bs.initialize()
+
+# sequence
+seq_effTE = sim.mrs_seq_press(88)
+seq = sim.mrs_seq_eja_svs_slaser(90)
+seq.allow_evolution_during_hard_pulses = False
+seq.pulse_rfc_real_shape_enable = False
+seq.pulse_rfc_r = 40
+seq.pulse_rfc_optim_power_enable = True
+
+# params
+p = sim.params(meta_bs)
+p[:] = 0.0
+p[xxx.m_Eth, xxx.p_cm] = 1.0
+p[xxx.m_Eth, xxx.p_dd] = 20
+
+# test
+seq.initialize(meta_bs)
+seq_effTE.initialize(meta_bs)
+plt.figure(1)
+plt.clf()
+s = seq_effTE.simulate_signal(p, 0.0, 1, "Original data")
+s.display_spectrum_1d(1)
+s = seq.simulate_signal(p, 0.0, 1, seq.name + " TE=" + str(seq.te) + "ms")
+s.display_spectrum_1d(1)
+
+# %% play with TE
+
+te_list = np.arange(50, 250, 1)
+s_list = []
+for te in te_list:
+    seq.te = te
+    s = seq.simulate_signal(p)
+    s_list.append(s.spectrum())
+
+# wireframe plot
+te2d, ppm2d = np.meshgrid(s.frequency_axis_ppm(), te_list)
+s_list_np = np.array(s_list)
+
+fig = plt.figure(1)
+ax = fig.add_subplot(111, projection='3d')
+ax.plot_wireframe(te2d, ppm2d, s_list_np)
+ax.set_ylim(te_list[0], te_list[-1])
+ax.set_xlim(1, 2)
+plt.show()
+
+# look for the middle multiplet peak at 1.3ppm
+ppm = s.frequency_axis_ppm()
+peak_index, _, peak_val, _, _, _ = s._analyze_peak_1d([1, 2])
+# build J evolution curve
+peak_te_evol = []
+for s in s_list:
+    peak_val = np.real(s.spectrum()[peak_index])
+    peak_te_evol.append(peak_val)
+
+peak_te_evol = np.array(peak_te_evol)
+
+# evaluate J-modulation amplitude relative to first TE
+peak_te_evol_rel = peak_te_evol / peak_te_evol[0] * 100.0
+
+fig = plt.figure(2)
+plt.plot(te_list, peak_te_evol_rel)
+
+
+
+

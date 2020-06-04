@@ -1230,13 +1230,14 @@ class mrs_seq_press(mrs_sequence):
         # type
         self.exc_type = sequence_exc_type.SPIN_ECHO
         # TE timing
-        if(te1 is None or te2 is None):
-            # symmetric TE by default
-            self.te1 = te / 2.0
-            self.te2 = te / 2.0
+        self.te = te
+        if(te1 is not None and te2 is not None):
+            self.te1 = te1
+            self.te2 = te2
         else:
-            self.te1 = te1 / 2.0
-            self.te2 = te2 / 2.0
+            self.te1 = None
+            self.te2 = None
+
         # flip phase for PRESS
         self.additional_phi0 = np.pi
 
@@ -1553,6 +1554,9 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
 
         # RF power (w1 in Hz) used for AFP pulses during simulation
         self._pulse_rfc_w1max = None
+
+        # interpulse delay list
+        self.tcp_ms_list = []
 
         # freeze
         self.__isfrozen = True
@@ -1875,6 +1879,7 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
         dt = np.double(1 / self.fs)
 
         # timing implementation close to what the CMRR's sLASER is doing
+        # those delays are between pulses' centers
         # 90-a-180-b-c-180-d-e-180-f-g-180-h-FID
         # all in ms
         a = self.pulse_exc_duration / 2.0 + self.pulse_rfc_duration / 2.0 + self.spoiler_duration + 0.4e-3  # timing found experimentally on the 7T
@@ -1894,62 +1899,76 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
         h = gh / 2.0
         fg = f + g
 
-        # now important: since rfc pulses here have a real durations, we need to convert the later a, bc, ... delays to time padding delays: 3 cases possible
-        if(self.pulse_rfc_real_shape_enable and self.allow_evolution_during_hard_pulses):
-            # we are using real shaped rfc pulses and a fake exc pulse
-            # we want to keep  time evolution during hard pulsing (and keep TE correct)
-            # remove all rfc pulse durations from delays because they are taken into account during simulation
-            # BUT do not remove exc pulse duration because it is a hard pulse
-            a = a - self.pulse_rfc_duration / 2.0
-            bc = bc - self.pulse_rfc_duration
-            de = de - self.pulse_rfc_duration
-            fg = fg - self.pulse_rfc_duration
-            h = h - self.pulse_rfc_duration / 2.0
-        elif(not self.pulse_rfc_real_shape_enable and self.allow_evolution_during_hard_pulses):
-            # we are using zero-duration exc and rfc hard pulses
-            # we want to keep  time evolution during hard pulsing (and keep TE correct)
-            # do not remove any pulse duration
-            a = a
-            bc = bc
-            de = de
-            fg = fg
-            h = h
-        elif(not self.pulse_rfc_real_shape_enable and not self.allow_evolution_during_hard_pulses):
-            # we are using zero-duration exc and rfc hard pulses
-            # we do not want to keep time evolution during hard pulsing (TE will be virtually shortened)
-            # remove all pulse duration
-            a = a - self.pulse_exc_duration / 2.0 - self.pulse_rfc_duration / 2.0
-            bc = bc - self.pulse_rfc_duration
-            de = de - self.pulse_rfc_duration
-            fg = fg - self.pulse_rfc_duration
-            h = h - self.pulse_rfc_duration / 2.0
+        # final delay list: center to center of pulses
+        self._subdelay_c2c_ms_list = np.array([a, bc, de, fg, h])
 
-        # final inter pulse delay list in seconds
-        evol_delays_s = np.array([a, bc, de, fg, h]) / 1000.0
+        # now, calculate evolution delays knowing the c2c delays and the user parameters
+        # 4 cases possible
+        # those delays are the actual time when spins will evolve
+        # 90-a-180-b-c-180-d-e-180-f-g-180-h-FID
+        if(self.pulse_rfc_real_shape_enable and self.allow_evolution_during_hard_pulses):
+            # we are using real shaped rfc pulses and a hard exc pulse
+            # we want to keep time evolution during hard pulsing
+            # evolution already happens during shaped pulses
+            a += -self.pulse_rfc_duration / 2.0
+            bc += -self.pulse_rfc_duration
+            de += -self.pulse_rfc_duration
+            fg += -self.pulse_rfc_duration
+            h += -self.pulse_rfc_duration / 2.0
+        elif(self.pulse_rfc_real_shape_enable and not self.allow_evolution_during_hard_pulses):
+            # we are using real shaped rfc pulses and a hard exc pulse
+            # we do not want to keep time evolution during hard pulsing
+            # evolution already happens during shaped pulses
+            a += -self.pulse_rfc_duration / 2.0 - self.pulse_exc_duration / 2.0
+            bc += -self.pulse_rfc_duration
+            de += -self.pulse_rfc_duration
+            fg += -self.pulse_rfc_duration
+            h += -self.pulse_rfc_duration / 2.0
+        elif(not self.pulse_rfc_real_shape_enable and self.allow_evolution_during_hard_pulses):
+            # we are not using real shaped rfc pulses, only a hard exc and rfc pulses
+            # we want to keep time evolution during hard pulsing
+            pass
+        elif(not self.pulse_rfc_real_shape_enable and not self.allow_evolution_during_hard_pulses):
+            # we are not using real shaped rfc pulses, only a hard exc and rfc pulses
+            # we do not want to keep time evolution during hard pulsing
+            a += -self.pulse_rfc_duration / 2.0 - self.pulse_exc_duration / 2.0
+            bc += -self.pulse_rfc_duration
+            de += -self.pulse_rfc_duration
+            fg += -self.pulse_rfc_duration
+            h += -self.pulse_rfc_duration / 2.0
+
+        # final delay list: evolution delays
+        self._subdelay_evol_ms_list = np.array([a, bc, de, fg, h])
+
+        # final tcp delay list (for CP effects)
+        self.tcp_ms_list = self._subdelay_c2c_ms_list.copy()
 
         # run the sequence
         sigma0 = pg.sigma_eq(sys)
-        te_real = 0.0
+        evol_delays_s = self._subdelay_evol_ms_list / 1000.0  # seconds
+        te_real_ms = 0.0
 
         # excitation: hard 90 pulse to simulate asymmetric sinc pulse
         sigma1 = pg.Iypuls(sys, sigma0, self.nuclei, 90.0)
-        te_real += 0.0  # fake pulse
+        if(not self.allow_evolution_during_hard_pulses):
+            te_real_ms += self.pulse_exc_duration / 2.0
         # evolution
         sigma0 = pg.evolve(sigma1, pg.prop(H, evol_delays_s[0]))
-        te_real += evol_delays_s[0]
+        te_real_ms += evol_delays_s[0] * 1000.0
 
         # LASER: 2 x (pair of 180 HSn pulses)
         for d in evol_delays_s[1:]:
             if(self.pulse_rfc_real_shape_enable):
                 sigma1 = Upulc180.evolve(sigma0)
-                te_real += self.pulse_rfc_duration / 1000.0
+                te_real_ms += self.pulse_rfc_duration
             else:
                 sigma1 = pg.Iypuls(sys, sigma0, self.nuclei, 180.0)
-                te_real += 0.0  # fake pulse
+                if(not self.allow_evolution_during_hard_pulses):
+                    te_real_ms += self.pulse_rfc_duration
 
             # evolution
             sigma0 = pg.evolve(sigma1, pg.prop(H, d))
-            te_real += d
+            te_real_ms += d * 1000.0
 
         data = pg.FID(sigma0, pg.gen_op(D), H, dt, self.npts)  # acquisition
 
@@ -1962,7 +1981,7 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
         s_MRSData = suspect.MRSData(s, dt, self.f0)
         s_MRSData2 = s_MRSData.view(reco.MRSData2)
 
-        log.debug("done. (real TE=%.2fms)" % (te_real * 1000.0))
+        log.debug("done. (real TE=%.2fms)" % te_real_ms)
 
         return(s_MRSData2)
 
@@ -2058,6 +2077,39 @@ class mrs_seq_fid(mrs_sequence):
         super().__init__(te, tr, nuclei, npts, fs, f0, scaling_factor)
         # name of sequence
         self.name = "fid"
+
+
+class mrs_seq_svs_se(mrs_seq_press):
+    """A class that represents the PRESS sequence from SIEMENS."""
+
+    def __init__(self, te, tr=3500.0, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, scaling_factor=1.0, te1=None, te2=None):
+        """
+        Initialize a virtual STEAM sequence.
+
+        Parameters
+        ----------
+        te : float
+            Echo time (ms)
+        tr : float
+            Repetition time (ms)
+        nuclei : string
+            Observed nuclei. Examples: "1H", "31P", etc.
+        npts : int
+            Number of acquisition points
+        fs : float
+            Acquisition bandwidth (Hz)
+        f0 : float
+            Water Larmor frequency (MHz)
+        scaling_factor : float
+            Scaling FID intensity factor
+        te1 : float
+            First part of TE (ms)
+        te2 : float
+            Second part of TE (ms)
+        """
+        super().__init__(te, tr, nuclei, npts, fs, f0, scaling_factor, te1, te2)
+        # name of sequence
+        self.name = "svs_se"
 
 
 class mrs_seq_svs_st(mrs_seq_steam):
