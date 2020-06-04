@@ -55,7 +55,7 @@ def _dummy_check_func(d, p):
         True if we keep this dataset/pipeline
     """
     r = (d.te > 0.0 and
-         p.data_coil_nChannels > 1)  # that is stupid, just an example
+         d.na > 0)  # that is stupid, just an example
     return(r)
 
 
@@ -151,6 +151,9 @@ class data_db():
                     dataset_list.append(d)
                     pipeline_list.append(p)
 
+        # print extracted datasets
+        self.print(check_func, True)
+
         return(dataset_list, pipeline_list)
 
     def get_latest_dataset(self):
@@ -186,8 +189,17 @@ class data_db():
 
         return(latest_data, latest_pipeline)
 
-    def print(self):
-        """Print a summary of the database content."""
+    def print(self, check_func=_dummy_check_func, indexed=False):
+        """
+        Print a summary of the database content..
+
+        Parameters
+        ----------
+        check_func : function
+            Function with two arguments (MRSData2 object, pipeline object) that you should code and which returns True if you want to print.
+        indexed : boolean
+            If you want to list to be indexed while printing
+        """
         # init
         pn_list = []
         dn_list = []
@@ -200,14 +212,21 @@ class data_db():
         for pnk in list(pkl_data_dict.keys()):
             # each dataset
             for dnk in list(pkl_data_dict[pnk].keys()):
-                pn_list.append(pnk)
-                dn_list.append(dnk)
-                if(len(pnk) > pn_max_len):
-                    pn_max_len = len(pnk)
+                if(check_func(pkl_data_dict[pnk][dnk]["data"], pkl_data_dict[pnk][dnk]["pipeline"])):
+                    pn_list.append(pnk)
+                    dn_list.append(dnk)
+                    if(len(pnk) > pn_max_len):
+                        pn_max_len = len(pnk)
 
-        print("[Patient name]".ljust(pn_max_len) + " [Dataset name]")
-        for pnk, dnk in zip(pn_list, dn_list):
-            print(pnk.ljust(pn_max_len) + " " + dnk)
+        if(indexed):
+            print("[#]".ljust(4) + "[Patient name]".ljust(pn_max_len) + " [Dataset name]")
+            ind_list = np.arange(len(pn_list))
+            for i, pnk, dnk in zip(ind_list, pn_list, dn_list):
+                print(str(i).ljust(4) + pnk.ljust(pn_max_len) + " " + dnk)
+        else:
+            print("[Patient name]".ljust(pn_max_len) + " [Dataset name]")
+            for pnk, dnk in zip(pn_list, dn_list):
+                print(pnk.ljust(pn_max_len) + " " + dnk)
 
     def save(self, d, p=None):
         """
@@ -310,6 +329,18 @@ class SIEMENS_data_file_reader():
             True if dicom file
         """
         return(self.file_ext == '.dcm')
+
+    def get_number_channels(self):
+        """
+        Return the number of channels.
+
+        Returns
+        -------
+        nchan : int
+            Number of channels
+        """
+        nchan = self.read_param_num("lMaximumNofRxReceiverChannels")
+        return(int(nchan))
 
     def read_data(self):
         """
@@ -544,8 +575,12 @@ class SIEMENS_data_file_reader():
         a = self.file_content_str.find('%' + "CustomerSeq" + '%', file_index)
         # could not find it?
         if(a < 0):
-            log.warning("could not find sequence name! :(")
-            return(None)
+            # maybe a siemens seq then ?
+            a = self.file_content_str.find('%' + "SiemensSeq" + '%', file_index)
+            # could not find it?
+            if(a < 0):
+                log.warning("could not find sequence name! :(")
+                return(None)
 
         a = self.file_content_str.find('\\', a)
         b = self.file_content_str.find('"', a + 1)
@@ -583,7 +618,7 @@ class SIEMENS_data_file_reader():
 class MRSData2(suspect.mrsobjects.MRSData):
     """A class based on suspect's MRSData to store MRS data."""
 
-    def __new__(cls, data_filepath, coil_nChannels=8, physio_log_file=None, obj=None, dt=None, f0=None, te=None, ppm0=None, voxel_dimensions=None, transform=None, metadata=None, data_ref=None, label="", offset_display=0.0, timestamp=None, patient_name="", patient_birthday=None, patient_sex=None, patient_weight=None, patient_height=None, tr=None, vref=None, shims=None, sequence_obj=None, noise_level=None, na_pre_data_rejection=None, na_post_data_rejection=None, is_concatenated=None, is_dicom=None):
+    def __new__(cls, data_filepath, physio_log_file=None, obj=None, dt=None, f0=None, te=None, ppm0=None, voxel_dimensions=None, transform=None, metadata=None, data_ref=None, label="", offset_display=0.0, timestamp=None, patient_name="", patient_birthday=None, patient_sex=None, patient_weight=None, patient_height=None, tr=None, vref=None, shims=None, sequence_obj=None, noise_level=None, na_pre_data_rejection=None, na_post_data_rejection=None, is_concatenated=None, is_dicom=None):
         """
         Construct a MRSData2 object that inherits of Suspect's MRSData class. In short, the MRSData2 class is a copy of MRSData + my custom methods for post-processing. To create a MRSData2 object, you need give a path that points to a SIEMENS DICOM or a SIEMENS TWIX file.
 
@@ -591,8 +626,6 @@ class MRSData2(suspect.mrsobjects.MRSData):
         ----------
         data_filepath: string
             Full absolute file path pointing to the stored signal (DCM or TWIX file) or the folder assuming that a dcm file named "original-primary_e09_0001.dcm" is stored inside.
-        coil_nChannels : int
-            Number of RX channels
         physio_log_file : string
             Full absolute file path pointing to a IDEA VB17 respiratory log file
         obj,dt,f0,te,ppm0,voxel_dimensions,transform,metadata
@@ -639,7 +672,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         obj : MRSData2 numpy array [averages,channels,timepoints]
             Resulting constructed MRSData2 object
         """
-        if(data_filepath == [] and coil_nChannels == []):
+        if(data_filepath == []):
             # calling the parent class' constructor
             pdb.set_trace()
             obj = super(suspect.mrsobjects.MRSData, cls).__new__(cls, obj, dt, f0, te, ppm0, voxel_dimensions, transform, metadata)
@@ -689,6 +722,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         if(MRSData_obj.ndim == 2):
             # this could be a single-shot multi-rx signal
             # or a averaged single-rx signal...
+            coil_nChannels = mfr.get_number_channels()
 
             if(coil_nChannels == MRSData_obj.shape[0]):
                 # beware, same number of averages / coil elements, which is which?
@@ -825,6 +859,9 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         elif(sequence_name == "fid"):
             sequence_obj = sim.mrs_seq_fid(obj.te, obj.tr, nucleus, npts, 1.0 / obj.dt, obj.f0, 1.0)
+
+        elif(sequence_name == "svs_se"):
+            sequence_obj = sim.mrs_seq_svs_se(obj.te, obj.tr, nucleus, npts, 1.0 / obj.dt, obj.f0, 1.0)
 
         elif(sequence_name == "svs_st"):
             sequence_obj = sim.mrs_seq_svs_st(obj.te, obj.tr, nucleus, npts, 1.0 / obj.dt, obj.f0, 1.0)
@@ -2542,7 +2579,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
             # nice plot showing all raw data
             plt.subplot(1, 3, 3)
-            ppm = self.frequency_axis_ppm()
+            ppm = s_ma.frequency_axis_ppm()
             ippm_peak_range = (peak_range[0] > ppm) | (ppm > peak_range[1])
             ystep = np.max(np.mean(s_ma.spectrum().real, axis=0))
             ystep = np.power(10, 1 + (np.floor(np.log10(ystep))))
@@ -2823,8 +2860,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig = plt.figure(160)
             fig.clf()
             axs = fig.subplots(2, 1, sharex='all', sharey='all')
-            fig.canvas.set_window_title("mrs.reco.MRSData2.correct_bandpass_filtering_1d")
-            fig.suptitle("filtering [%s]" % self.display_label)
+            fig.canvas.set_window_title("mrs.reco.MRSData2.correct_phase_1d")
+            fig.suptitle("phasing (suspect) [%s]" % self.display_label)
 
             axs[0].plot(s.frequency_axis_ppm(), s.spectrum().real, 'k-', linewidth=1)
             axs[0].set_xlim(display_range[1], display_range[0])
@@ -3716,9 +3753,6 @@ class pipeline:
         # list of reference data signals
         self._data_ref_list = []
 
-        # to avoid any data reshaping misunderstanding, the number of coil channels
-        self.data_coil_nChannels = 8
-
         # option to process only a set of datasets: list of indexes
         self.data_process_only_this_data_index = []
 
@@ -4331,7 +4365,7 @@ class pipeline:
             log.info_line________________________()
             log.info("reading data [" + data_leg + "]")
             log.info_line________________________()
-            s = MRSData2(data_fn, self.data_coil_nChannels, physio_fn)
+            s = MRSData2(data_fn, physio_fn)
             log.debug("got a " + str(s.shape) + " vector")
             # store
             self._data_list.append(s)
@@ -4350,7 +4384,7 @@ class pipeline:
                 log.info_line________________________()
                 log.info("reading ref. data [" + data_leg + "]")
                 log.info_line________________________()
-                s = MRSData2(data_ref_fn, self.data_coil_nChannels, None)
+                s = MRSData2(data_ref_fn, None)
                 log.info("got a " + str(s.shape) + " vector")
                 # if several averages, mean now (that could be a problem!?)
                 s = s.mean(axis=0)

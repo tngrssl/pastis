@@ -34,14 +34,14 @@ def my_sc_data(d: reco.MRSData2, p: reco.pipeline):
     """Filter data to get from database."""
     r = (d.f0 > 6*42 and
         d.f0 < 8*42 and
-        p.data_coil_nChannels == 8 and
-        "YT" in d.patient_name)
+        p.data_coil_nChannels > 8)
     return(r)
 
 data_list, data_pipeline_list = rdb.get_datasets(my_sc_data)
 
 data = data_list[0]
 data_pipeline = data_pipeline_list[0]
+data.display_spectrum_1d()
 
 # %% set metabolites to fit, water concentration, csv file
 
@@ -53,7 +53,10 @@ metabolites_fit = np.sort([
     xxx.m_Cr_CH2,
     xxx.m_Cho_CH3,
     xxx.m_Cho_CH2,
+    # xxx.m_Gln,
+    # xxx.m_Glu,
     xxx.m_mI,
+    # xxx.m_Tau,
     xxx.m_Water])
 
 lipids_fit = np.sort([
@@ -110,6 +113,11 @@ fittool.initialize()
 
 # %% fit water-suppressed data
 
+# dte_list = np.arange(-20, +5, 1)
+# for dte in dte_list:
+#     seq = sim.mrs_seq_press(data.te + dte, data.sequence.tr, data.sequence.nuclei, data.sequence.npts, data.sequence.fs, data.sequence.f0)
+#     seq.initialize(meta_bs)
+seq.te = 39
 fittool = fit.fit_tool(data, seq)
 
 # default fitting bounds from muscle template

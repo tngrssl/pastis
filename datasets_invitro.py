@@ -2308,7 +2308,6 @@ get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChannels = 32
 p.data_filepaths = """
 /home/tangir/crmbm/acq/braino_alcoholic_002/braino-with-alcohol-belt/20190612/01_0011_steam-shortte-snr
 """
@@ -2349,7 +2348,6 @@ get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChannels = 32
 p.data_filepaths = """
 /home/tangir/crmbm/acq/braino_alcoholic_002/braino-with-alcohol-belt/20190612/01_0011_steam-shortte-snr
 /home/tangir/crmbm/acq_twix/braino_alcoholic_002/meas_MID90_steam_shortTE_SNR+_FID33706.dat
@@ -2398,7 +2396,6 @@ get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChannels = 32
 p.data_filepaths = """
 /home/tangir/crmbm/acq_twix/braino_alcoholic_002/meas_MID91_steam_shortTE_SNR+_FID33707.dat
 /home/tangir/crmbm/acq_twix/braino_alcoholic_002/meas_MID92_steam_shortTE_SNR+_FID33708.dat
@@ -2479,7 +2476,6 @@ get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChannels = 8
 p.data_filepaths = """
 /home/tangir/crmbm/acq_twix/phantom_test_inv/meas_MID145_slaser_R_N=20+_1_longTE_SNR++++_FID47558.dat
 /home/tangir/crmbm/acq_twix/phantom_test_inv/meas_MID149_slaser_R_N=20+_1_longTE_SNR++++_FID47562.dat
@@ -2523,7 +2519,6 @@ get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChannels = 8
 p.data_filepaths = """
 /home/tangir/crmbm/acq/test-ir-slaser/20191220/01_0012_slaser-r-n/original-primary_e09_0001.dcm
 /home/tangir/crmbm/acq/test-ir-slaser/20191220/01_0012_slaser-r-n/original-primary_e09_0002.dcm
@@ -2636,7 +2631,6 @@ p.run()
 plt.close('all')
 
 p = reco.pipeline()
-p.data_coil_nChannels = 32
 p.data_filepaths = """
 /home/tangir/crmbm/acq_twix/test-ir-slaser/meas_MID68_slaser_R_N=20+_1_longTE_SNR++++_FID48889.dat
 /home/tangir/crmbm/acq_twix/test-ir-slaser/meas_MID69_slaser_R_N=20+_1_longTE_SNR++++_FID48890.dat
@@ -2696,7 +2690,6 @@ p.run()
 plt.close('all')
 
 p = reco.pipeline()
-p.data_coil_nChannels = 32
 p.data_filepaths = ["/home/tangir/crmbm/acq_twix/test-ir-slaser2/meas_MID72_slaser_R_N=20+_1_longTE_SNR++++_FID49978.dat",
                     "/home/tangir/crmbm/acq_twix/test-ir-slaser2/meas_MID73_slaser_R_N=20+_1_longTE_SNR++++_FID49979.dat",
                     "/home/tangir/crmbm/acq_twix/test-ir-slaser2/meas_MID74_slaser_R_N=20+_1_longTE_SNR++++_FID49980.dat",
@@ -2851,7 +2844,7 @@ p.jobs["analyzing-lw"]["range_ppm"] = [2.5, 3.5]
 p.data_process_only_this_data_index = [2]
 data_list = p.run()
 
-# %% 26/05/2020 - Checking sLASER in vitro data fit
+# %% 26/05/2020 - Ethanol tests
 plt.close('all')
 
 p = reco.pipeline()
@@ -2905,10 +2898,89 @@ p.jobs["phasing"]["order"] = 1
 p.jobs["zero-filling"]["npts"] = 16384 + 1024
 p.jobs["cropping"]["final_npts"] = 16384 + 1024
 p.jobs["apodizing"]["damping_hz"] = 15
-p.jobs["calibrating"]["POI_range_ppm"] = [4, 5]
+p.jobs["calibrating"]["POI_range_ppm"] = [4.5, 5]
 p.jobs["calibrating"]["POI_true_ppm"] = 4.7
 
 p.analyze_enable = False
-p.data_process_only_this_data_index = []
+p.data_process_only_this_data_index = [3, 4]
+p.run()
+p.save(rdb)
+
+
+# %% 03/06/2020 - Ethanol night tests
+plt.close('all')
+
+p = reco.pipeline()
+
+p.data_filepaths = ["/home/tangir/crmbm/acq_twix/ethanol_slaser_head/meas_MID200_slaser_R_N=20+_1_longTE_SNR++++_FID56493.dat",
+                    "/home/tangir/crmbm/acq_twix/ethanol_slaser_head/meas_MID203_slaser_R_N=20+_1_longTE_SNR++++_FID56496.dat",
+                    "/home/tangir/crmbm/acq_twix/ethanol_slaser_head/meas_MID205_slaser_R_N=20+_1_longTE_SNR++++_FID56498.dat",
+                    "/home/tangir/crmbm/acq_twix/ethanol_slaser_head/meas_MID208_slaser_R_N=20+_1_longTE_SNR++++_FID56501.dat",
+                    "/home/tangir/crmbm/acq_twix/ethanol_slaser_head/meas_MID210_slaser_R_N=20+_1_longTE_SNR++++_FID56503.dat",
+                    "/home/tangir/crmbm/acq_twix/ethanol_slaser_head/meas_MID212_slaser_R_N=20+_1_longTE_SNR++++_FID56505.dat",
+                    "/home/tangir/crmbm/acq_twix/ethanol_slaser_head/meas_MID218_svs_se_30_FID56511.dat",
+                    "/home/tangir/crmbm/acq_twix/ethanol_slaser_head/meas_MID221_svs_se_30_FID56514.dat",
+                    "/home/tangir/crmbm/acq_twix/ethanol_slaser_head/meas_MID228_eja_svs_press_FID56521.dat",
+                    "/home/tangir/crmbm/acq_twix/glu_slaser_head/meas_MID263_slaser_R_N=20+_1_longTE_SNR++++_FID56556.dat"]
+
+p.data_ref_filepaths = ["/home/tangir/crmbm/acq_twix/ethanol_slaser_head/meas_MID201_slaser_R_N=20+_1_longTE_SNR++++_FID56494.dat",
+                        "/home/tangir/crmbm/acq_twix/ethanol_slaser_head/meas_MID204_slaser_R_N=20+_1_longTE_SNR++++_FID56497.dat",
+                        "/home/tangir/crmbm/acq_twix/ethanol_slaser_head/meas_MID206_slaser_R_N=20+_1_longTE_SNR++++_FID56499.dat",
+                        "/home/tangir/crmbm/acq_twix/ethanol_slaser_head/meas_MID209_slaser_R_N=20+_1_longTE_SNR++++_FID56502.dat",
+                        "/home/tangir/crmbm/acq_twix/ethanol_slaser_head/meas_MID211_slaser_R_N=20+_1_longTE_SNR++++_FID56504.dat",
+                        "/home/tangir/crmbm/acq_twix/ethanol_slaser_head/meas_MID213_slaser_R_N=20+_1_longTE_SNR++++_FID56506.dat",
+                        "/home/tangir/crmbm/acq_twix/ethanol_slaser_head/meas_MID219_svs_se_30_FID56512.dat",
+                        "/home/tangir/crmbm/acq_twix/ethanol_slaser_head/meas_MID222_svs_se_30_FID56515.dat",
+                        "/home/tangir/crmbm/acq_twix/ethanol_slaser_head/meas_MID230_eja_svs_press_FID56523.dat",
+                        "/home/tangir/crmbm/acq_twix/glu_slaser_head/meas_MID264_slaser_R_N=20+_1_longTE_SNR++++_FID56557.dat"]
+
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                # p.jobs["phasing (suspect)"],
+                p.jobs["displaying"]]
+
+p.analyze_job_list = [  p.jobs["channel-combining"],
+                        p.jobs["zero-filling"],
+                        p.jobs["realigning"],
+                        p.jobs["averaging"],
+                        p.jobs["calibrating"]
+                        ]
+
+p.display_legends = """
+Ethanol2 - 20/1 R=70
+Ethanol2 - 20/1 R=20
+Ethanol2 - 20/1 R=70 5ms
+Ethanol2 - 20/1 TE=100 R=70
+Ethanol2 - 20/1 TE=100 R=20
+Ethanol2 - 20/1 TE=100 R=70 5ms
+Ethanol2 - PRESS TE=50ms
+Ethanol2 - PRESS TE=30ms
+Ethanol2 - ejaPRESS TE=30ms
+Glu - 20/1 R=70
+"""
+
+p.jobs["phasing"]["order"] = 1
+p.jobs["zero-filling"]["npts"] = 16384 + 1024
+p.jobs["cropping"]["final_npts"] = 16384 + 1024
+p.jobs["apodizing"]["damping_hz"] = 15
+p.jobs["calibrating"]["POI_range_ppm"] = [4.5, 5]
+p.jobs["calibrating"]["POI_true_ppm"] = 4.7
+p.jobs["displaying"]["range_ppm"] = [0, 5]
+
+p.analyze_enable = False
+p.data_process_only_this_data_index = [9]
 p.run()
 p.save(rdb)
