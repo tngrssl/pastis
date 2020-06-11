@@ -1555,7 +1555,9 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
         # RF power (w1 in Hz) used for AFP pulses during simulation
         self._pulse_rfc_w1max = None
 
-        # interpulse delay list
+        # interpulse delay lists
+        self._subdelay_c2c_ms_list = []
+        self._subdelay_evol_ms_list = []
         self.tcp_ms_list = []
 
         # freeze

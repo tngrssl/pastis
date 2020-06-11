@@ -1870,6 +1870,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
                     fig.subplots_adjust()
                     fig.show()
+                    plt.pause(0.1)
 
                 # store
                 s_phased[a, c, :] = this_s_phased
