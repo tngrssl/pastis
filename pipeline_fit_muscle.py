@@ -43,6 +43,8 @@ metabolites_fit = np.sort([
     xxx.m_Carno,
     xxx.m_Water])
 
+data.data_ref = data.data_ref.correct_freqshift_1d([4, 6])
+
 lipids_fit = np.sort([
     xxx.m_Lip1,
     xxx.m_Lip2,
@@ -64,7 +66,7 @@ meta_bs.initialize()
 
 # sequence
 seq = data.sequence
-seq.seqdb_file = "./metabolite_basis_sets/muscle_7T_20200519.pkl"
+seq.seqdb_file = "./metabolite_basis_sets/muscle_7T_20200611.pkl"
 seq.initialize(meta_bs)
 
 # B0 field switch
