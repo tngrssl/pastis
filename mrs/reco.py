@@ -1827,7 +1827,14 @@ class MRSData2(suspect.mrsobjects.MRSData):
                     # ifft back
                     this_s_phased = np.fft.ifft(np.fft.ifftshift(this_sf_phased))
 
+                # store
+                s_phased[a, c, :] = this_s_phased
+
                 if(display):
+
+                    # convert back to MRSData2
+                    this_s_phased = self.inherit(this_s_phased)
+
                     # display original meta FID
                     axs[0, 1].cla()
                     axs[0, 1].plot(t, np.real(this_s), linewidth=1, label='real part')
@@ -1871,9 +1878,6 @@ class MRSData2(suspect.mrsobjects.MRSData):
                     fig.subplots_adjust()
                     fig.show()
                     plt.pause(0.1)
-
-                # store
-                s_phased[a, c, :] = this_s_phased
 
                 pbar.update(c * s.shape[0] + a + 1)
 
@@ -2088,8 +2092,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             this_resp_s_interp = np.interp(this_resp_t_interp, resp_t, resp_s)
 
             # now crop the signals to have the same length
-            final_length = min(
-                this_resp_s_interp.shape[0], peak_prop_abs.shape[0])
+            final_length = min(this_resp_s_interp.shape[0], peak_prop_abs.shape[0])
             this_mri_t = mri_t[0:final_length]
             this_params_trace = peak_prop_abs[0:final_length, :]
             this_resp_s_interp = this_resp_s_interp[0:final_length]
@@ -2398,7 +2401,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         # prepare rejection ranges
         peak_prop_min = [-peak_properties_ranges_list[0],
-                         0.0,
+                         1.0,
                          -peak_properties_ranges_list[2],
                          -phase_std_reject_range]
 
@@ -2425,7 +2428,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             for (ilw, this_lw) in enumerate(lw_range):
                 # rebuild min/max rejection bounds
                 peak_prop_min_auto = peak_prop_min.copy()
-                peak_prop_min_auto[1] = 0.0
+                peak_prop_min_auto[1] = 1.0
                 peak_prop_max_auto = peak_prop_max.copy()
                 peak_prop_max_auto[1] = this_lw
 
@@ -2446,8 +2449,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 if(this_mask_reject_data_sumup.sum() < s_ma.shape[0]):
                     old_level = log.getLevel()
                     log.setLevel(log.ERROR)
-                    test_snr_list[ilw], _, _ = this_s_cor.correct_zerofill_nd().correct_realign_2d().correct_average_2d().correct_apodization_1d().analyze_snr_1d(peak_range)
-                    test_lw_list[ilw] = this_s_cor.correct_zerofill_nd().correct_realign_2d().correct_average_2d().correct_apodization_1d().analyze_linewidth_1d(peak_range)
+                    test_snr_list[ilw], _, _ = this_s_cor.correct_zerofill_nd().correct_realign_2d().correct_average_2d().correct_apodization_nd().analyze_snr_1d(peak_range)
+                    test_lw_list[ilw] = this_s_cor.correct_zerofill_nd().correct_realign_2d().correct_average_2d().correct_apodization_nd().analyze_linewidth_1d(peak_range)
                     log.setLevel(old_level)
                     test_nrej_list[ilw] = this_mask_reject_data_sumup.sum()
 
@@ -2613,7 +2616,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         return(s_cor)
 
-    def correct_realign_2d(self, peak_range=[4.5, 5], moving_Naverages=1, display=False, display_range=[1, 6]):
+    def correct_realign_2d(self, peak_range=[4.5, 5], moving_Naverages=1, inter_corr_mode=False, display=False, display_range=[1, 6]):
         """
         Realign each signal of interest in frequency by taking as a reference the first spectra in absolute mode.
 
@@ -2626,6 +2629,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
             Range in ppm used to analyze peak phase
         moving_Naverages : int
             Number of averages to perform when using moving average, need to be an odd number
+        inter_corr_mode : boolean
+            Use inter-correlation technique to adjust frequency shifts. Could be more robust when SNR is low.
         display : boolean
             Display correction process (True) or not (False)
         display_range : list [2]
@@ -2652,10 +2657,19 @@ class MRSData2(suspect.mrsobjects.MRSData):
             # build moving averaged data
             s_ma = self._build_moving_average_data_2d(moving_Naverages)
 
-            # find peak in average spectrum absolute mode
+            # init
             s_avg = np.mean(s, axis=0)
-            ippm_peak_avg, ppm_peak_avg, peak_val, _, _, _ = s_avg._analyze_peak_1d(peak_range)
-            log.debug("measuring peak properties at %0.2fppm!" % ppm_peak_avg)
+            if(inter_corr_mode):
+                # let's fix a +/-0.5ppm range
+                f_shifts_min = - np.abs(peak_range[1] - peak_range[0]) * s_ma.f0
+                f_shifts_max = + np.abs(peak_range[1] - peak_range[0]) * s_ma.f0
+                # let's fix a 0.1ppm resolution here for inter-correlation tests
+                f_shifts_step = 0.1 * s_ma.f0
+                f_shifts_list = np.arange(f_shifts_min, f_shifts_max, f_shifts_step)
+            else:
+                # find peak in average spectrum absolute mode
+                ippm_peak_avg, ppm_peak_avg, peak_val, _, _, _ = s_avg._analyze_peak_1d(peak_range)
+                log.debug("measuring peak properties at %0.2fppm!" % ppm_peak_avg)
 
             # for each average in moving averaged data
             s_realigned_ma = s_ma.copy()
@@ -2663,12 +2677,28 @@ class MRSData2(suspect.mrsobjects.MRSData):
             pbar = log.progressbar("realigning", s_ma.shape[0])
             for a in range(0, s_ma.shape[0]):
 
-                # measure shift on moving average data
-                ippm_peak, ppm_peak, _, _, _, _ = s_ma[a, :]._analyze_peak_1d(peak_range)
+                if(inter_corr_mode):
+                    # compare this individual spectrum with the first,  using inter-correlation
 
-                # estimate frequency shift in Hz compared to average spectrum
-                dppm = -(ppm_peak_avg - ppm_peak)
-                df_trace[a] = dppm * s_ma.f0
+                    # use the peak_range as a range for inter-corr tests
+                    cc_2d = f_shifts_list * 0.0
+                    for ifs, fs in enumerate(f_shifts_list):
+                        s_ma_ref = np.abs(s_ma[0, :].spectrum())
+                        s_ma_shifted = np.abs(s_ma[a, :].adjust_frequency(fs).spectrum())
+                        cc = np.corrcoef(s_ma_ref, s_ma_shifted)
+                        cc_2d[ifs] = np.abs(cc[0, 1])
+
+                    # find max correlation
+                    optimal_fs_ind = np.argmax(cc_2d)
+                    optimal_fs = f_shifts_list[optimal_fs_ind]
+                    df_trace[a] = optimal_fs
+                else:
+                    # measure shift on moving average data
+                    ippm_peak, ppm_peak, _, _, _, _ = s_ma[a, :]._analyze_peak_1d(peak_range)
+
+                    # estimate frequency shift in Hz compared to average spectrum
+                    dppm = -(ppm_peak_avg - ppm_peak)
+                    df_trace[a] = dppm * s_ma.f0
 
                 # correct moving averaged data
                 s_realigned_ma[a, :] = s_ma[a, :].adjust_frequency(df_trace[a])
@@ -2694,9 +2724,10 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 axs[0, 0].set_xlim(display_range[1], display_range[0])
                 axs[0, 0].set_ylabel('averaged')
                 axs[0, 0].grid('on')
-                # add peak position
-                axs[0, 0].plot(ppm_peak_avg, np.abs(peak_val), 'ro')
-                axs[0, 0].axvline(x=ppm_peak_avg, color='r', linestyle='--')
+                if(not inter_corr_mode):
+                    # add peak position
+                    axs[0, 0].plot(ppm_peak_avg, np.abs(peak_val), 'ro')
+                    axs[0, 0].axvline(x=ppm_peak_avg, color='r', linestyle='--')
 
                 # display original data
                 axs[0, 1].plot(ppm, np.abs(s_ma.spectrum().transpose()), 'k-', linewidth=1)
@@ -2704,19 +2735,19 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 axs[0, 1].set_ylabel('original')
                 axs[0, 1].grid('on')
 
-                # display corrected spectrum
-                axs[1, 0].plot(s_realigned_ma.frequency_axis_ppm(), np.abs(s_realigned_ma.spectrum().transpose()), 'b-', linewidth=1)
-                axs[1, 0].set_xlim(display_range[1], display_range[0])
-                axs[1, 0].set_xlabel('chemical shift (ppm)')
-                axs[1, 0].set_ylabel('corrected')
-                axs[1, 0].grid('on')
-
-                # display corrected averaged spectrum
-                axs[1, 1].plot(s_realigned_ma.frequency_axis_ppm(), np.abs(np.mean(s_realigned_ma, axis=0).spectrum().transpose()), 'b-', linewidth=1)
+                # display corrected spectra
+                axs[1, 1].plot(s_realigned_ma.frequency_axis_ppm(), np.abs(s_realigned_ma.spectrum().transpose()), 'b-', linewidth=1)
                 axs[1, 1].set_xlim(display_range[1], display_range[0])
                 axs[1, 1].set_xlabel('chemical shift (ppm)')
-                axs[1, 1].set_ylabel('averaged & corrected')
+                axs[1, 1].set_ylabel('corrected')
                 axs[1, 1].grid('on')
+
+                # display corrected averaged spectrum
+                axs[1, 0].plot(s_realigned_ma.frequency_axis_ppm(), np.abs(np.mean(s_realigned_ma, axis=0).spectrum().transpose()), 'b-', linewidth=1)
+                axs[1, 0].set_xlim(display_range[1], display_range[0])
+                axs[1, 0].set_xlabel('chemical shift (ppm)')
+                axs[1, 0].set_ylabel('averaged & corrected')
+                axs[1, 0].grid('on')
 
                 plt.subplot(1, 3, 3)
                 plt.plot(df_trace, np.arange(s_ma.shape[0]), 'k-x', linewidth=1)
@@ -2935,12 +2966,11 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         return(s)
 
-    def correct_apodization_1d(self, apo_factor=1.0, display=False, display_range=[1, 6]):
+    def correct_apodization_nd(self, apo_factor=1.0, display=False, display_range=[1, 6]):
         """
-        Apodize signal using an exponential window adjusted by a linewidth parameter in Hz. Works only for a 1D MRSData2 object.
+        Apodize signal using an exponential window adjusted by a linewidth parameter in Hz.
 
-        * Works only with a 1D [timepoints] signal.
-        * Returns a 1D [timepoints] signal.
+        * Works with multi-dimensional signals.
 
         Parameters
         ----------
@@ -2953,19 +2983,21 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         Returns
         -------
-        s_apo : MRSData2 numpy array [timepoints]
+        s_apo : MRSData2 numpy array [whatever,...,timepoints]
             Resulting apodized data stored in a MRSData2 object
         """
         log.debug("apodizing [%s]..." % self.display_label)
-        # dimensions check
-        if(self.ndim != 1):
-            log.error("this method only works for 1D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
 
-        # init
+        # apodize each individual signal
+
         s = self.copy()
         t = s.time_axis()
         w_apo = np.exp(-apo_factor * t)
-        s_apo = s * w_apo
+        if(s.ndim == 1):
+            w_apo_nd = w_apo
+        else:  # >1
+            w_apo_nd = np.tile(w_apo, list(s.shape[:-1]) + [1])
+        s_apo = s * w_apo_nd
 
         if(display):
             ppm = s.frequency_axis_ppm()
@@ -2977,24 +3009,24 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig.canvas.set_window_title("mrs.reco.MRSData2.correct_apodization")
             fig.suptitle("apodizing [%s]" % self.display_label)
 
-            axs[0, 0].plot(t, np.abs(s), 'k-', linewidth=1, label='fid')
+            axs[0, 0].plot(t, np.abs(s).transpose(), 'k-', linewidth=1, label='fid')
             axs[0, 0].plot(t, w_apo * np.abs(s.max()), 'r-', linewidth=1, label='apodization window')
             axs[0, 0].set_xlabel('time (s)')
             axs[0, 0].set_ylabel('original')
             axs[0, 0].grid('on')
 
-            axs[0, 1].plot(t, np.abs(s_apo), 'b-', linewidth=1)
+            axs[0, 1].plot(t, np.abs(s_apo).transpose(), 'b-', linewidth=1)
             axs[0, 1].set_xlabel('time (s)')
             axs[0, 1].set_ylabel('apodized')
             axs[0, 1].grid('on')
 
-            axs[1, 0].plot(ppm, s.spectrum().real, 'k-', linewidth=1)
+            axs[1, 0].plot(ppm, s.spectrum().real.transpose(), 'k-', linewidth=1)
             axs[1, 0].set_xlabel('chemical shift (ppm)')
             axs[1, 0].set_ylabel('original spectrum')
             axs[1, 0].set_xlim(display_range[1], display_range[0])
             axs[1, 0].grid('on')
 
-            axs[1, 1].plot(ppm_apo, s_apo.spectrum().real, 'b-', linewidth=1)
+            axs[1, 1].plot(ppm_apo, s_apo.spectrum().real.transpose(), 'b-', linewidth=1)
             axs[1, 1].set_xlabel("chemical shift (ppm)")
             axs[1, 1].set_ylabel('apodized spectrum')
             axs[1, 1].set_xlim(display_range[1], display_range[0])
@@ -3008,7 +3040,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         # if any ref data available, we apodize it too (silently)
         if(s_apo.data_ref is not None):
-            s_apo.data_ref = s_apo.data_ref.correct_apodization_1d(apo_factor, False)
+            s_apo.data_ref = s_apo.data_ref.correct_apodization_nd(apo_factor, False)
 
         return(s_apo)
 
@@ -3889,6 +3921,8 @@ class pipeline:
                                    "POI_range_ppm": [4.5, 5],
                                    # size of moving average window
                                    "moving_averages": 1,
+                                   # use correlation mode
+                                   "inter_corr_mode": False,
                                    # display all this process to check what the hell is going on
                                    "display": True,
                                    "display_range_ppm": self.jobs["displaying"]["range_ppm"]
@@ -3937,7 +3971,7 @@ class pipeline:
 
         # --- job: data apodization ---
         self.jobs["apodizing"] = {0:
-                                  {"func": MRSData2.correct_apodization_1d, "name": "apodizing"},
+                                  {"func": MRSData2.correct_apodization_nd, "name": "apodizing"},
                                   # exponential damping factor for apodization (Hz)
                                   "damping_hz": 5,
                                   # display all this process to check what the hell is going on
