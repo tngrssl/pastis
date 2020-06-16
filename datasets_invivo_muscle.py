@@ -66,15 +66,15 @@ T:/users/JS/200228_phantoms/meas_MID54_steam_[25]_WSAT_FID53606.dat
 T:/users/JS/200228_phantoms/meas_MID59_slaser_[25]_WSAT_FID53611.dat
 T:/users/JS/200228_phantoms/meas_MID75_steam_[50]_WSAT_FID53627.dat
 T:/users/JS/200228_phantoms/meas_MID80_slaser_[50]_WSAT_FID53632.dat
-/home/tangir/desktop/200303_1HMRS_pd002/meas_MID55_eja_svs_slaser_VAPOR_BH3_FID25884.dat
-/home/tangir/desktop/200303_1HMRS_pd002/meas_MID49_eja_svs_slaser_VAPOR_BH2_FID25878.dat
-/home/tangir/desktop/200303_1HMRS_pd002/meas_MID38_eja_svs_steam_FID25867.dat
-/home/tangir/desktop/200303_1HMRS_pd002/meas_MID51_eja_svs_steam_VAPOR_BH2_FID25880.dat
-/home/tangir/desktop/200303_1HMRS_pd002/meas_MID44_eja_svs_press_FID25873.dat
-/home/tangir/desktop/200303_1HMRS_pd002/meas_MID53_eja_svs_press_VAPOR_BH2_FID25882.dat
-/home/tangir/desktop/200303_1HMRS_pd002/meas_MID46_eja_svs_slaser_VAPOR_FB_FID25875.dat
-/home/tangir/desktop/200303_1HMRS_pd002/meas_MID47_eja_svs_steam_VAPO_FB_FID25876.dat
-/home/tangir/desktop/200303_1HMRS_pd002/meas_MID48_eja_svs_press_VAPOR_FB_FID25877.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200303_1HMRS_pd002/meas_MID55_eja_svs_slaser_VAPOR_BH3_FID25884.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200303_1HMRS_pd002/meas_MID49_eja_svs_slaser_VAPOR_BH2_FID25878.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200303_1HMRS_pd002/meas_MID38_eja_svs_steam_FID25867.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200303_1HMRS_pd002/meas_MID51_eja_svs_steam_VAPOR_BH2_FID25880.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200303_1HMRS_pd002/meas_MID44_eja_svs_press_FID25873.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200303_1HMRS_pd002/meas_MID53_eja_svs_press_VAPOR_BH2_FID25882.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200303_1HMRS_pd002/meas_MID46_eja_svs_slaser_VAPOR_FB_FID25875.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200303_1HMRS_pd002/meas_MID47_eja_svs_steam_VAPO_FB_FID25876.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200303_1HMRS_pd002/meas_MID48_eja_svs_press_VAPOR_FB_FID25877.dat
 T:/users/SSSR/Data/2020_NUTRI7T/200213_nutri7t352/meas_MID108_slaser_20_1_TE200_FID52352.dat
 T:/users/SSSR/Data/2020_NUTRI7T/200122_nutri7t345/muscle/meas_MID128_slaser_20_1_LONGTE_FID50247.dat
 T:/users/JS/2020_coeur_mrs7T/200311_JB_358/meas_MID62_slaser_WSAT_PULS_100NEX_FID54390.dat
@@ -115,6 +115,75 @@ C:/Users/jsourdon/Desktop/2020_1H_MRS/201303_1hmrs_sr006/meas_MID297_eja_svs_sla
 C:/Users/jsourdon/Desktop/2020_1H_MRS/201303_1hmrs_sr006/meas_MID298_eja_svs_steam_VAPOR_FB_FID27663.dat
 C:/Users/jsourdon/Desktop/2020_1H_MRS/201303_1hmrs_sr006/meas_MID301_eja_svs_press_VAPOR_FB_FID27666.dat
 C:/Users/jsourdon/Desktop/2020_1H_MRS/201303_1hmrs_af004/meas_MID57_eja_svs_steam_VAPOR_BH_FID27422.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_007js2/meas_MID62_eja_svs_slaser_VAPOR_BH_FID29816.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_007js2/meas_MID77_eja_svs_slaser_VAPOR_BH_REP_FID29831.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_007js2/
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_007js2/
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_007js2/meas_MID70_eja_svs_press_VAPOR_FB_FID29824.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_007js2/meas_MID75_eja_svs_press_VAPOR_BH_REP_FID29829.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_007js2/meas_MID68_eja_svs_slaser_VAPOR_FB_FID29822.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_007js2/meas_MID73_eja_svs_steam_VAPOR_FB_FID29827.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_007js2/meas_MID72_eja_svs_press_VAPOR_FB_FID29826.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_008sr2/meas_MID115_eja_svs_slaser_VAPOR_BH_FID29869.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_008sr2/meas_MID129_eja_svs_slaser_VAPOR_BH_FID29883.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_008sr2/
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_008sr2/
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_008sr2/meas_MID118_eja_svs_press_VAPOR_BH_FID29872.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_008sr2/meas_MID131_eja_svs_press_VAPOR_BH_FID29885.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_008sr2/meas_MID124_eja_svs_slaser_VAPOR_FB_FID29878.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_008sr2/meas_MID126_eja_svs_steam_VAPOR_FB_FID29880.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_008sr2/meas_MID128_eja_svs_press_VAPOR_FB_FID29882.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_pv009/meas_MID109_eja_svs_slaser_VAPOR_BH_FID29280.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_pv009/meas_MID116_eja_svs_slaser_VAPOR_BH_FID29287.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_pv009/
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_pv009/
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_pv009/meas_MID111_eja_svs_press_VAPOR_BH_FID29282.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_pv009/meas_MID140_eja_svs_press_VAPOR_BH_FID29311.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_pv009/meas_MID124_eja_svs_slaser_VAPOR_FB_FID29295.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_pv009/meas_MID125_eja_svs_steam_VAPOR_FB_FID29296.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_pv009/meas_MID127_eja_svs_press_VAPOR_FB_FID29298.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID197_eja_svs_slaser_VAPOR_BHVOX2_FID29368.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID202_eja_svs_slaser_VAPOR_BHVOX2REPRO_FID29373.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID199_eja_svs_press_VAPOR_BHVOX2_FID29370.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID203_eja_svs_press_VAPOR_BHVOX2REPRO_FID29374.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID200_eja_svs_slaser_VAPOR_FB_FID29371.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID196_eja_svs_steam_VAPOR_FB_FID29367.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID195_eja_svs_press_VAPOR_FB_FID29366.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/meas_MID61_eja_svs_slaser_NOVAPOR_VOX4_FID28498.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/meas_MID63_eja_svs_steam_NOVAPOR_VOX4_FID28500.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/meas_MID64_eja_svs_press_NOVAPOR_VOX4_FID28501.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/meas_MID66_eja_svs_steam_NOVAPOR_VOX4_TE64_FID28503.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/meas_MID65_eja_svs_press_NOVAPOR_VOX4_TE64_FID28502.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_011tr/meas_MID220_eja_svs_slaser_VAPOR_BHVOX2_FID29974.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_011tr/meas_MID223_eja_svs_slaser_VAPOR_BHVOX2_FID29977.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_011tr/
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_011tr/
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_011tr/meas_MID221_eja_svs_press_VAPOR_BH8VOX2_FID29975.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_011tr/meas_MID224_eja_svs_press_VAPOR_BH8VOX2_FID29978.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_011tr/meas_MID215_eja_svs_slaser_VAPOR_FB_FID29969.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_011tr/meas_MID219_eja_svs_steam_VAPOR_FB_FID29973.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_011tr/meas_MID217_eja_svs_press_VAPOR_FB_FID29971.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_012vc/meas_MID41_eja_svs_slaser_VAPOR_BH_FID30852.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_012vc/meas_MID74_eja_svs_slaser_VAPOR_BH_REPRO_FID30885.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_012vc/
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_012vc/
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_012vc/meas_MID45_eja_svs_press_VAPOR_BH_FID30856.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_012vc/meas_MID51_eja_svs_press_VAPOR_BH_FID30862.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_012vc/meas_MID65_eja_svs_slaser_VAPOR_FB_FID30876.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_012vc/
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_012vc/meas_MID67_eja_svs_press_VAPOR_FB_FID30878.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_013zb/meas_MID106_eja_svs_slaser_VAPOR_BH_FID30917.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_013zb/meas_MID130_eja_svs_slaser_VAPOR_BH_REPRO2_FID30941.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_013zb/
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_013zb/
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_013zb/meas_MID114_eja_svs_press_VAPOR_BH_FID30925.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_013zb/meas_MID128_eja_svs_press_VAPOR_BH_REPRO_FID30939.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_013zb/meas_MID120_eja_svs_slaser_VAPOR_FB_FID30931.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_013zb/meas_MID124_eja_svs_steam_VAPOR_FB_FID30935.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_013zb/meas_MID122_eja_svs_press_VAPOR_FB_FID30933.dat
+Y:/data/users/js/verio/1h_mrs/012-vc/20200605/01_0043_eja-svs-slaser-vapor-bh-repro/original-primary_e09_0001.dcm
 """
 
 # file paths to non water-suppressed raw data
@@ -156,15 +225,15 @@ T:/users/JS/200228_phantoms/meas_MID55_steam_[25]_NOWSAT_FID53607.dat
 T:/users/JS/200228_phantoms/meas_MID60_slaser_[25]_NOWSAT_FID53612.dat
 T:/users/JS/200228_phantoms/meas_MID82_steam_[50]_NOWSAT_FID53634.dat
 T:/users/JS/200228_phantoms/meas_MID81_slaser_[50]_NOWSAT_FID53633.dat
-/home/tangir/desktop/200303_1HMRS_pd002/meas_MID50_eja_svs_slaser_NOVAPOR_BH2_FID25879.dat
-/home/tangir/desktop/200303_1HMRS_pd002/meas_MID50_eja_svs_slaser_NOVAPOR_BH2_FID25879.dat
-/home/tangir/desktop/200303_1HMRS_pd002/meas_MID52_eja_svs_steam_NOVAPOR_BH2_FID25881.dat
-/home/tangir/desktop/200303_1HMRS_pd002:meas_MID52_eja_svs_steam_NOVAPOR_BH2_FID25881.dat
-/home/tangir/desktop/200303_1HMRS_pd002/meas_MID54_eja_svs_press_NOVAPOR_BH2_FID25883.dat
-/home/tangir/desktop/200303_1HMRS_pd002/meas_MID54_eja_svs_press_NOVAPOR_BH2_FID25883.dat
-/home/tangir/desktop/200303_1HMRS_pd002/meas_MID50_eja_svs_slaser_NOVAPOR_BH2_FID25879.dat
-/home/tangir/desktop/200303_1HMRS_pd002/meas_MID52_eja_svs_steam_NOVAPOR_BH2_FID25881.dat
-/home/tangir/desktop/200303_1HMRS_pd002/meas_MID54_eja_svs_press_NOVAPOR_BH2_FID25883.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200303_1HMRS_pd002/meas_MID50_eja_svs_slaser_NOVAPOR_BH2_FID25879.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200303_1HMRS_pd002/meas_MID50_eja_svs_slaser_NOVAPOR_BH2_FID25879.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200303_1HMRS_pd002/meas_MID52_eja_svs_steam_NOVAPOR_BH2_FID25881.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200303_1HMRS_pd002/meas_MID52_eja_svs_steam_NOVAPOR_BH2_FID25881.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200303_1HMRS_pd002/meas_MID54_eja_svs_press_NOVAPOR_BH2_FID25883.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200303_1HMRS_pd002/meas_MID54_eja_svs_press_NOVAPOR_BH2_FID25883.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200303_1HMRS_pd002/meas_MID50_eja_svs_slaser_NOVAPOR_BH2_FID25879.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200303_1HMRS_pd002/meas_MID52_eja_svs_steam_NOVAPOR_BH2_FID25881.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200303_1HMRS_pd002/meas_MID54_eja_svs_press_NOVAPOR_BH2_FID25883.dat
 T:/users/SSSR/Data/2020_NUTRI7T/200213_nutri7t352/meas_MID108_slaser_20_1_TE200_FID52352.dat
 T:/users/SSSR/Data/2020_NUTRI7T/200122_nutri7t345/muscle/meas_MID128_slaser_20_1_LONGTE_FID50247.dat
 T:/users/JS/2020_coeur_mrs7T/200311_JB_358/meas_MID63_slaser_WATER_PULS_10NEX_FID54391.dat
@@ -205,6 +274,75 @@ C:/Users/jsourdon/Desktop/2020_1H_MRS/201303_1hmrs_sr006/meas_MID288_eja_svs_sla
 C:/Users/jsourdon/Desktop/2020_1H_MRS/201303_1hmrs_sr006/meas_MID292_eja_svs_steam_NOVAPOR_BH_FID27657.dat
 C:/Users/jsourdon/Desktop/2020_1H_MRS/201303_1hmrs_sr006/meas_MID295_eja_svs_press_NOVAPOR_BH_FID27660.dat
 C:/Users/jsourdon/Desktop/2020_1H_MRS/201303_1hmrs_af004/meas_MID92_eja_svs_steam_NOVAPOR_BH_FID27457.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_007js2/meas_MID65_eja_svs_slaser_NOVAPOR_BH_FID29819.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_007js2/meas_MID65_eja_svs_slaser_NOVAPOR_BH_FID29819.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_007js2/meas_MID66_eja_svs_steam_NOVAPOR_BH_FID29820.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_007js2/meas_MID66_eja_svs_steam_NOVAPOR_BH_FID29820.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_007js2/meas_MID64_eja_svs_press_NOVAPOR_BH_FID29818.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_007js2/meas_MID64_eja_svs_press_NOVAPOR_BH_FID29818.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_007js2/meas_MID65_eja_svs_slaser_NOVAPOR_BH_FID29819.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_007js2/meas_MID66_eja_svs_steam_NOVAPOR_BH_FID29820.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_007js2/meas_MID64_eja_svs_press_NOVAPOR_BH_FID29818.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_008sr2/meas_MID122_eja_svs_slaser_NOVAPOR_BH_FID29876.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_008sr2/meas_MID122_eja_svs_slaser_NOVAPOR_BH_FID29876.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_008sr2/meas_MID123_eja_svs_steam_NOVAPOR_BH_FID29877.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_008sr2/
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_008sr2/meas_MID121_eja_svs_press_NOVAPOR_BH_FID29875.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_008sr2/meas_MID121_eja_svs_press_NOVAPOR_BH_FID29875.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_008sr2/meas_MID122_eja_svs_slaser_NOVAPOR_BH_FID29876.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_008sr2/
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_008sr2/meas_MID121_eja_svs_press_NOVAPOR_BH_FID29875.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_pv009/meas_MID120_eja_svs_slaser_NOVAPOR_FID29291.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_pv009/meas_MID120_eja_svs_slaser_NOVAPOR_FID29291.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_pv009/meas_MID122_eja_svs_steam_NOVAPOR_FID29293.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_pv009/meas_MID122_eja_svs_steam_NOVAPOR_FID29293.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_pv009/meas_MID123_eja_svs_press_novapor_FID29294.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_pv009/meas_MID123_eja_svs_press_novapor_FID29294.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_pv009/meas_MID120_eja_svs_slaser_NOVAPOR_FID29291.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_pv009/meas_MID122_eja_svs_steam_NOVAPOR_FID29293.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_pv009/meas_MID123_eja_svs_press_novapor_FID29294.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID191_eja_svs_slaser_NOVAPOR_FID29362.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID191_eja_svs_slaser_NOVAPOR_FID29362.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID193_eja_svs_steam_NOVAPOR_FID29364.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID193_eja_svs_steam_NOVAPOR_FID29364.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID192_eja_svs_press_NOVAPOR_FID29363.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID192_eja_svs_press_NOVAPOR_FID29363.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID191_eja_svs_slaser_NOVAPOR_FID29362.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID193_eja_svs_steam_NOVAPOR_FID29364.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID192_eja_svs_press_NOVAPOR_FID29363.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/meas_MID61_eja_svs_slaser_NOVAPOR_VOX4_FID28498.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/meas_MID63_eja_svs_steam_NOVAPOR_VOX4_FID28500.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/meas_MID64_eja_svs_press_NOVAPOR_VOX4_FID28501.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/meas_MID66_eja_svs_steam_NOVAPOR_VOX4_TE64_FID28503.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/meas_MID65_eja_svs_press_NOVAPOR_VOX4_TE64_FID28502.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_011tr/meas_MID228_eja_svs_slaser_NOVAPOR_BH_FID29982.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_011tr/meas_MID228_eja_svs_slaser_NOVAPOR_BH_FID29982.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_011tr/
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_011tr/
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_011tr/meas_MID212_eja_svs_press_NOVAPOR_BH_FID29966.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_011tr/meas_MID227_eja_svs_press_NOVAPOR_BH_FID29981.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_011tr/meas_MID213_eja_svs_slaser_NOVAPOR_BH_FID29967.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_011tr/meas_MID214_eja_svs_steam_NOVAPOR_BH_FID29968.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202905_1hmrs_011tr/meas_MID212_eja_svs_press_NOVAPOR_BH_FID29966.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_012vc/meas_MID64_eja_svs_slaser_NOVAPOR_BH_FID30875.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_012vc/meas_MID80_eja_svs_slaser_NOVAPOR_BH_REPRO_FID30891.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_012vc/meas_MID63_eja_svs_steam_NOVAPOR_BH_FID30874.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_012vc/meas_MID63_eja_svs_steam_NOVAPOR_BH_FID30874.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_012vc/meas_MID61_eja_svs_press_NOVAPOR_BH_FID30872.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_012vc/meas_MID61_eja_svs_press_NOVAPOR_BH_FID30872.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_012vc/meas_MID64_eja_svs_slaser_NOVAPOR_BH_FID30875.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_012vc/meas_MID63_eja_svs_steam_NOVAPOR_BH_FID30874.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_012vc/meas_MID61_eja_svs_press_NOVAPOR_BH_FID30872.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_013zb/meas_MID116_eja_svs_slaser_NOVAPOR_BH_FID30927.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_013zb/meas_MID132_eja_svs_slaser_NOVAPOR_BH_FID30943.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_013zb/meas_MID115_eja_svs_press_NOVAPOR_BH_FID30926.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_013zb/meas_MID131_eja_svs_press_NOVAPOR_BH_FID30942.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_013zb/meas_MID129_eja_svs_steam_VAPOR_BH_REPRO_FID30940.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_013zb/meas_MID129_eja_svs_steam_VAPOR_BH_REPRO_FID30940.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_013zb/meas_MID116_eja_svs_slaser_NOVAPOR_BH_FID30927.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_013zb/meas_MID129_eja_svs_steam_VAPOR_BH_REPRO_FID30940.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_013zb/meas_MID115_eja_svs_press_NOVAPOR_BH_FID30926.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_012vc/meas_MID80_eja_svs_slaser_NOVAPOR_BH_REPRO_FID30891.dat
 """
 
 # legend captions
@@ -295,11 +433,80 @@ display_legends = """
 83_1HMRS_006_steamFR
 84_1HMRS_006_pressFR
 85_1HMRS_004_steam3
+86_1HMRS_007_slaser1
+87_1HMRS_007_slaser2
+88_1HMRS_007_steam1
+89_1HMRS_007_steam2
+90_1HMRS_007_press1
+91_1HMRS_007_press2
+92_1HMRS_007_slaserFB
+93_1HMRS_007_steamFB
+94_1HMRS_007_pressFB
+95_1HMRS_008_slaser1
+96_1HMRS_008_slaser2
+97_1HMRS_008_steam1
+98_1HMRS_008_steam2
+99_1HMRS_008_press1
+100_1HMRS_008_press2
+101_1HMRS_008_slaserFB
+102_1HMRS_008_steamFB
+103_1HMRS_008_pressFB
+104_1HMRS_009_slaser1
+105_1HMRS_009_slaser2
+106_1HMRS_009_steam1
+107_1HMRS_009_steam2
+108_1HMRS_009_press1
+109_1HMRS_009_press2
+110_1HMRS_009_slaserFB
+111_1HMRS_009_steamFB
+112_1HMRS_009_pressFB
+113_1HMRS_010_slaser1
+114_1HMRS_010_slaser2
+115_1HMRS_010_steam1
+116_1HMRS_010_steam2
+117_1HMRS_010_press1
+118_1HMRS_010_press2
+119_1HMRS_010_slaserFB
+120_1HMRS_010_steamFB
+121_1HMRS_010_pressFB
+122_1HMRS_phantom001_slaser
+123_1HMRS_phantom001_steam
+124_1HMRS_phantom001_press
+125_1hmrs_phantom001_steamTE64
+126_1hmrs_phantom001_pressTE64
+127_1hmrs_011_slaser1
+128_1hmrs_011_slaser2
+129_1hmrs_011_steam1
+130_1hmrs_011_steam2
+131_1hmrs_011_press1
+132_1hmrs_011_press2
+133_1hmrs_011_slaserFB
+134_1hmrs_011_steamFB
+135_1hmrs_011_pressFB
+136_1hmrs_012_slaser1
+137_1hmrs_012_slaser2
+138_1hmrs_012_steam1
+139_1hmrs_012_steam2
+140_1hmrs_012_press1
+141_1hmrs_012_press2
+142_1hmrs_012_slaserFB
+143_1hmrs_012_steamFB
+144_1hmrs_012_pressFB
+145_1hmrs_013_slaser1
+146_1hmrs_013_slaser2
+147_1hmrs_013_steam1
+148_1hmrs_013_steam2
+149_1hmrs_013_press1
+150_1hmrs_013_press2
+151_1hmrs_013_slaserFB
+152_1hmrs_013_steamFB
+153_1hmrs_013_pressFB
+154_137_dicom
 """
 
 # the data lists above, which data index should we process (starting from 0)
 # [] means process all
-index_to_process = 45
+index_to_process = 137
 
 # --- process the water-suppressed (WS) data ---
 p = reco.pipeline()
@@ -307,24 +514,23 @@ p.data_filepaths = data_filepaths
 p.data_ref_filepaths = data_ref_filepaths
 p.data_physio_filepaths = []
 p.display_legends = display_legends
-# we are using a single channel RF coil
-p.data_coil_nChannels = 1
 
-p.job_list = [  p.jobs["phasing"],
-                p.jobs["scaling"],
-                # p.jobs["FID modulus"],
+p.job_list = [  #p.jobs["phasing"],
+                #p.jobs["scaling"],
+                #p.jobs["FID modulus"],
                 p.jobs["channel-combining"],
                 # p.jobs["concatenate"],
                 p.jobs["zero-filling"],
                 # p.jobs["physio-analysis"],
-                p.jobs["data-rejecting"],
-                p.jobs["realigning"],
+                #p.jobs["data-rejecting"],
+                #p.jobs["realigning"],
                 p.jobs["averaging"],
                 p.jobs["noise-estimation"],
                 p.jobs["apodizing"],
                 p.jobs["cropping"],
                 # p.jobs["water-removal"],
                 p.jobs["calibrating"],
+                p.jobs["phasing (suspect)"],
                 p.jobs["displaying"]
                 ]
 
@@ -332,10 +538,11 @@ p.analyze_job_list = [  p.jobs["channel-combining"],
                         p.jobs["zero-filling"],
                         p.jobs["realigning"],
                         p.jobs["averaging"],
-                        p.jobs["calibrating"]]
+                        p.jobs["calibrating"]
+                        ]
 
 # self-phasing the WS spectrum using the the big lipid peak at ~1.5ppm (Here you can choose btw Lipid and Cr for phasing)
-p.jobs["phasing"]["POI_range_ppm"] = [4, 5.2]  # find this peak in this ppm range
+p.jobs["phasing"]["POI_range_ppm"] = [4.5, 5]  # find this peak in this ppm range
 p.jobs["phasing"]["offset"] = 0.0  # manual phase offset
 p.jobs["phasing"]["using_ref_data"] = False
 
@@ -344,16 +551,17 @@ p.jobs["data-rejecting"]["moving_averages"] = 1
 p.jobs["data-rejecting"]["POI_range_ppm"] = [4, 5.2]
 # rejection ranges
 p.jobs["data-rejecting"]["ranges"]["amplitude (%)"] = None  # do not reject on amplitude changes
-p.jobs["data-rejecting"]["ranges"]["linewidth (Hz)"] = 20  # max linewidth acceptable
+p.jobs["data-rejecting"]["ranges"]["linewidth (Hz)"] = 80  # max linewidth acceptable
 p.jobs["data-rejecting"]["ranges"]["chemical shift (ppm)"] = 0.5  # +/- ppm
-p.jobs["data-rejecting"]["ranges"]["phase std. factor (%)"] = 60.0  # stan's phase +/- 60% of std criteria (see doi:10.1002/jmri.26802)
+#p.jobs["data-rejecting"]["ranges"]["phase std. factor (%)"] = 60.0  # stan's phase +/- 60% of std criteria (see doi:10.1002/jmri.26802)
 # auto rejection based on linewidth?
-p.jobs["data-rejecting"]["auto"] = True
+#p.jobs["data-rejecting"]["auto"] = True
 # minimum allowed SNR change (%) when adjusting the linewidth criteria
-p.jobs["data-rejecting"]["auto_allowed_snr_change"] = -10.0
+#p.jobs["data-rejecting"]["auto_allowed_snr_change"] = -10.0
 
 # frequency realignement
 p.jobs["realigning"]["POI_range_ppm"] = [4, 5.2]
+
 # select number of excitations to average
 # p.jobs["averaging"]["na"] = 8
 # let's denoize a little (5Hz exponential apodization)
@@ -366,19 +574,21 @@ p.jobs["calibrating"]["POI_range_ppm"] = [4, 5.2]
 # p.jobs["calibrating"]["POI_range_ppm"] = [1, 2]
 
 # snr and linewidth estimation on Cr peak
-p.jobs["analyzing-snr"]["s_range_ppm"] = [2.5, 3.5]  # signal ppm range
+p.jobs["analyzing-snr"]["s_range_ppm"] = [2.9, 3.1]  # signal ppm range
 p.jobs["analyzing-snr"]["n_range_ppm"] = [-3, -1]  # noise ppm range
-p.jobs["analyzing-lw"]["range_ppm"] = [2.5, 3.5]
+p.jobs["analyzing-lw"]["range_ppm"] = [1, 1.5]
 
 # display ppm range
-p.jobs["displaying"]["range_ppm"] = [0, 5]
+p.jobs["displaying"]["range_ppm"] = [0.5, 5]
 # run the process pipeline
 p.data_process_only_this_data_index = [index_to_process]
 p.run()
 # save this to db file
 p.save(rdb)
 
-# %% need to fix a phase problem? manual phasing
+reco.remove_grids_from_all_figs()
+
+# %% need to fix a phase problem? manual phasing (to change: 0.0)
 p._data_list[0] = p._data_list[0] * np.exp(1j * 0.0)
 p._data_list[0].display_spectrum_1d()
 # save this to db file
@@ -393,6 +603,6 @@ rejection_rate = n_rejected / n_initial * 100.0
 print(">>> Data rejected = %d/%d (%.2f%%)" % (n_rejected, n_initial, rejection_rate))
 
 # %% replace
-"C:/Users/jsourdon/Desktop/2020_1H_MRS/200303_1HMRS_pd002/"
-# by
 "/home/tangir/desktop/200303_1HMRS_pd002"
+# by
+"C:/Users/jsourdon/Desktop/2020_1H_MRS/200303_1HMRS_pd002/"
