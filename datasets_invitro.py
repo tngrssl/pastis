@@ -2921,7 +2921,25 @@ p.data_filepaths = ["/home/tangir/crmbm/acq_twix/ethanol_slaser_head/meas_MID200
                     "/home/tangir/crmbm/acq_twix/ethanol_slaser_head/meas_MID218_svs_se_30_FID56511.dat",
                     "/home/tangir/crmbm/acq_twix/ethanol_slaser_head/meas_MID221_svs_se_30_FID56514.dat",
                     "/home/tangir/crmbm/acq_twix/ethanol_slaser_head/meas_MID228_eja_svs_press_FID56521.dat",
-                    "/home/tangir/crmbm/acq_twix/glu_slaser_head/meas_MID263_slaser_R_N=20+_1_longTE_SNR++++_FID56556.dat"]
+                    "/home/tangir/crmbm/acq_twix/glu_slaser_head/meas_MID263_slaser_R_N=20+_1_longTE_SNR++++_FID56556.dat",
+                    "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID204_slaser_R_N=20+_1_longTE_SNR++++_FID56867.dat",
+                    "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID206_slaser_R_N=20+_1_longTE_SNR++++_FID56869.dat",
+                    "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID208_slaser_R_N=20+_1_longTE_SNR++++_FID56871.dat",
+                    "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID226_slaser_R_N=20+_1_longTE_SNR++++_FID56889.dat",
+                    "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID228_slaser_R_N=20+_1_longTE_SNR++++_FID56891.dat",
+                    "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID230_slaser_R_N=20+_1_longTE_SNR++++_FID56893.dat",
+                    "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID252_slaser_R_N=10_2_longTE_SNR+++_FID56915.dat",
+                    "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID255_slaser_R_N=20+_1_longTE_SNR++++_FID56918.dat",
+                    "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID257_slaser_R_N=20+_1_longTE_SNR++++_FID56920.dat",
+                    "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID259_slaser_R_N=20+_1_longTE_SNR++++_FID56922.dat",
+                    "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID261_slaser_R_N=20+_1_longTE_SNR++++_FID56924.dat",
+                    "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID263_slaser_R_N=20+_1_longTE_SNR++++_FID56926.dat",
+                    "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID276_slaser_R_N=10_2_longTE_SNR+++_FID56939.dat",
+                    "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID280_slaser_R_N=20+_1_longTE_SNR++++_FID56943.dat",
+                    "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID283_slaser_R_N=20+_1_longTE_SNR++++_FID56946.dat",
+                    "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID285_slaser_R_N=20+_1_longTE_SNR++++_FID56948.dat",
+                    "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID287_slaser_R_N=20+_1_longTE_SNR++++_FID56950.dat",
+                    "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID289_slaser_R_N=20+_1_longTE_SNR++++_FID56952.dat"]
 
 p.data_ref_filepaths = ["/home/tangir/crmbm/acq_twix/ethanol_slaser_head/meas_MID201_slaser_R_N=20+_1_longTE_SNR++++_FID56494.dat",
                         "/home/tangir/crmbm/acq_twix/ethanol_slaser_head/meas_MID204_slaser_R_N=20+_1_longTE_SNR++++_FID56497.dat",
@@ -2932,7 +2950,25 @@ p.data_ref_filepaths = ["/home/tangir/crmbm/acq_twix/ethanol_slaser_head/meas_MI
                         "/home/tangir/crmbm/acq_twix/ethanol_slaser_head/meas_MID219_svs_se_30_FID56512.dat",
                         "/home/tangir/crmbm/acq_twix/ethanol_slaser_head/meas_MID222_svs_se_30_FID56515.dat",
                         "/home/tangir/crmbm/acq_twix/ethanol_slaser_head/meas_MID230_eja_svs_press_FID56523.dat",
-                        "/home/tangir/crmbm/acq_twix/glu_slaser_head/meas_MID264_slaser_R_N=20+_1_longTE_SNR++++_FID56557.dat"]
+                        "/home/tangir/crmbm/acq_twix/glu_slaser_head/meas_MID264_slaser_R_N=20+_1_longTE_SNR++++_FID56557.dat",
+                        "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID205_slaser_R_N=20+_1_longTE_SNR++++_FID56868.dat",
+                        "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID207_slaser_R_N=20+_1_longTE_SNR++++_FID56870.dat",
+                        "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID209_slaser_R_N=20+_1_longTE_SNR++++_FID56872.dat",
+                        "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID227_slaser_R_N=20+_1_longTE_SNR++++_FID56890.dat",
+                        "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID229_slaser_R_N=20+_1_longTE_SNR++++_FID56892.dat",
+                        "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID231_slaser_R_N=20+_1_longTE_SNR++++_FID56894.dat",
+                        "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID253_slaser_R_N=10_2_longTE_SNR+++_FID56916.dat",
+                        "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID256_slaser_R_N=20+_1_longTE_SNR++++_FID56919.dat",
+                        "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID258_slaser_R_N=20+_1_longTE_SNR++++_FID56921.dat",
+                        "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID260_slaser_R_N=20+_1_longTE_SNR++++_FID56923.dat",
+                        "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID262_slaser_R_N=20+_1_longTE_SNR++++_FID56925.dat",
+                        "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID264_slaser_R_N=20+_1_longTE_SNR++++_FID56927.dat",
+                        "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID277_slaser_R_N=10_2_longTE_SNR+++_FID56940.dat",
+                        "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID282_slaser_R_N=20+_1_longTE_SNR++++_FID56945.dat",
+                        "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID284_slaser_R_N=20+_1_longTE_SNR++++_FID56947.dat",
+                        "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID286_slaser_R_N=20+_1_longTE_SNR++++_FID56949.dat",
+                        "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID288_slaser_R_N=20+_1_longTE_SNR++++_FID56951.dat",
+                        "/home/tangir/crmbm/acq_twix/eth-gly-slaser/meas_MID290_slaser_R_N=20+_1_longTE_SNR++++_FID56953.dat"]
 
 p.job_list = [  p.jobs["phasing"],
                 p.jobs["scaling"],
@@ -2970,17 +3006,37 @@ Ethanol2 - PRESS TE=50ms
 Ethanol2 - PRESS TE=30ms
 Ethanol2 - ejaPRESS TE=30ms
 Glu - 20/1 R=70
+Glycerol - 20/1 R=70
+Glycerol - 20/1 R=20
+Glycerol - 20/1 R=70 5ms
+Ethanol - 20/1 R=70
+Ethanol - 20/1 R=20
+Ethanol - 20/1 R=70 5ms
+Eth3 - 10/2
+Eth3 - 20/1 6ms
+Eth3 - 20/1 7ms
+Eth3 - 20/1 8ms
+Eth3 - 20/1 9ms
+Eth3 - 20/1 10ms
+Gly3 - 10/2
+Gly3 - 20/1 6ms
+Gly3 - 20/1 7ms
+Gly3 - 20/1 8ms
+Gly3 - 20/1 9ms
+Gly3 - 20/1 10ms
 """
 
-p.jobs["phasing"]["order"] = 1
+p.jobs["phasing"]["display"] = False
+p.jobs["phasing"]["order"] = 0
+p.jobs["channel-combining"]["phasing"] = False
 p.jobs["zero-filling"]["npts"] = 16384 + 1024
 p.jobs["cropping"]["final_npts"] = 16384 + 1024
-p.jobs["apodizing"]["damping_hz"] = 15
+p.jobs["apodizing"]["damping_hz"] = 5
 p.jobs["calibrating"]["POI_range_ppm"] = [4.5, 5]
 p.jobs["calibrating"]["POI_true_ppm"] = 4.7
 p.jobs["displaying"]["range_ppm"] = [0, 5]
 
 p.analyze_enable = False
-p.data_process_only_this_data_index = [9]
+p.data_process_only_this_data_index = np.arange(16,28)
 p.run()
 p.save(rdb)

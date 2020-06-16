@@ -536,7 +536,7 @@ p.job_list = [  #p.jobs["phasing"],
 
 p.analyze_job_list = [  p.jobs["channel-combining"],
                         p.jobs["zero-filling"],
-                        p.jobs["realigning"],
+                        #p.jobs["realigning"],
                         p.jobs["averaging"],
                         p.jobs["calibrating"]
                         ]
@@ -594,15 +594,136 @@ p._data_list[0].display_spectrum_1d()
 # save this to db file
 p.save(rdb)
 
-# %% print data rejection stuff
+# %% print data rejection stuff + NOVAPOR water lw
 n_initial = p._data_list[0].na_pre_data_rejection
 n_final = p._data_list[0].na_post_data_rejection
 n_rejected = n_initial - n_final
 rejection_rate = n_rejected / n_initial * 100.0
-
 print(">>> Data rejected = %d/%d (%.2f%%)" % (n_rejected, n_initial, rejection_rate))
 
-# %% replace
-"/home/tangir/desktop/200303_1HMRS_pd002"
-# by
-"C:/Users/jsourdon/Desktop/2020_1H_MRS/200303_1HMRS_pd002/"
+water_lw = p._data_list[0].data_ref.analyze_linewidth_1d([4.5, 5])
+print(">>> Water LW = %.2fHz" % water_lw)
+
+# %% process challenging crappy data
+get_ipython().magic("clear")
+plt.close("all")
+
+# file paths to water-suppressed raw data
+data_filepaths = """
+/crmbm/data_seq/users/JS/2020_1H_MRS/200506_1hmrs_012vc/meas_MID74_eja_svs_slaser_VAPOR_BH_REPRO_FID30885.dat
+/crmbm/data_cemerem/data/users/js/verio/1h_mrs/012-vc/20200605/01_0043_eja-svs-slaser-vapor-bh-repro/original-primary_e09_0001.dcm
+/crmbm/data_seq/users/JS/2020_1H_MRS/200506_1hmrs_013zb/meas_MID114_eja_svs_press_VAPOR_BH_FID30925.dat
+/crmbm/data_cemerem/data/users/js/verio/1h_mrs/013-zb/20200605/01_0018_eja-svs-press-vapor-bh/original-primary_e09_0001.dcm
+/crmbm/data_seq/users/JS/2020_1H_MRS/200529_1hmrs_011tr/meas_MID223_eja_svs_slaser_VAPOR_BHVOX2_FID29977.dat
+/crmbm/data_cemerem/data/users/js/verio/1h_mrs/011-tr/20200528/01_0039_eja-svs-slaser-vapor-bhvox2/original-primary_e09_0001.dcm
+/crmbm/data_seq/users/JS/2020_1H_MRS/200506_1hmrs_012vc/meas_MID65_eja_svs_slaser_VAPOR_FB_FID30876.dat
+/crmbm/data_cemerem/data/users/js/verio/1h_mrs/012-vc/20200605/01_0037_eja-svs-slaser-vapor-fb/original-primary_e09_0001.dcm
+"""
+
+# file paths to non water-suppressed raw data
+data_ref_filepaths = """
+/crmbm/data_seq/users/JS/2020_1H_MRS/200506_1hmrs_012vc/meas_MID80_eja_svs_slaser_NOVAPOR_BH_REPRO_FID30891.dat
+/crmbm/data_cemerem/data/users/js/verio/1h_mrs/012-vc/20200605/01_0043_eja-svs-slaser-vapor-bh-repro/original-primary_e09_0001.dcm
+/crmbm/data_seq/users/JS/2020_1H_MRS/200506_1hmrs_013zb/meas_MID129_eja_svs_steam_VAPOR_BH_REPRO_FID30940.dat
+/crmbm/data_cemerem/data/users/js/verio/1h_mrs/013-zb/20200605/01_0018_eja-svs-press-vapor-bh/original-primary_e09_0001.dcm
+/crmbm/data_seq/users/JS/2020_1H_MRS/200529_1hmrs_011tr/meas_MID228_eja_svs_slaser_NOVAPOR_BH_FID29982.dat
+/crmbm/data_cemerem/data/users/js/verio/1h_mrs/011-tr/20200528/01_0039_eja-svs-slaser-vapor-bhvox2/original-primary_e09_0001.dcm
+/crmbm/data_seq/users/JS/2020_1H_MRS/200506_1hmrs_012vc/meas_MID64_eja_svs_slaser_NOVAPOR_BH_FID30875.dat
+/crmbm/data_cemerem/data/users/js/verio/1h_mrs/012-vc/20200605/01_0037_eja-svs-slaser-vapor-fb/original-primary_e09_0001.dcm
+"""
+
+# legend captions
+display_legends = """
+Celle que nous avions regardé ensemble vendredi (apnée)
+Celle que nous avions regardé ensemble vendredi (apnée) [DCM]
+Celle qui bug complet (apnée)
+Celle qui bug complet (apnée) [DCM]
+Un autre exemple de slaser (apnée)
+Un autre exemple de slaser (apnée) [DCM]
+Essayons une slaser en respiration libre désormais
+Essayons une slaser en respiration libre désormais [DCM]
+"""
+
+# --- process the water-suppressed (WS) data ---
+p = reco.pipeline()
+p.data_filepaths = data_filepaths
+p.data_ref_filepaths = data_ref_filepaths
+p.data_physio_filepaths = []
+p.display_legends = display_legends
+
+p.job_list = [  # p.jobs["phasing"],
+                p.jobs["scaling"],
+                #np.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["apodizing"],
+                p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["phasing (suspect)"],
+                p.jobs["displaying"]
+                ]
+
+p.analyze_job_list = [  p.jobs["channel-combining"],
+                        p.jobs["zero-filling"],
+                        #p.jobs["realigning"],
+                        p.jobs["averaging"],
+                        p.jobs["calibrating"]
+                        ]
+
+# self-phasing the WS spectrum using the the big lipid peak at ~1.5ppm (Here you can choose btw Lipid and Cr for phasing)
+p.jobs["phasing"]["POI_range_ppm"] = [4, 5]  # find this peak in this ppm range
+p.jobs["phasing"]["offset"] = 0.0  # manual phase offset
+p.jobs["phasing"]["using_ref_data"] = True
+# p.jobs["channel-combining"]["using_ref_data"] = False
+
+# reject bad data
+p.jobs["data-rejecting"]["moving_averages"] = 1
+p.jobs["data-rejecting"]["POI_range_ppm"] = [4, 5]
+# rejection ranges
+p.jobs["data-rejecting"]["ranges"]["amplitude (%)"] = None  # do not reject on amplitude changes
+p.jobs["data-rejecting"]["ranges"]["linewidth (Hz)"] = 80  # max linewidth acceptable
+p.jobs["data-rejecting"]["ranges"]["chemical shift (ppm)"] = 0.1  # +/- ppm
+p.jobs["data-rejecting"]["ranges"]["phase std. factor (%)"] = 60.0  # stan's phase +/- 60% of std criteria (see doi:10.1002/jmri.26802)
+# auto rejection based on linewidth?
+p.jobs["data-rejecting"]["auto"] = True
+# minimum allowed SNR change (%) when adjusting the linewidth criteria
+p.jobs["data-rejecting"]["auto_allowed_snr_change"] = -10.0
+
+# frequency realignement
+p.jobs["realigning"]["POI_range_ppm"] = [4.5, 5]
+p.jobs["realigning"]["inter_corr_mode"] = True
+
+# select number of excitations to average
+# p.jobs["averaging"]["na"] = 8
+# let's denoize a little (5Hz exponential apodization)
+p.jobs["apodizing"]["damping_hz"] = 10
+# let's calibrate ppm scale so that water residue is at 4.7ppm
+# p.jobs["calibrating"]["POI_true_ppm"] = 4.7
+# p.jobs["calibrating"]["POI_range_ppm"] = [4, 5.2]
+# or if the residue is too small, let's use the lipid at 1.5ppm
+p.jobs["calibrating"]["POI_true_ppm"] = 1.4
+p.jobs["calibrating"]["POI_range_ppm"] = [1, 2]
+
+# snr and linewidth estimation on Cr peak
+p.jobs["analyzing-snr"]["s_range_ppm"] = [3, 3.5]  # signal ppm range
+p.jobs["analyzing-snr"]["n_range_ppm"] = [-3, -1]  # noise ppm range
+p.jobs["analyzing-lw"]["range_ppm"] = [1, 1.5]
+
+# display ppm range
+p.jobs["displaying"]["range_ppm"] = [0.5, 5]
+# run the process pipeline
+p.data_process_only_this_data_index = [6]
+p.run()
+
+# %% process corresponding DCM
+p.jobs["scaling"]["scaling_factor"] = 1
+p.data_process_only_this_data_index = [p.data_process_only_this_data_index[0] + 1]
+p.run()
+

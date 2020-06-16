@@ -33,8 +33,7 @@ rdb = reco.data_db()
 def my_sc_data(d: reco.MRSData2, p: reco.pipeline):
     """Filter data to get from database."""
     r = (d.f0 > 6*42 and
-        d.f0 < 8*42 and
-        p.data_coil_nChannels > 8)
+        d.f0 < 8*42)
     return(r)
 
 data_list, data_pipeline_list = rdb.get_datasets(my_sc_data)
