@@ -2253,7 +2253,6 @@ class metabolite_basis_set(dict):
         """
         # check attributes
         if(self.__dict__ != other.__dict__):
-            pdb.set_trace()
             return(False)
         # check dict content
         r = self.__eq_dict(self, other)
