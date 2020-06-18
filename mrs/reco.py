@@ -538,7 +538,11 @@ class SIEMENS_data_file_reader():
             Patient height in meters
         """
         if(self.is_dicom()):
-            patient_height_m = float(self.dcm_header.PatientSize)
+            try:
+                patient_height_m = float(self.dcm_header.PatientSize)
+            except:
+                patient_height_m = np.nan
+
         elif(self.file_ext == '.dat'):
             # find patient height dirty way
             a = self.file_content_str.find("flPatientHeight")

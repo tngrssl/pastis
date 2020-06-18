@@ -74,6 +74,26 @@ gamma1H = 42.576
 b0 = seq.f0 / gamma1H
 b0_factor = b0 / 7.0
 
+# %% area integration stuff
+
+# for non water-suppressed data
+prefittool = fit.prefit_tool(data.data_ref, seq)
+prefittool.area_integration_peak_search_range = 0.5
+prefittool.area_integration_peaks = [xxx.m_Water]
+prefittool.initialize()
+params_ref_area, params_ref_area_pnorm = prefittool.run()
+
+# for water-suppressed data
+prefittool = fit.prefit_tool(data, seq)
+prefittool.area_integration_peak_search_range = 0.5
+prefittool.area_integration_peaks = [xxx.m_Cr_CH3, xxx.m_Lip2]
+prefittool.initialize()
+params_area, params_area_pnorm = prefittool.run()
+
+print("* Ratio Cr_CH3/Lip2 = %.2f" % (params_area[xxx.m_Cr_CH3, xxx.p_cm] / params_area[xxx.m_Lip2, xxx.p_cm]))
+
+print("* Ratio Cr_CH3/Lip2 (proton norm.) = %.2f" % (params_area_pnorm[xxx.m_Cr_CH3, xxx.p_cm] / params_area_pnorm[xxx.m_Lip2, xxx.p_cm]))
+
 # %% fit non water-suppressed data
 
 fittool = fit.fit_tool(data.data_ref, seq)

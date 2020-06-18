@@ -582,7 +582,7 @@ p.jobs["analyzing-lw"]["range_ppm"] = [1, 1.5]
 # display ppm range
 p.jobs["displaying"]["range_ppm"] = [0.5, 5]
 # run the process pipeline
-p.data_process_only_this_data_index = [index_to_process]
+p.data_process_only_this_data_index = []
 p.run()
 # save this to db file
 p.save(rdb)
