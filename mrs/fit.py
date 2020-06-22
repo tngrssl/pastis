@@ -77,9 +77,7 @@ class prefit_tool:
         # metabolites to integrate
         self.area_integration_peaks = [xxx.m_Water]
         # ppm range to look for peak maximum
-        self.area_integration_peak_search_range = 0.4  # ppm
-        # force area integration over area_integration_peak_search_range?
-        self.fixed_peak_width = False
+        self.area_integration_peak_ranges = [0.4]  # ppm
         # internal parameters
         self._peak_names = []
         self._peak_ppms = []
@@ -215,23 +213,21 @@ class prefit_tool:
 
         log.info("integrating peak for...")
         log.info_line________________________()
-        for (this_peak_index, this_peak_name, this_peak_ppm, this_peak_np) in zip(self.area_integration_peaks, self._peak_names, self._peak_ppms, self._peak_nprots):
+        for (this_peak_index, this_peak_range, this_peak_name, this_peak_ppm, this_peak_np) in zip(self.area_integration_peaks, self.area_integration_peak_ranges, self._peak_names, self._peak_ppms, self._peak_nprots):
             log.info("[%s] theoretically at %.2fppm in theory" % (this_peak_name, this_peak_ppm))
 
             # first find closest peak in range
-            this_peak_search_range = [this_peak_ppm - self.area_integration_peak_search_range, this_peak_ppm + self.area_integration_peak_search_range]
+            this_peak_search_range = [this_peak_ppm - this_peak_range / 2.0, this_peak_ppm + this_peak_range / 2.0]
             _, this_peak_ppm, _, this_peak_lw_hz, _, _ = self.data._analyze_peak_1d(this_peak_search_range)
             log.debug("found it in the spectrum at %.2fppm" % this_peak_ppm)
 
             # integrate area
 
-            if(self.fixed_peak_width):
-                # use self.area_integration_peak_search_range as integration range
-                this_peak_lw_ppm = self.area_integration_peak_search_range
-            else:
-                # according to https://doi.org/10.1002/nbm.4257
-                # peak integration area should be 2 * peak linewidth
-                this_peak_lw_ppm = this_peak_lw_hz / self.data.f0
+            # according to https://doi.org/10.1002/nbm.4257
+            # peak integration area should be 2 * peak linewidth
+            this_peak_lw_ppm = this_peak_lw_hz / self.data.f0
+            if(this_peak_lw_ppm > this_peak_range):
+                this_peak_lw_ppm = this_peak_range
 
             ippm_peak_range = (ppm > (this_peak_ppm - this_peak_lw_ppm)) & (ppm < (this_peak_ppm + this_peak_lw_ppm))
             sf_to_integrate = sf_real[ippm_peak_range]
