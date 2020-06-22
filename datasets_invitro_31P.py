@@ -19,15 +19,14 @@ get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChanneldata_list =1
 p.ppm0 = 0.0
-p.data_filepathdata_list ="""
+p.data_filepaths ="""
 /home/tangir/crmbm/acq/phosphates_mix_001/phosphates-mix/20190808/01_0006_fid/original-primary_e09_0001.dcm
 /home/tangir/crmbm/acq/phosphates_mix_001/phosphates-mix/20190808/01_0007_fid/original-primary_e09_0001.dcm
 /home/tangir/crmbm/acq/phosphates_mix_001/phosphates-mix/20190808/01_0008_fid/original-primary_e09_0001.dcm
 """
 
-p.display_legenddata_list ="""
+p.display_legends ="""
 un peu de lessive
 beaucoup
 beaucoup beaucoup
@@ -63,9 +62,8 @@ get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChanneldata_list =1
 p.ppm0 = 0.0
-p.data_filepathdata_list ="""
+p.data_filepaths ="""
 /home/tangir/crmbm/acq/phosphates_mix_002/phosphates-mix/20190809/01_0004_fid/original-primary_e09_0001.dcm
 /home/tangir/crmbm/acq/phosphates_mix_002/phosphates-mix/20190809/01_0006_svs-st-vapor-643-optim/original-primary_e09_0001.dcm
 /home/tangir/crmbm/acq/phosphates_mix_002/phosphates-mix/20190809/01_0006_svs-st-vapor-643-optim/original-primary_e09_0002.dcm
@@ -79,7 +77,7 @@ p.data_filepathdata_list ="""
 /home/tangir/crmbm/acq/phosphates_mix_002/phosphates-mix/20190809/01_0006_svs-st-vapor-643-optim/original-primary_e09_0010.dcm
 """
 
-p.display_legenddata_list ="""
+p.display_legends ="""
 non-localized
 FA test
 FA test
@@ -123,14 +121,13 @@ get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChanneldata_list =1
 p.ppm0 = 0.0
-p.data_filepathdata_list ="""
+p.data_filepaths ="""
 /home/tangir/crmbm/acq/phosphates_mix_002/phosphates-mix/20190809/01_0010_slaser-r-n/original-primary_e09_0001.dcm
 /home/tangir/crmbm/acq/phosphates_mix_002/phosphates-mix/20190809/01_0012_bow-isis-15/original-primary_e09_0001.dcm
 """
 
-p.display_legenddata_list ="""
+p.display_legends ="""
 sLASER
 ISIS
 """
@@ -165,14 +162,13 @@ get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChanneldata_list =1
 p.ppm0 = 0.0
-p.data_filepathdata_list ="""
+p.data_filepaths ="""
 /home/tangir/crmbm/acq/phosphates_mix_002/phosphates-mix/20190809/01_0012_bow-isis-15/original-primary_e09_0001.dcm
 /home/tangir/crmbm/acq_twix/phosphates_mix_002/meas_MID110_bow_isis_15_FID37704.dat
 """
 
-p.display_legenddata_list ="""
+p.display_legends ="""
 dcm ISIS
 raw ISIS
 """
@@ -227,9 +223,8 @@ get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChanneldata_list =1
 p.ppm0 = 0.0
-p.data_filepathdata_list ="""
+p.data_filepaths ="""
 /home/tangir/crmbm/acq/phosphates_mix_003/phosphates-mix/20190813/01_0016_bow-isis-15/original-primary_e09_0001.dcm
 /home/tangir/crmbm/acq/phosphates_mix_003/phosphates-mix/20190813/01_0017_bow-isis-15/original-primary_e09_0001.dcm
 /home/tangir/crmbm/acq/phosphates_mix_003/phosphates-mix/20190813/01_0018_bow-isis-15/original-primary_e09_0001.dcm
@@ -242,7 +237,7 @@ p.data_filepathdata_list ="""
 /home/tangir/crmbm/acq/phosphates_mix_003/phosphates-mix/20190813/01_0025_bow-isis-15/original-primary_e09_0001.dcm
 """
 
-p.display_legenddata_list ="""
+p.display_legends ="""
 1 kHz
 2 kHz
 3 kHz
@@ -304,9 +299,8 @@ get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChanneldata_list =1
 p.ppm0 = 0.0
-p.data_filepathdata_list ="""
+p.data_filepaths ="""
 /home/tangir/crmbm/acq/phosphates_mix_003/phosphates-mix/20190813/01_0026_bow-isis-15/original-primary_e09_0001.dcm
 /home/tangir/crmbm/acq/phosphates_mix_003/phosphates-mix/20190813/01_0027_bow-isis-15/original-primary_e09_0001.dcm
 /home/tangir/crmbm/acq/phosphates_mix_003/phosphates-mix/20190813/01_0028_bow-isis-15/original-primary_e09_0001.dcm
@@ -316,7 +310,7 @@ p.data_filepathdata_list ="""
 /home/tangir/crmbm/acq/phosphates_mix_003/phosphates-mix/20190813/01_0032_bow-isis-15/original-primary_e09_0001.dcm
 """
 
-p.display_legenddata_list ="""
+p.display_legends ="""
 50V
 100V
 150V
@@ -375,9 +369,8 @@ get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChanneldata_list =1
 p.ppm0 = 0.0
-p.data_filepathdata_list ="""
+p.data_filepaths ="""
 /home/tangir/crmbm/acq_twix/phantom_31p/meas_MID179_svs_st_vapor_643_optim_FID50085.dat
 /home/tangir/crmbm/acq_twix/phantom_31p/meas_MID180_svs_st_vapor_643_optim_FID50086.dat
 /home/tangir/crmbm/acq_twix/phantom_31p/meas_MID181_svs_st_vapor_643_optim_FID50087.dat
@@ -392,7 +385,7 @@ p.data_filepathdata_list ="""
 /home/tangir/crmbm/acq_twix/phantom_31p/meas_MID191_svs_st_vapor_643_optim_FID50097.dat
 """
 
-p.display_legenddata_list ="""
+p.display_legends ="""
 300
 275
 250
@@ -455,9 +448,8 @@ get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline()
-p.data_coil_nChanneldata_list =1
 p.ppm0 = 0.0
-p.data_filepathdata_list ="""
+p.data_filepaths ="""
 /home/tangir/crmbm/acq_twix/phantom_31p/meas_MID209_svs_st_vapor_643_optim_FID50115.dat
 /home/tangir/crmbm/acq_twix/phantom_31p/meas_MID210_svs_st_vapor_643_optim_FID50116.dat
 /home/tangir/crmbm/acq_twix/phantom_31p/meas_MID211_svs_st_vapor_643_optim_FID50117.dat
@@ -465,7 +457,7 @@ p.data_filepathdata_list ="""
 /home/tangir/crmbm/acq_twix/phantom_31p/meas_MID213_svs_st_vapor_643_optim_FID50119.dat
 """
 
-p.display_legenddata_list ="""
+p.display_legends ="""
 250
 200
 150
@@ -515,3 +507,63 @@ p.jobs["apodizing"]["damping_hz"] = 100
 p.jobs["displaying"]["magnitude_mode"] = True
 p.jobs["displaying"]["range_ppm"] = [-25, 25]
 data_list =p.run()
+
+# %% 22/06/2020 - phantom multicomp, ISIS
+get_ipython().magic("clear")
+plt.close("all")
+
+p = reco.pipeline()
+p.ppm0 = 0.0
+p.data_filepaths ="""
+/home/tangir/crmbm/acq_twix/csi-31p-phantom/meas_MID295_bow_isis_15_FID58328.dat
+"""
+
+p.display_legends ="""
+ISIS on Pi+MDAP tube
+"""
+
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                # p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                #p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                # p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["apodizing"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.analyze_job_list = [  p.jobs["channel-combining"],
+                        # p.jobs["zero-filling"],
+                        # p.jobs["realigning"],
+                        p.jobs["averaging"],
+                        # p.jobs["calibrating"]
+                        ]
+
+p.jobs["phasing"]["POI_range_ppm"] = [-1, 1]
+
+# remove 1h channel from data
+p.jobs["channel-combining"]["phasing"] = False
+p.jobs["channel-combining"]["weights"] = [False, True]
+
+p.jobs["realigning"]["POI_range_ppm"] = [-2, 1.2]
+p.jobs["realigning"]["moving_averages"] = 2
+p.jobs["realigning"]["inter_corr_mode"] = False
+
+p.jobs["apodizing"]["damping_hz"] = 300
+
+p.jobs["calibrating"]["POI_range_ppm"] = [-5, 5]
+p.jobs["calibrating"]["POI_true_ppm"] = 0.0
+
+p.jobs["displaying"]["magnitude_mode"] = True
+p.jobs["displaying"]["range_ppm"] = [-25, 25]
+
+p.analyze_enable = False
+data_list =p.run()
+

@@ -3040,3 +3040,69 @@ p.analyze_enable = False
 p.data_process_only_this_data_index = np.arange(16,28)
 p.run()
 p.save(rdb)
+
+
+# %% 03/06/2020 - Creatine tubes in water/agar
+plt.close('all')
+
+p = reco.pipeline()
+
+p.data_filepaths = ["/home/tangir/crmbm/acq_twix/q-mrs-tests-cre/meas_MID107_slaser_R_N=20+_1_longTE_SNR++++_FID58514.dat",
+                    "/home/tangir/crmbm/acq_twix/q-mrs-tests-cre/meas_MID109_slaser_R_N=20+_1_longTE_SNR++++_FID58516.dat",
+                    "/home/tangir/crmbm/acq_twix/q-mrs-tests-cre/meas_MID111_slaser_R_N=20+_1_longTE_SNR++++_FID58518.dat",
+                    "/home/tangir/crmbm/acq_twix/q-mrs-tests-cre/meas_MID248_slaser_R_N=20+_1_longTE_SNR++++_FID58655.dat",
+                    "/home/tangir/crmbm/acq_twix/q-mrs-tests-cre/meas_MID252_slaser_R_N=20+_1_longTE_SNR++++_FID58659.dat",
+                    "/home/tangir/crmbm/acq_twix/q-mrs-tests-cre/meas_MID254_slaser_R_N=20+_1_longTE_SNR++++_FID58661.dat"]
+
+p.data_ref_filepaths = ["/home/tangir/crmbm/acq_twix/q-mrs-tests-cre/meas_MID108_slaser_R_N=20+_1_longTE_SNR++++_FID58515.dat",
+                        "/home/tangir/crmbm/acq_twix/q-mrs-tests-cre/meas_MID110_slaser_R_N=20+_1_longTE_SNR++++_FID58517.dat",
+                        "/home/tangir/crmbm/acq_twix/q-mrs-tests-cre/meas_MID112_slaser_R_N=20+_1_longTE_SNR++++_FID58519.dat",
+                        "/home/tangir/crmbm/acq_twix/q-mrs-tests-cre/meas_MID251_slaser_R_N=20+_1_longTE_SNR++++_FID58658.dat",
+                        "/home/tangir/crmbm/acq_twix/q-mrs-tests-cre/meas_MID253_slaser_R_N=20+_1_longTE_SNR++++_FID58660.dat",
+                        "/home/tangir/crmbm/acq_twix/q-mrs-tests-cre/meas_MID255_slaser_R_N=20+_1_longTE_SNR++++_FID58662.dat"]
+
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                # p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["phasing (suspect)"],
+                p.jobs["displaying"]]
+
+p.analyze_job_list = [  p.jobs["channel-combining"],
+                        p.jobs["zero-filling"],
+                        p.jobs["realigning"],
+                        p.jobs["averaging"],
+                        p.jobs["calibrating"]
+                        ]
+
+p.display_legends = """
+Cre - 25M - TE=50ms
+Cre - 25M - TE=90ms
+Cre - 25M - TE=130ms
+Cre - 10M - TE=50ms
+Cre - 10M - TE=90ms
+Cre - 10M - TE=130ms
+"""
+
+p.jobs["zero-filling"]["npts"] = 16384 + 1024
+p.jobs["cropping"]["final_npts"] = 16384 + 1024
+p.jobs["apodizing"]["damping_hz"] = 5
+p.jobs["calibrating"]["POI_range_ppm"] = [4.5, 5]
+p.jobs["calibrating"]["POI_true_ppm"] = 4.7
+p.jobs["displaying"]["range_ppm"] = [0, 5]
+
+p.analyze_enable = False
+p.data_process_only_this_data_index = []
+p.run()
+p.save(rdb)

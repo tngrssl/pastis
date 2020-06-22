@@ -78,6 +78,8 @@ class prefit_tool:
         self.area_integration_peaks = [xxx.m_Water]
         # ppm range to look for peak maximum
         self.area_integration_peak_search_range = 0.4  # ppm
+        # force area integration over area_integration_peak_search_range?
+        self.fixed_peak_width = False
         # internal parameters
         self._peak_names = []
         self._peak_ppms = []
@@ -223,9 +225,14 @@ class prefit_tool:
 
             # integrate area
 
-            # according to https://doi.org/10.1002/nbm.4257
-            # peak integration area should be 2 * peak linewidth
-            this_peak_lw_ppm = this_peak_lw_hz / self.data.f0
+            if(self.fixed_peak_width):
+                # use self.area_integration_peak_search_range as integration range
+                this_peak_lw_ppm = self.area_integration_peak_search_range
+            else:
+                # according to https://doi.org/10.1002/nbm.4257
+                # peak integration area should be 2 * peak linewidth
+                this_peak_lw_ppm = this_peak_lw_hz / self.data.f0
+
             ippm_peak_range = (ppm > (this_peak_ppm - this_peak_lw_ppm)) & (ppm < (this_peak_ppm + this_peak_lw_ppm))
             sf_to_integrate = sf_real[ippm_peak_range]
             ppm_to_integrate = ppm[ippm_peak_range]
