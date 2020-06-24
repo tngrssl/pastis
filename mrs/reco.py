@@ -2372,7 +2372,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         # frequency: relative in ppm
         peak_prop_analyze[:, 2] = peak_prop_rel[:, 2]
         # phase: absolute in rad
-        peak_prop_analyze[:, 3] = peak_prop_abs[:, 3]
+        peak_prop_analyze[:, 3] = peak_prop_rel[:, 3]
 
         # choose if absolute or relative will be displayed
         peak_prop_disp = peak_prop_rel * 0.0
