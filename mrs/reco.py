@@ -1656,7 +1656,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         return(s_zf)
 
-    def correct_phase_3d(self, use_ref_data=True, peak_range=[4.5, 5], weak_ws=False, high_snr=False, phase_order=0, phase_offset=0.0, display=False, display_range=[1, 6]):
+    def correct_phase_3d(self, use_ref_data=True, peak_range=[4.5, 5], average_per_channel_mode=False, first_point_fid_mode=False, phase_order=0, phase_offset=0.0, display=False, display_range=[1, 6]):
         """
         Well, that's a big one but basically it rephases the signal of interest.
 
@@ -1674,10 +1674,10 @@ class MRSData2(suspect.mrsobjects.MRSData):
             Use reference data (usually non water suppressed) for phasing
         peak_range : list [2]
             Range in ppm used to peak-pick and estimate a phase
-        weak_ws : boolean
-            Weak water suppression, enough to have substantial water signal contributing to the 1st time point for phasing
-        high_snr : boolean
-            High SNR, enough to process each channel separately
+        average_per_channel_mode : boolean
+            Average all the averages for each channel when doing peak analysis
+        first_point_fid_mode : boolean
+            Estimate phase from 1st point of FID
         phase_order : int
             Order of phasing: 0(th) or 1(st) order phasing
         phase_offset : float
@@ -1729,14 +1729,14 @@ class MRSData2(suspect.mrsobjects.MRSData):
         else:
             # we do not have a ref scan, so method #2, #3, #4, #5
             # that depends on water intensity and water suppression
-            if(weak_ws):
-                phase_method = 3
+            if(first_point_fid_mode):
+                phase_method = 2
             else:
-                phase_method = 5
+                phase_method = 4
 
             # and on SNR
-            if(high_snr):
-                phase_method -= 1
+            if(average_per_channel_mode):
+                phase_method += 1
 
         if(display):
             # prepare subplots
@@ -3004,8 +3004,16 @@ class MRSData2(suspect.mrsobjects.MRSData):
         s_apo = s * w_apo_nd
 
         if(display):
-            ppm = s.frequency_axis_ppm()
-            ppm_apo = s_apo.frequency_axis_ppm()
+            # reshaping
+            if(s.ndim == 3):
+                s_disp = s.reshape([s.shape[0] * s.shape[1], s.shape[2]])
+                s_apo_disp = s_apo.reshape([s_apo.shape[0] * s_apo.shape[1], s_apo.shape[2]])
+            else:
+                s_disp = s.copy()
+                s_apo_disp = s_apo.copy()
+
+            ppm = s_disp.frequency_axis_ppm()
+            ppm_apo = s_apo_disp.frequency_axis_ppm()
 
             fig = plt.figure(170)
             fig.clf()
@@ -3013,24 +3021,24 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig.canvas.set_window_title("mrs.reco.MRSData2.correct_apodization")
             fig.suptitle("apodizing [%s]" % self.display_label)
 
-            axs[0, 0].plot(t, np.abs(s).transpose(), 'k-', linewidth=1, label='fid')
-            axs[0, 0].plot(t, w_apo * np.abs(s.max()), 'r-', linewidth=1, label='apodization window')
+            axs[0, 0].plot(t, np.abs(s_disp).transpose(), 'k-', linewidth=1, label='fid')
+            axs[0, 0].plot(t, w_apo * np.abs(s_disp.max()), 'r-', linewidth=1, label='apodization window')
             axs[0, 0].set_xlabel('time (s)')
             axs[0, 0].set_ylabel('original')
             axs[0, 0].grid('on')
 
-            axs[0, 1].plot(t, np.abs(s_apo).transpose(), 'b-', linewidth=1)
+            axs[0, 1].plot(t, np.abs(s_apo_disp).transpose(), 'b-', linewidth=1)
             axs[0, 1].set_xlabel('time (s)')
             axs[0, 1].set_ylabel('apodized')
             axs[0, 1].grid('on')
 
-            axs[1, 0].plot(ppm, s.spectrum().real.transpose(), 'k-', linewidth=1)
+            axs[1, 0].plot(ppm, s_disp.spectrum().real.transpose(), 'k-', linewidth=1)
             axs[1, 0].set_xlabel('chemical shift (ppm)')
             axs[1, 0].set_ylabel('original spectrum')
             axs[1, 0].set_xlim(display_range[1], display_range[0])
             axs[1, 0].grid('on')
 
-            axs[1, 1].plot(ppm_apo, s_apo.spectrum().real.transpose(), 'b-', linewidth=1)
+            axs[1, 1].plot(ppm_apo, s_apo_disp.spectrum().real.transpose(), 'b-', linewidth=1)
             axs[1, 1].set_xlabel("chemical shift (ppm)")
             axs[1, 1].set_ylabel('apodized spectrum')
             axs[1, 1].set_xlim(display_range[1], display_range[0])
@@ -3831,10 +3839,10 @@ class pipeline:
                                 "using_ref_data": True,
                                 # ppm range to look fo peak used to estimate phase
                                 "POI_range_ppm": [1.5, 2.5],
-                                # weak water suppression was used, thus we can use the 1st pt of the FID
-                                "weak_ws_mode": False,
-                                # high SNR? we rephase each individual spectrum from each channel separately
-                                "high_snr_mode": False,
+                                # average all averages per channel
+                                "average_per_channel_mode": False,
+                                # measure phase from 1st time point
+                                "first_point_fid_mode": False,
                                 # order of phasing in time: 0th or 1st order
                                 "order": 0,
                                 # add an additional 0th order phase (rd)
