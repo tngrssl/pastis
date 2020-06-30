@@ -971,7 +971,7 @@ p.analyze_enable = False
 p.run()
 p.save(rdb)
 
-# %% 28/01/2019 - 300-pm-p2-moelle - Pelayo :)
+# %% 28/01/2019 - 300-pm-p2-moelle - Pelayo P2 :)
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -1100,7 +1100,7 @@ p.jobs["data-rejecting"]["ranges"]["chemical shift (ppm)"] = 0.17
 p.run()
 p.save(rdb)
 
-# %% 04/03/2020 - 304-ka-p2-moelle - Karen
+# %% 04/03/2020 - 304-ka-p2-moelle - Karen P2
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -1136,3 +1136,224 @@ p.job_list = [  p.jobs["phasing"],
 
 p.run()
 p.save(rdb)
+
+# %% 30/05/2020 - 311-sl-p2-moelle - Simon P2
+get_ipython().magic("clear")
+plt.close("all")
+
+p = reco.pipeline()
+
+p.data_filepaths = ["/home/tangir/crmbm/acq_twix/311-sl-p2-moelle/meas_MID152_slaser_R_N=20+_1_longTE_SNR++++_FID56036.dat",
+                    "/home/tangir/crmbm/acq_twix/311-sl-p2-moelle/meas_MID156_slaser_R_N=20+_1_longTE_SNR++++_FID56040.dat"]
+
+p.data_ref_filepaths = ["/home/tangir/crmbm/acq_twix/311-sl-p2-moelle/meas_MID153_slaser_R_N=20+_1_longTE_SNR++++_FID56037.dat",
+                        "/home/tangir/crmbm/acq_twix/311-sl-p2-moelle/meas_MID157_slaser_R_N=20+_1_longTE_SNR++++_FID56041.dat"]
+
+p.data_physio_filepaths = []
+
+p.display_legends = ["sLASER 20/1 NA=128 trig",
+                     "sLASER 20/1 NA=128 notrig"]
+
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.run()
+p.save(rdb)
+
+# %% 09/06/2020 - 336-nb-p2-moelle - Naouelle P2
+get_ipython().magic("clear")
+plt.close("all")
+
+p = reco.pipeline()
+
+p.data_filepaths = ["/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID98_slaser_R_N=20+_1_longTE_SNR++++_FID57305.dat",
+                    "/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID103_slaser_R_N=20+_1_longTE_SNR++++_FID57310.dat",
+                    "/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID122_slaser_R_N=10_2_longTE_SNR+++_FID57329.dat",
+                    "/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID127_slaser_R_N=5_5+_shortTE_SNR++_FID57334.dat"]
+
+p.data_ref_filepaths = ["/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID100_slaser_R_N=20+_1_longTE_SNR++++_FID57307.dat",
+                        "/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID105_slaser_R_N=20+_1_longTE_SNR++++_FID57312.dat",
+                        "/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID124_slaser_R_N=10_2_longTE_SNR+++_FID57331.dat",
+                        "/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID129_slaser_R_N=5_5+_shortTE_SNR++_FID57336.dat"]
+
+p.data_physio_filepaths = []
+
+p.display_legends = ["sLASER 20/1 NA=128 trig",
+                     "sLASER 20/1 NA=64 notrig",
+                     "sLASER 10/2 NA=64 notrig",
+                     "sLASER 5/1 NA=64 notrig"]
+
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.data_process_only_this_data_index = []
+p.run()
+p.save(rdb)
+
+# %% 11/06/2020 - 319-fc-p2-moelle - Fernando P2
+get_ipython().magic("clear")
+plt.close("all")
+
+p = reco.pipeline()
+
+p.data_filepaths = ["/home/tangir/crmbm/acq_twix/319-fc-p2-moelle/meas_MID72_slaser_R_N=10_2_longTE_SNR+++_FID57445.dat"]
+
+p.data_ref_filepaths = ["/home/tangir/crmbm/acq_twix/319-fc-p2-moelle/meas_MID74_slaser_R_N=10_2_longTE_SNR+++_FID57447.dat"]
+
+p.data_physio_filepaths = []
+
+p.display_legends = ["sLASER 10/2 NA=64 trig"]
+
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.run()
+p.save(rdb)
+
+# %% 15/06/2020 - 313-ft-p2-moelle - Fransiska P2
+get_ipython().magic("clear")
+plt.close("all")
+
+p = reco.pipeline()
+
+p.data_filepaths = ["/home/tangir/crmbm/acq_twix/313-ft-p2-moelle/meas_MID239_slaser_R_N=20+_1_longTE_SNR++++_FID57752.dat"]
+
+p.data_ref_filepaths = ["/home/tangir/crmbm/acq_twix/313-ft-p2-moelle/meas_MID240_slaser_R_N=20+_1_longTE_SNR++++_FID57753.dat"]
+
+p.data_physio_filepaths = []
+
+p.display_legends = ["sLASER 20/1"]
+
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.run()
+p.save(rdb)
+
+# %% 19/06/2020 - 333-sc-p2-moelle - Shirley P2
+get_ipython().magic("clear")
+plt.close("all")
+
+p = reco.pipeline()
+
+p.data_filepaths = ["/home/tangir/crmbm/acq_twix/333-sc-p2-moelle/meas_MID180_slaser_R_N=20+_1_longTE_SNR++++_FID58587.dat"]
+
+p.data_ref_filepaths = ["/home/tangir/crmbm/acq_twix/333-sc-p2-moelle/meas_MID181_slaser_R_N=20+_1_longTE_SNR++++_FID58588.dat"]
+
+p.data_physio_filepaths = []
+
+p.display_legends = ["sLASER 20/1"]
+
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["data-rejecting"],
+                #p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["noise-estimation"],
+                p.jobs["apodizing"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.run()
+p.save(rdb)
+
+# %% 25/06/2020 - 314-yt-p2-moelle - Yolanda P2
+get_ipython().magic("clear")
+plt.close("all")
+
+p = reco.pipeline()
+
+p.data_filepaths = ["/home/tangir/crmbm/acq_twix/314-yt-p2-moelle/meas_MID98_slaser_R_N=20+_1_longTE_SNR++++_FID59064.dat"]
+
+p.data_ref_filepaths = ["/home/tangir/crmbm/acq_twix/314-yt-p2-moelle/meas_MID99_slaser_R_N=20+_1_longTE_SNR++++_FID59065.dat"]
+
+p.data_physio_filepaths = []
+
+p.display_legends = ["sLASER 20/1 NA=128"]
+
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                p.jobs["noise-estimation"],
+                # p.jobs["concatenate"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["apodizing"],
+                p.jobs["data-rejecting"],
+                p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["cropping"],
+                # p.jobs["water-removal"],
+                p.jobs["calibrating"],
+                p.jobs["displaying"]]
+
+p.jobs["data-rejecting"]["ranges"]["amplitude (%)"] = 50.0
+p.jobs["data-rejecting"]["auto_method"] = reco.data_rejection_method.AUTO_LINEWIDTH
+p.run()
+p.save(rdb)
+
+

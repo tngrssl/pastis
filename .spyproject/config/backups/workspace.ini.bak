@@ -6,5 +6,5 @@ save_non_project_files = False
 
 [main]
 version = 0.2.0
-recent_files = ['mrs/reco.py', 'mrs/fit.py', '../../../data/work/recherche/crmbm/python/shrimp/sim_datasets.py', 'datasets_invivo_muscle.py', 'pipeline_fit_muscle.py', 'mrs/sim.py']
+recent_files = ['mrs/reco.py', 'datasets_invivo_spinalcord.py']
 

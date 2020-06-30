@@ -12,6 +12,7 @@ import matplotlib.pylab as plt
 import mrs.aliases as xxx
 import mrs.reco as reco
 import mrs.sim as sim
+import mrs.fit as fit
 import mrs.log as log
 import numpy as np
 from datetime import datetime
@@ -91,6 +92,9 @@ te = 55.0
 
 meta_bs = sim.metabolite_basis_set()
 meta_bs.initialize()
+# meta_bs["Cr_CH3"]["metabolites"]["Cr_CH3"]["ppm"] = [3.027, 3.027,3.027,3.027,3.027,3.027]
+# meta_bs["Cr_CH3"]["metabolites"]["Cr_CH3"]["iso"] = [1,1,1,1,1,1]
+# meta_bs["Cr_CH3"]["metabolites"]["Cr_CH3"]["J"] = np.zeros([6,6])
 
 seq = sim.mrs_seq_eja_svs_press(te)
 seq.initialize(meta_bs)
@@ -112,18 +116,24 @@ p_human_min = sim.params(meta_bs).set_default_min()
 p_human_max = sim.params(meta_bs).set_default_max()
 
 p_human = (p_human_min + p_human_max) / 2.0
-p_human[xxx.m_Water, 0] = 1.0
-p_human[:, xxx.p_dd] = 10.0
+p_human[:, 0] = 0.0
+p_human[:, xxx.p_dd] = 30.0
+p_human[xxx.m_Cr_CH3, xxx.p_cm] = 1.0
 
 ss_mod = seq.simulate_signal(p_human)
 p_human.print()
+
+pf = fit.prefit_tool(ss_mod, seq)
+pf.area_integration_peaks = [xxx.m_Cr_CH3]
+pf.initialize()
+pf.run()
 
 fig = plt.figure(100)
 fig.clf()
 ax = fig.subplots()
 fig.canvas.set_window_title("sim_datasets")
 ax.set_title("GAMMA simulation of average normal brain MR spectrum (Cf. de Graaf's book) | " + seq.name + " | TE=" + str(seq.te) + "ms")
-sim.disp_fit(ax, ss_mod, p_human, seq, True, True)
+fit.disp_fit(ax, ss_mod, p_human, seq, True, True)
 fig.subplots_adjust()
 
 ss_mod.display_spectrum_1d(200, [1, 5])
