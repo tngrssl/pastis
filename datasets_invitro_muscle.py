@@ -29,21 +29,23 @@ plt.close("all")
 
 # --- process the water-suppressed (WS) data ---
 p = reco.pipeline()
-p.data_filepaths = ["/home/tangir/desktop/01_0018_eja-svs-press-novapor-t2map/original-primary_e09_0001.dcm",
-"/home/tangir/desktop/01_0018_eja-svs-press-novapor-t2map/original-primary_e09_0002.dcm",
-"/home/tangir/desktop/01_0018_eja-svs-press-novapor-t2map/original-primary_e09_0003.dcm",
-"/home/tangir/desktop/01_0018_eja-svs-press-novapor-t2map/original-primary_e09_0004.dcm",
-"/home/tangir/desktop/01_0018_eja-svs-press-novapor-t2map/original-primary_e09_0005.dcm",
-"/home/tangir/desktop/01_0018_eja-svs-press-novapor-t2map/original-primary_e09_0006.dcm",
-"/home/tangir/desktop/01_0018_eja-svs-press-novapor-t2map/original-primary_e09_0007.dcm",
-"/home/tangir/desktop/01_0018_eja-svs-press-novapor-t2map/original-primary_e09_0008.dcm",
-"/home/tangir/desktop/01_0018_eja-svs-press-novapor-t2map/original-primary_e09_0009.dcm",
-"/home/tangir/desktop/01_0018_eja-svs-press-novapor-t2map/original-primary_e09_0010.dcm"]
+p.data_filepaths = ["C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/meas_MID61_eja_svs_slaser_NOVAPOR_VOX4_FID28498.dat"]
+
+"C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/01_0018_eja-svs-press-novapor-t2map/original-primary_e09_0001.dcm",
+"C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/01_0018_eja-svs-press-novapor-t2map/original-primary_e09_0002.dcm",
+"C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/01_0018_eja-svs-press-novapor-t2map/original-primary_e09_0003.dcm",
+"C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/01_0018_eja-svs-press-novapor-t2map/original-primary_e09_0004.dcm",
+"C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/01_0018_eja-svs-press-novapor-t2map/original-primary_e09_0005.dcm",
+"C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/01_0018_eja-svs-press-novapor-t2map/original-primary_e09_0006.dcm",
+"C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/01_0018_eja-svs-press-novapor-t2map/original-primary_e09_0007.dcm",
+"C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/01_0018_eja-svs-press-novapor-t2map/original-primary_e09_0008.dcm",
+"C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/01_0018_eja-svs-press-novapor-t2map/original-primary_e09_0009.dcm",
+"C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/01_0018_eja-svs-press-novapor-t2map/original-primary_e09_0010.dcm"
 
 # found this TEs in the dicom headers
-te_list = np.array([23960, 28960, 33960, 38960, 43960, 48960, 53960, 58960, 63960, 68960]) / 1000.0
+#te_list = np.array([23960, 28960, 33960, 38960, 43960, 48960, 53960, 58960, 63960, 68960]) / 1000.0
 
-p.display_legends = [str(te) + "ms" for te in te_list]
+#p.display_legends = [str(te) + "ms" for te in te_list]
 
 p.job_list = [  # p.jobs["phasing"],
                 p.jobs["scaling"],
@@ -92,7 +94,7 @@ datasets = p.run()
 # %% T2 fit
 
 # choose peak ppm range
-peak_ppm_range = [1, 1.5]
+peak_ppm_range = [4, 5]
 
 # for all datasets
 peak_intensity_list = []
