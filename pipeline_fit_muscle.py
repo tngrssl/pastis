@@ -78,14 +78,14 @@ b0_factor = b0 / 7.0
 
 # for non water-suppressed data
 prefittool = fit.prefit_tool(data.data_ref, seq)
-prefittool.area_integration_peak_search_range = 0.5
+prefittool.area_integration_peak_ranges = [0.5]
 prefittool.area_integration_peaks = [xxx.m_Water]
 prefittool.initialize()
 params_ref_area, params_ref_area_pnorm = prefittool.run()
 
 # for water-suppressed data
 prefittool = fit.prefit_tool(data, seq)
-prefittool.area_integration_peak_search_range = 0.5
+prefittool.area_integration_peak_ranges = [0.1, 1]
 prefittool.area_integration_peaks = [xxx.m_Cr_CH3, xxx.m_Lip2]
 prefittool.initialize()
 params_area, params_area_pnorm = prefittool.run()
@@ -98,7 +98,7 @@ fittool.params_min = fittool.params_min.set_default_water_min()
 fittool.params_max = fittool.params_max.set_default_water_max()
 # water concentration parameter
 fittool.params_min[xxx.m_Water, xxx.p_cm] = 0
-fittool.params_max[xxx.m_Water, xxx.p_cm] = 100000.0
+fittool.params_max[xxx.m_Water, xxx.p_cm] = 1000000.0
 # water linewidth
 fittool.params_min[xxx.m_Water, xxx.p_dd] = 10.0 * b0_factor
 fittool.params_max[xxx.m_Water, xxx.p_dd] = 500.0 * b0_factor
@@ -181,7 +181,7 @@ fittool.params_init[lipids_fit, xxx.p_dd] = 51.0 * b0_factor
 
 # lipids frequency shift init and bound values
 fittool.params_min[lipids_fit, xxx.p_df] = -40.0 * b0_factor
-fittool.params_max[lipids_fit, xxx.p_df] = +40.0 * b0_factor
+fittool.params_max[lipids_fit, xxx.p_df] = +60.0 * b0_factor
 fittool.params_init[lipids_fit, xxx.p_df] = 0.0 * b0_factor
 
 fittool.params_init[xxx.m_Lip3, xxx.p_df] = +12
