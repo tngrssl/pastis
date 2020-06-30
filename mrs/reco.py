@@ -39,6 +39,16 @@ class suspect_phasing_method(Enum):
     ACME = 3
 
 
+class data_rejection_method(Enum):
+    """The enum data_rejection_method describes the type of data rejection method used."""
+
+    AUTO_AMPLITUDE = 0
+    AUTO_LINEWIDTH = 1
+    AUTO_FREQUENCY = 2
+    AUTO_PHASE = 3
+    MANUAL = 4
+
+
 def _dummy_check_func(d, p):
     """
     Return true if you want to select this dataset/pipeline when getting data from database using the get_datasets method. This is only a dummy example. Please feel free to recode a function with the same prototype to select for example only 3T scans, or short-TE scans, etc.
@@ -1656,6 +1666,52 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         return(s_zf)
 
+    def analyze_noise_nd(self, n_pts=100):
+        """
+        Measure noise level in time domain and store it in the "noise_level" attribute. This is usefull to keep track of the original noise level for later use, CRB normalization durnig quantification for example.
+
+        * Works with multi-dimensional signals.
+        * Returns a multi-dimensional signal.
+
+        Parameters
+        ----------
+        n_pts : int
+            Apodization factor in Hz
+
+        Returns
+        -------
+        noise_lev : float
+            Time-domain noise level
+        """
+        log.debug("estimating noise level for [%s]..." % self.display_label)
+
+        s = self.copy()
+        s_real = np.real(s)
+
+        # average if needed
+        while(s_real.ndim > 1):
+            s_real = np.mean(s_real, axis=0)
+
+        # init
+        log.debug("estimating noise level in FID using last %d points..." % n_pts)
+        # noise is the std of the last real points, but that is not so simple
+        # we really want real noise, not zeros from zero-filling
+        s_nonzero_mask = (s_real != 0.0)
+        s_analyze = s_real[s_nonzero_mask]
+        # now take the last 100 points
+        noise_lev = np.std(s_analyze[-n_pts:-1])
+        log.info("noise level = %.2E" % noise_lev)
+
+        # changing noise level attribute
+        log.debug("updating noise level...")
+        s._noise_level = noise_lev
+
+        # if any ref data available, we crop it too (silently)
+        if(s.data_ref is not None):
+            s.data_ref = s.data_ref.analyze_noise_nd(n_pts)
+
+        return(s)
+
     def correct_phase_3d(self, use_ref_data=True, peak_range=[4.5, 5], average_per_channel_mode=False, first_point_fid_mode=False, phase_order=0, phase_offset=0.0, display=False, display_range=[1, 6]):
         """
         Well, that's a big one but basically it rephases the signal of interest.
@@ -2305,7 +2361,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         # done
 
-    def correct_analyze_and_reject_2d(self, peak_range=[4.5, 5], moving_Naverages=1, peak_properties_ranges={"amplitude (%)": None, "linewidth (Hz)": 30.0, "chemical shift (ppm)": 0.5, "phase std. factor (%)": 60.0}, peak_properties_rel2mean=True, auto_adjust_lw_bound=False, auto_adjust_allowed_snr_change=-10.0, display=False):
+    def correct_analyze_and_reject_2d(self, peak_range=[4.5, 5], moving_Naverages=1, peak_properties_ranges={"amplitude (%)": None, "linewidth (Hz)": [5.0, 30.0], "chemical shift (ppm)": 0.5, "phase std. factor (%)": 60.0}, peak_properties_rel2mean=True, auto_method=data_rejection_method.MANUAL, auto_adjust_allowed_snr_change=-10.0, display=False):
         """
         Analyze peak in each average in terms intensity, linewidth, chemical shift and phase and reject data if one of these parameters goes out of the min / max bounds. Usefull to understand what the hell went wrong during your acquisition when you have the raw data (TWIX) and to try to improve things a little...
 
@@ -2321,13 +2377,13 @@ class MRSData2(suspect.mrsobjects.MRSData):
         peak_properties_ranges : dict
             Dictionnary that contains 4 entries, 4 rejection criterias for
                 "amplitude (%)": amplitude relative changes: keep data if within +/-val % range
-                "linewidth (Hz)": linewidth changes: keep data is below val Hz
+                "linewidth (Hz)": linewidth changes: keep data is within values in Hz
                 "chemical shift (ppm)": chemical shift changes: keep data is within +/-val ppm
                 "phase std. factor (%)": phase changes: keep data if within +/- val/100 * std(phase) rd
         peak_properties_rel2mean : boolean
             Relative peak properties (amplitude, chemical shift and phase) should be caculated based on the mean value over the whole acquisition (True) or only the first acquired point (False)
-        auto_adjust_lw_bound : boolean
-            Try to adjust the peak linewidth rejection criteria automatically
+        auto_method : data_rejection_method
+            Automatic rejection bounds adjustment method
         auto_adjust_allowed_snr_change : float
             Allowed change in SNR (%), a positive or negative relative to the initial SNR without data rejection
         display : boolean
@@ -2399,42 +2455,51 @@ class MRSData2(suspect.mrsobjects.MRSData):
         peak_properties_ranges_list = list(peak_properties_ranges.values())
         peak_properties_ranges_list = [np.inf if p is None else p for p in peak_properties_ranges_list]
 
+        # special for linewidth: can be a max linewidth or a list
+        if(type(peak_properties_ranges_list[1]) != list):
+            peak_properties_ranges_list[1] = [1.0, peak_properties_ranges_list[1]]
+
         # special for phase: rejection range is a factor of std
         phase_std = peak_prop_analyze[:, 3].std()
         phase_std_reject_range = peak_properties_ranges_list[3] / 100.0 * phase_std
 
         # prepare rejection ranges
         peak_prop_min = [-peak_properties_ranges_list[0],
-                         1.0,
+                         peak_properties_ranges_list[1][0],
                          -peak_properties_ranges_list[2],
                          -phase_std_reject_range]
 
         peak_prop_max = [+peak_properties_ranges_list[0],
-                         peak_properties_ranges_list[1],
+                         peak_properties_ranges_list[1][1],
                          +peak_properties_ranges_list[2],
                          +phase_std_reject_range]
 
-        if(auto_adjust_lw_bound):
-            # automatic rejection based on lw
+        # automatic rejection ?
+        if(auto_method != data_rejection_method.MANUAL):
 
-            # first find optimal lw sweeping range
-            lw_min = (np.floor(peak_prop_analyze[:, 1].min() / 10.0)) * 10.0
-            lw_max = (np.floor(peak_prop_analyze[:, 1].max() / 10.0) + 1.0) * 10.0
-            lw_range = np.arange(lw_min, lw_max, 1.0)
+            properties_names = list(peak_properties_ranges.keys())
+
+            if(auto_method == data_rejection_method.AUTO_LINEWIDTH):
+                this_prop_min = max((np.floor(peak_prop_analyze[:, 1].min() / 10.0)) * 10.0, peak_properties_ranges_list[1][0])
+                this_prop_max = (np.floor(peak_prop_analyze[:, 1].max() / 10.0) + 1.0) * 10.0
+            else:
+                this_prop_min = (np.floor(np.abs(peak_prop_analyze[:, auto_method]).min() / 10.0) + 1.0) * 10.0
+                this_prop_max = (np.floor(np.abs(peak_prop_analyze[:, auto_method]).max() / 10.0) + 1.0) * 10.0
+
+            this_prop_range = np.arange(this_prop_min, this_prop_max, 1.0)
 
             # iterate between max and min for linewidth, and test the resulting data
-            pbar = log.progressbar("adjusting linewidth threshold", lw_range.shape[0])
+            pbar = log.progressbar("adjusting linewidth threshold", this_prop_range.shape[0])
 
-            test_snr_list = np.zeros(lw_range.shape)
-            test_lw_list = np.zeros(lw_range.shape)
-            test_nrej_list = np.zeros(lw_range.shape)
+            test_snr_list = np.zeros(this_prop_range.shape)
+            test_lw_list = np.zeros(this_prop_range.shape)
+            test_nrej_list = np.zeros(this_prop_range.shape)
             # test each lw
-            for (ilw, this_lw) in enumerate(lw_range):
+            for (ilw, this_prop_val) in enumerate(this_prop_range):
                 # rebuild min/max rejection bounds
                 peak_prop_min_auto = peak_prop_min.copy()
-                peak_prop_min_auto[1] = 1.0
                 peak_prop_max_auto = peak_prop_max.copy()
-                peak_prop_max_auto[1] = this_lw
+                peak_prop_max_auto[auto_method] = this_prop_val
 
                 # now see what we can reject
                 this_mask_reject_data = np.full([s_ma.shape[0], 4], False)
@@ -2473,15 +2538,15 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 # that was a bit ambitious
                 log.warning("sorry but your exceptation regarding the SNR was a bit ambitious! You are refusing to go under %.0f%% SNR change. While trying to adjust the linewidth criteria for data rejection, the best we found was a %.0f%% SNR change :(" % (auto_adjust_allowed_snr_change, test_snr_list_rel.max()))
                 # set optimal LW to max
-                optim_lw = lw_max
+                optim_prop = this_prop_max
             else:
                 # we found SNR values which matches our request
                 # let's choose the one with the lowest LW
-                ind_lowest_lw = np.argmax(test_snr_list_rel > auto_adjust_allowed_snr_change)
-                optim_lw = lw_range[ind_lowest_lw]
-                log.info("found optimal linewidth for data rejection = %.1f Hz" % optim_lw)
+                ind_lowest_prop = np.argmax(test_snr_list_rel > auto_adjust_allowed_snr_change)
+                optim_prop = this_prop_range[ind_lowest_prop]
+                log.info("found optimal criteria for data rejection : " + properties_names[auto_method] + " = %.1f" % optim_prop)
                 # adjusting bounds
-                peak_prop_max[1] = optim_lw
+                this_prop_max = optim_prop
 
             # plot SNR / LW combinaisons and optimal choice
             if(display):
@@ -2588,7 +2653,6 @@ class MRSData2(suspect.mrsobjects.MRSData):
             # nice plot showing all raw data
             plt.subplot(1, 3, 3)
             ppm = s_ma.frequency_axis_ppm()
-            ippm_peak_range = (peak_range[0] > ppm) | (ppm > peak_range[1])
             ystep = np.max(np.mean(s_ma.spectrum().real, axis=0))
             ystep = np.power(10, 1 + (np.floor(np.log10(ystep))))
 
@@ -2925,50 +2989,6 @@ class MRSData2(suspect.mrsobjects.MRSData):
             s_phased.data_ref = s_phased.data_ref.correct_phase_1d(suspect_method, ppm_range)
 
         return(s_phased)
-
-    def analyze_noise_1d(self, n_pts=100):
-        """
-        Measure noise level in time domain and store it in the "noise_level" attribute. This is usefull to keep track of the original noise level for later use, CRB normalization durnig quantification for example.
-
-        * Works only with a 1D [timepoints] signal.
-        * Returns a 1D [timepoints] signal.
-
-        Parameters
-        ----------
-        n_pts : int
-            Apodization factor in Hz
-
-        Returns
-        -------
-        noise_lev : float
-            Time-domain noise level
-        """
-        log.debug("estimating noise level for [%s]..." % self.display_label)
-        # dimensions check
-        if(self.ndim != 1):
-            log.error("this method only works for 1D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
-
-        # init
-        log.debug("estimating noise level in FID using last %d points..." % n_pts)
-        s = self.copy()
-        s_real = np.real(s)
-        # noise is the std of the last real points, but that is not so simple
-        # we really want real noise, not zeros from zero-filling
-        s_nonzero_mask = (s_real != 0.0)
-        s_analyze = s_real[s_nonzero_mask]
-        # now take the last 100 points
-        noise_lev = np.std(s_analyze[-n_pts:-1])
-        log.info("noise level = %.2E" % noise_lev)
-
-        # changing noise level attribute
-        log.debug("updating noise level...")
-        s._noise_level = noise_lev
-
-        # if any ref data available, we crop it too (silently)
-        if(s.data_ref is not None):
-            s.data_ref = s.data_ref.analyze_noise_1d(n_pts)
-
-        return(s)
 
     def correct_apodization_nd(self, apo_factor=1.0, display=False, display_range=[1, 6]):
         """
@@ -3913,13 +3933,13 @@ class pipeline:
                                        # chemical shift changes: keep data is within +/-val ppm
                                        # phase changes: keep data if within +/-val/100 * std(phase) rd
                                        "ranges": {"amplitude (%)": None,
-                                                  "linewidth (Hz)": 30.0,
+                                                  "linewidth (Hz)": [5.0, 30.0],
                                                   "chemical shift (ppm)": 0.5,
                                                   "phase std. factor (%)": None},
                                        # for amplitude, chemical shift and phase, the rejection of data is based on ranges of relative changes of those metrics. Relative to what? The mean value over the whole acquisition (True) or the first acquired point (False)
                                        "rel2mean": True,
-                                       # automatic adjustement of linewidth criteria
-                                       "auto": False,
+                                       # method for automatic adjustement
+                                       "auto_method": data_rejection_method.MANUAL,
                                        # minimum allowed SNR change (%) when adjusting the linewidth criteria, this can be positive (we want to increase SNR +10% by rejecting crappy data) or negative (we are ok in decreasing the SNR -10% in order to get better resolved spectra)
                                        "auto_allowed_snr_change": -10.0,
                                        # display all this process to check what the hell is going on
@@ -3976,7 +3996,7 @@ class pipeline:
 
         # --- job: noise level analysis ---
         self.jobs["noise-estimation"] = {0:
-                                         {"func": MRSData2.analyze_noise_1d, "name": "estimating noise level"},
+                                         {"func": MRSData2.analyze_noise_nd, "name": "estimating noise level"},
                                          # estimate noise std time-domain on the last 100 pts of the FID
                                          "npts": 100
                                          }

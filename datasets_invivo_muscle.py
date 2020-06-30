@@ -150,7 +150,7 @@ C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID189_eja_svs_pre
 C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID203_eja_svs_press_VAPOR_BHVOX2REPRO_FID29374.dat
 C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID200_eja_svs_slaser_VAPOR_FB_FID29371.dat
 C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID196_eja_svs_steam_VAPOR_FB_FID29367.dat
-C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID195_eja_svs_press_VAPOR_FB_FID29366.dat
+/crmbm/data_seq/users/JS/2020_1H_MRS/200526_1hmrs_lp010/meas_MID195_eja_svs_press_VAPOR_FB_FID29366.dat
 C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/meas_MID61_eja_svs_slaser_NOVAPOR_VOX4_FID28498.dat
 C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/meas_MID63_eja_svs_steam_NOVAPOR_VOX4_FID28500.dat
 C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/meas_MID64_eja_svs_press_NOVAPOR_VOX4_FID28501.dat
@@ -310,7 +310,7 @@ C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID192_eja_svs_pre
 C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID192_eja_svs_press_NOVAPOR_FID29363.dat
 C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID191_eja_svs_slaser_NOVAPOR_FID29362.dat
 C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID193_eja_svs_steam_NOVAPOR_FID29364.dat
-C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID192_eja_svs_press_NOVAPOR_FID29363.dat
+/crmbm/data_seq/users/JS/2020_1H_MRS/200526_1hmrs_lp010/meas_MID192_eja_svs_press_NOVAPOR_FID29363.dat
 C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/meas_MID61_eja_svs_slaser_NOVAPOR_VOX4_FID28498.dat
 C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/meas_MID63_eja_svs_steam_NOVAPOR_VOX4_FID28500.dat
 C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/meas_MID64_eja_svs_press_NOVAPOR_VOX4_FID28501.dat
@@ -520,12 +520,9 @@ p.display_legends = display_legends
 
 p.job_list = [  p.jobs["phasing"],
                 p.jobs["scaling"],
-                #p.jobs["FID modulus"],
                 p.jobs["channel-combining"],
-                # p.jobs["concatenate"],
-                p.jobs["zero-filling"],
-                # p.jobs["physio-analysis"],
                 p.jobs["noise-estimation"],
+                p.jobs["zero-filling"],
                 p.jobs["apodizing"],
                 p.jobs["data-rejecting"],
                 #p.jobs["realigning"],
@@ -533,10 +530,11 @@ p.job_list = [  p.jobs["phasing"],
                 p.jobs["cropping"],
                 # p.jobs["water-removal"],
                 p.jobs["calibrating"],
-                p.jobs["phasing (suspect)"],
+                #p.jobs["phasing (suspect)"],
                 p.jobs["displaying"]
                 ]
 
+p.analyze_enable = False
 p.analyze_job_list = [  p.jobs["channel-combining"],
                         p.jobs["zero-filling"],
                         #p.jobs["realigning"],
@@ -547,18 +545,24 @@ p.analyze_job_list = [  p.jobs["channel-combining"],
 # self-phasing the WS spectrum using the the big lipid peak at ~1.5ppm (Here you can choose btw Lipid and Cr for phasing)
 p.jobs["phasing"]["POI_range_ppm"] = [4, 5.2]  # find this peak in this ppm range
 p.jobs["phasing"]["offset"] = 0.0  # manual phase offset
+p.jobs["phasing"]["average_per_channel_mode"] = False
+p.jobs["phasing"]["first_point_fid_mode"] = False
 p.jobs["phasing"]["using_ref_data"] = False
+p.jobs["phasing"]["display"] = False
+
+p.jobs["channel-combining"]["phasing"] = False
+p.jobs["channel-combining"]["using_ref_data"] = True
 
 # reject bad data
 p.jobs["data-rejecting"]["moving_averages"] = 1
 p.jobs["data-rejecting"]["POI_range_ppm"] = [4, 5.2]
 # rejection ranges
 #p.jobs["data-rejecting"]["ranges"]["amplitude (%)"] = 50  # do not reject on amplitude changes
-p.jobs["data-rejecting"]["ranges"]["linewidth (Hz)"] = 150 # max linewidth acceptable
+p.jobs["data-rejecting"]["ranges"]["linewidth (Hz)"] = 1080  # max linewidth acceptable
 p.jobs["data-rejecting"]["ranges"]["chemical shift (ppm)"] = 0.5  # +/- ppm
-p.jobs["data-rejecting"]["ranges"]["phase std. factor (%)"] = 60.0  # stan's phase +/- 60% of std criteria (see doi:10.1002/jmri.26802)
+p.jobs["data-rejecting"]["ranges"]["phase std. factor (%)"] = 1060.0  # stan's phase +/- 60% of std criteria (see doi:10.1002/jmri.26802)
 # auto rejection based on linewidth?
-#p.jobs["data-rejecting"]["auto"] = True
+p.jobs["data-rejecting"]["auto_method"] = reco.data_rejection_method.MANUAL
 # minimum allowed SNR change (%) when adjusting the linewidth criteria
 #p.jobs["data-rejecting"]["auto_allowed_snr_change"] = -10.0
 
