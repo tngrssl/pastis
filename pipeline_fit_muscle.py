@@ -39,8 +39,6 @@ metabolites_fit = np.sort([
     xxx.m_Cr_CH3,
     xxx.m_Cr_CH2,
     xxx.m_Alcar,
-    xxx.m_Carni,
-    xxx.m_Carno,
     xxx.m_Water])
 
 data.data_ref = data.data_ref.correct_freqshift_1d([4, 6])
@@ -172,12 +170,12 @@ fittool.params_init.linklock[xxx.m_Water, :] = [0, 0, 0, 0]
 fittool.params_init[lipids_fit, xxx.p_cm] = 0.1
 
 # max lipid cm
-fittool.params_max[lipids_fit, xxx.p_cm] = 10000.0
+fittool.params_max[lipids_fit, xxx.p_cm] = 1000.0
 
 # linewidth bounds for metabolites
-fittool.params_min[lipids_fit, xxx.p_dd] = 50.0 * b0_factor
+fittool.params_min[lipids_fit, xxx.p_dd] = 70.0 * b0_factor
 fittool.params_max[lipids_fit, xxx.p_dd] = 225.0 * b0_factor
-fittool.params_init[lipids_fit, xxx.p_dd] = 51.0 * b0_factor
+fittool.params_init[lipids_fit, xxx.p_dd] = 71.0 * b0_factor
 
 # lipids frequency shift init and bound values
 fittool.params_min[lipids_fit, xxx.p_df] = -40.0 * b0_factor
@@ -190,9 +188,25 @@ fittool.params_init[xxx.m_Lip6, xxx.p_df] = -9
 
 # lipids linklock
 fittool.params_init.linklock[xxx.m_All_MMs, :] = 1
-fittool.params_init.linklock[lipids_fit[0], :] = [0, 200, 0, 100]
+fittool.params_init.linklock[lipids_fit[0], :] = [0, 0, 0, 100]
 for il in lipids_fit[1:]:
-    fittool.params_init.linklock[il, :] = [0, 200, 0, 100]
+    fittool.params_init.linklock[il, :] = [0, 0, 0, 100]
+
+# add a "baseline" using vey large MM resonances
+fittool.params_min.add_macromolecules_min()
+fittool.params_max.add_macromolecules_max()
+# take ony one resonance
+fittool.params_init.linklock[xxx.m_All_MMs, :] = [1, 1, 1, 1]
+fittool.params_init.linklock[xxx.m_Offset2, :] = [0, 0, 0, 0]
+
+# huge linewidth
+fittool.params_min[xxx.m_Offset2, xxx.p_dd] = 300
+fittool.params_max[xxx.m_Offset2, xxx.p_dd] = 2000
+fittool.params_init[xxx.m_Offset2, xxx.p_dd] = 600
+
+# not too strong
+fittool.params_max[xxx.m_Offset2, xxx.p_cm] = 200
+fittool.params_init[xxx.m_Offset2, xxx.p_cm] = 0.1
 
 # numerical optimization parameters
 fittool.display_range_ppm = [0, 6]
