@@ -1308,7 +1308,7 @@ p.job_list = [  p.jobs["phasing"],
                 p.jobs["zero-filling"],
                 # p.jobs["physio-analysis"],
                 p.jobs["data-rejecting"],
-                #p.jobs["realigning"],
+                # p.jobs["realigning"],
                 p.jobs["averaging"],
                 p.jobs["noise-estimation"],
                 p.jobs["apodizing"],
@@ -1351,7 +1351,7 @@ p.job_list = [  p.jobs["phasing"],
                 p.jobs["calibrating"],
                 p.jobs["displaying"]]
 
-p.jobs["data-rejecting"]["ranges"]["amplitude (%)"] = 50.0
+p.jobs["data-rejecting"]["ranges"]["amplitude (%)"] = 55
 p.jobs["data-rejecting"]["auto_method"] = reco.data_rejection_method.AUTO_LINEWIDTH
 p.run()
 p.save(rdb)

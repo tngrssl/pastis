@@ -2480,16 +2480,31 @@ class MRSData2(suspect.mrsobjects.MRSData):
             properties_names = list(peak_properties_ranges.keys())
 
             if(auto_method == data_rejection_method.AUTO_LINEWIDTH):
-                this_prop_min = max((np.floor(peak_prop_analyze[:, 1].min() / 10.0)) * 10.0, peak_properties_ranges_list[1][0])
-                this_prop_max = (np.floor(peak_prop_analyze[:, 1].max() / 10.0) + 1.0) * 10.0
+                this_prop_min = max(peak_prop_analyze[:, 1].min(), peak_properties_ranges_list[1][0])
+                this_prop_max = peak_prop_analyze[:, 1].max()
             else:
-                this_prop_min = (np.floor(np.abs(peak_prop_analyze[:, auto_method]).min() / 10.0) + 1.0) * 10.0
-                this_prop_max = (np.floor(np.abs(peak_prop_analyze[:, auto_method]).max() / 10.0) + 1.0) * 10.0
+                this_prop_min = np.abs(peak_prop_analyze[:, auto_method.value]).min()
+                this_prop_max = np.abs(peak_prop_analyze[:, auto_method.value]).max()
 
-            this_prop_range = np.arange(this_prop_min, this_prop_max, 1.0)
+            # adjust the number of tries / number of steps depending on criteria
+            if(auto_method == data_rejection_method.AUTO_AMPLITUDE):
+                this_prop_step = 1.0
+            elif(auto_method == data_rejection_method.AUTO_LINEWIDTH):
+                this_prop_step = 1.0
+            elif(auto_method == data_rejection_method.AUTO_FREQUENCY):
+                this_prop_step = 0.001
+            elif(auto_method == data_rejection_method.AUTO_PHASE):
+                this_prop_step = 0.01
+
+            # generate a range of criteria value to test, using the step
+            this_prop_range = np.arange(this_prop_min, this_prop_max, this_prop_step)
+
+            # if that is too long, just generate a list of 50
+            if(this_prop_range.size > 50):
+                this_prop_range = np.linspace(this_prop_min, this_prop_max, 50)
 
             # iterate between max and min for linewidth, and test the resulting data
-            pbar = log.progressbar("adjusting linewidth threshold", this_prop_range.shape[0])
+            pbar = log.progressbar("adjusting rejection threshold for [" + properties_names[auto_method.value] + "]", this_prop_range.shape[0])
 
             test_snr_list = np.zeros(this_prop_range.shape)
             test_lw_list = np.zeros(this_prop_range.shape)
@@ -2499,7 +2514,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 # rebuild min/max rejection bounds
                 peak_prop_min_auto = peak_prop_min.copy()
                 peak_prop_max_auto = peak_prop_max.copy()
-                peak_prop_max_auto[auto_method] = this_prop_val
+                peak_prop_max_auto[auto_method.value] = this_prop_val
 
                 # now see what we can reject
                 this_mask_reject_data = np.full([s_ma.shape[0], 4], False)
@@ -2528,25 +2543,42 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
             pbar.finish("done")
 
-            # analyze SNR curve choose LW threshold
+            # analyze SNR curve
             snr_initial = test_snr_list[-1]
             snr_threshold = snr_initial + snr_initial * auto_adjust_allowed_snr_change / 100.0
-            test_snr_list_rel = test_snr_list / snr_initial * 100.0 - 100.0
-            test_snr_list_mask = (test_snr_list_rel > auto_adjust_allowed_snr_change)
 
-            if(not test_snr_list_mask.any()):
-                # that was a bit ambitious
-                log.warning("sorry but your exceptation regarding the SNR was a bit ambitious! You are refusing to go under %.0f%% SNR change. While trying to adjust the linewidth criteria for data rejection, the best we found was a %.0f%% SNR change :(" % (auto_adjust_allowed_snr_change, test_snr_list_rel.max()))
-                # set optimal LW to max
-                optim_prop = this_prop_max
+            # first, try and find a higher SNR than the initial one (best case, we reject crappy data and improved final SNR)
+            if(test_snr_list.max() > snr_initial):
+                log.info("data rejection result: SNR improved compared to original data! :)")
+                ind_max_snr = np.argmax(test_snr_list)
+                optim_prop = this_prop_range[ind_max_snr]
+                log.info("found optimal criteria for data rejection [" + properties_names[auto_method.value] + "] = %.1f" % optim_prop)
             else:
-                # we found SNR values which matches our request
-                # let's choose the one with the lowest LW
-                ind_lowest_prop = np.argmax(test_snr_list_rel > auto_adjust_allowed_snr_change)
-                optim_prop = this_prop_range[ind_lowest_prop]
-                log.info("found optimal criteria for data rejection : " + properties_names[auto_method] + " = %.1f" % optim_prop)
-                # adjusting bounds
-                this_prop_max = optim_prop
+                # no higher SNR found, so let's try to find at least a lower linewidth (intermediate case), by respecting the SNR threshold
+                test_snr_list_rel = test_snr_list / snr_initial * 100.0 - 100.0
+                test_snr_list_mask = (test_snr_list_rel > auto_adjust_allowed_snr_change)
+                # check that we have a segment of the curve above the SNR threshold
+                if(not test_snr_list_mask.any()):
+                    # that was a bit ambitious
+                    log.warning("sorry but your exceptation regarding the SNR was a bit ambitious! You are refusing to go under %.0f%% SNR change. While trying to adjust rejection criteria for data rejection, the best we found was a %.0f%% SNR change :(" % (auto_adjust_allowed_snr_change, test_snr_list_rel.max()))
+                    # set optimal LW to max
+                    optim_prop = this_prop_max
+                else:
+                    # we found SNR values which matches our request
+                    # let's choose the one with the lowest LW
+                    log.info("data rejection result: could not improve SNR but will try to reduce peak linewidth! :)")
+                    ind_min_lw_snr_masked = np.argmin(test_lw_list[test_snr_list_mask])
+                    this_prop_range_masked = this_prop_range[test_snr_list_mask]
+                    optim_prop = this_prop_range_masked[ind_min_lw_snr_masked]
+                    log.info("found optimal criteria for data rejection [" + properties_names[auto_method.value] + "] = %.1f" % optim_prop)
+
+            # save the found optimal criteria to rejection critera vector
+            if(auto_method == data_rejection_method.AUTO_LINEWIDTH):
+                peak_prop_max[auto_method.value] = optim_prop
+            else:
+                peak_prop_min[auto_method.value] = -optim_prop
+                peak_prop_max[auto_method.value] = optim_prop
+
 
             # plot SNR / LW combinaisons and optimal choice
             if(display):
@@ -2556,26 +2588,26 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 ax2 = axs[0].twinx()
                 ax3 = axs[1].twinx()
                 fig.canvas.set_window_title("mrs.reco.MRSData2.correct_analyze_and_reject_2d (auto)")
-                fig.suptitle("adjusting linewidth data rejection criteria for [%s]" % self.display_label)
+                fig.suptitle("adjusting data rejection criteria [" + properties_names[auto_method.value] + "] for [%s]" % self.display_label)
 
-                axs[0].plot(lw_range, test_snr_list, 'rx-', label='SNR')
-                axs[0].plot([optim_lw, optim_lw], [test_snr_list.min(), test_snr_list.max()], 'm--', label='Optimal linewidth')
-                axs[0].plot([lw_range.min(), lw_range.max()], [snr_threshold, snr_threshold], 'g--', label='SNR threshold')
-                axs[0].set_xlabel('Max allowed linewidth (Hz)')
+                axs[0].plot(this_prop_range, test_snr_list, 'rx-', label='SNR')
+                axs[0].axvline(optim_prop, color='m', linestyle='--', label='Optimal')
+                axs[0].axhline(snr_threshold, color='g', linestyle='--', label='SNR threshold')
+                axs[0].set_xlabel(properties_names[auto_method.value][0].upper() + properties_names[auto_method.value][1:])
                 axs[0].set_ylabel('Estimated SNR (u.a)')
                 axs[0].grid('on')
                 axs[0].legend(loc='lower left')
 
-                ax2.plot(lw_range, test_lw_list, 'bx-', label='Linewidth')
+                ax2.plot(this_prop_range, test_lw_list, 'bx-', label='Linewidth')
                 ax2.set_ylabel('Estimated linewidth (Hz)')
                 ax2.legend(loc='lower right')
 
-                axs[1].plot(lw_range, test_nrej_list, 'ko-', label='Number of scans rejected')
-                axs[1].set_xlabel('Max allowed linewidth (Hz)')
+                axs[1].plot(this_prop_range, test_nrej_list, 'ko-', label='Number of scans rejected')
+                axs[1].set_xlabel(properties_names[auto_method.value][0].upper() + properties_names[auto_method.value][1:])
                 axs[1].set_ylabel('Number of scans rejected')
                 axs[1].grid('on')
 
-                ax3.plot(lw_range, test_nrej_list / s_ma.shape[0] * 100, 'ko-', label='Total percentage of scans rejected')
+                ax3.plot(this_prop_range, test_nrej_list / s_ma.shape[0] * 100, 'ko-', label='Total percentage of scans rejected')
                 ax3.set_ylabel('Estimated linewidth (Hz)')
                 ax3.set_ylabel('Rejection percentage (%)')
 

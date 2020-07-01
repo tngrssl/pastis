@@ -18,7 +18,7 @@ except ImportError:
     GAMMA_LIB_LOADED = False
 
 # GAMMA_LIB_LOADED forced to False for debug
-GAMMA_LIB_LOADED = False
+# GAMMA_LIB_LOADED = False
 
 import suspect
 import numpy as np
@@ -543,8 +543,8 @@ class params(np.ndarray):
         self[xxx.m_All_MMs, xxx.p_dp] = -0.1
 
         # link all MM parameters to MM1
-        self.linklock[xxx.m_All_MMs, :] = np.tile([0, 200, 300, 400], (xxx.n_MMs, 1))
-        self.linklock[xxx.m_Ref_MM, :] = [0, -200, -300, -400]
+        self.linklock[xxx.m_All_MMs, :] = np.tile([0, 2000, 3000, 4000], (xxx.n_MMs, 1))
+        self.linklock[xxx.m_Ref_MM, :] = [0, -2000, -3000, -4000]
 
         return(self.copy())
 
@@ -563,8 +563,8 @@ class params(np.ndarray):
         self[xxx.m_All_MMs, xxx.p_dp] = +0.1
 
         # link all MM parameters to MM1
-        self.linklock[xxx.m_All_MMs, :] = np.tile([0, 200, 300, 400], (xxx.n_MMs, 1))
-        self.linklock[xxx.m_Ref_MM, :] = [0, -200, -300, -400]
+        self.linklock[xxx.m_All_MMs, :] = np.tile([0, 2000, 3000, 4000], (xxx.n_MMs, 1))
+        self.linklock[xxx.m_Ref_MM, :] = [0, -2000, -3000, -4000]
         return(self.copy())
 
     def print(self, bMM=False, bLL=True):
@@ -2312,83 +2312,85 @@ class metabolite_basis_set(dict):
         T1s = np.array(sheet_T1s.col_values(0))
         T2s = np.array(sheet_T2s.col_values(0))
 
-        # metagroup list
-        for this_metagroup_name in sheet_groups.col_values(0):
-            # index
-            this_metagroup_ind = sheet_groups.col_values(0).index(this_metagroup_name)
+        # browse metabolite groups and MMs
+        for this_sheet in [sheet_groups, sheet_MMs]:
+            # metagroup list
+            for this_metagroup_name in this_sheet.col_values(0):
+                # index
+                this_metagroup_ind = this_sheet.col_values(0).index(this_metagroup_name)
 
-            # prepare group entry
-            this_metagroup_entry = {"metabolites": {}}
+                # prepare group entry
+                this_metagroup_entry = {"metabolites": {}}
 
-            # look for the members of the group
-            for this_meta_name in sheet_groups.row_values(this_metagroup_ind):
-                # is this metagroup name is a metabolite or not ?
-                if(this_meta_name in sheet_names.col_values(0)):
-                    # its index
-                    this_meta_ind = sheet_names.col_values(0).index(this_meta_name)
+                # look for the members of the group
+                for this_meta_name in this_sheet.row_values(this_metagroup_ind):
+                    # is this metagroup name is a metabolite or not ?
+                    if(this_meta_name in sheet_names.col_values(0)):
+                        # its index
+                        this_meta_ind = sheet_names.col_values(0).index(this_meta_name)
 
-                    # find info on this meta
-                    # ppm
-                    this_meta_ppm_line = np.array(sheet_ppm.row_values(this_meta_ind))
-                    this_meta_ppm_line[this_meta_ppm_line == ''] = np.nan
-                    this_ppm_list = this_meta_ppm_line.astype(np.float64)
-                    this_meta_mask = ~np.isnan(this_ppm_list)
-                    this_ppm_list = this_ppm_list[this_meta_mask]
+                        # find info on this meta
+                        # ppm
+                        this_meta_ppm_line = np.array(sheet_ppm.row_values(this_meta_ind))
+                        this_meta_ppm_line[this_meta_ppm_line == ''] = np.nan
+                        this_ppm_list = this_meta_ppm_line.astype(np.float64)
+                        this_meta_mask = ~np.isnan(this_ppm_list)
+                        this_ppm_list = this_ppm_list[this_meta_mask]
 
-                    # ppm filtering: hope that works
-                    this_ppm_list[(this_ppm_list < self.ppm_range[0]) | (this_ppm_list > self.ppm_range[1])] = 100.0
+                        # ppm filtering: hope that works
+                        this_ppm_list[(this_ppm_list < self.ppm_range[0]) | (this_ppm_list > self.ppm_range[1])] = 100.0
 
-                    # iso
-                    this_meta_iso_line = np.array(sheet_iso.row_values(this_meta_ind))
-                    this_meta_iso_line[this_meta_iso_line == ''] = np.nan
-                    this_iso_list = this_meta_iso_line.astype(np.float64)
-                    this_iso_list = this_iso_list[this_meta_mask]
+                        # iso
+                        this_meta_iso_line = np.array(sheet_iso.row_values(this_meta_ind))
+                        this_meta_iso_line[this_meta_iso_line == ''] = np.nan
+                        this_iso_list = this_meta_iso_line.astype(np.float64)
+                        this_iso_list = this_iso_list[this_meta_mask]
 
-                    # J couplings
-                    # check if there is a sheet for this metabolite
-                    if(this_meta_name in book_db.sheet_names()):
-                        this_sheet_Jcouplings = book_db.sheet_by_name(this_meta_name)
-                        this_j_list = np.full([len(this_ppm_list), len(this_ppm_list)], np.nan)
-                        for irowJ in range(len(this_ppm_list)):
-                            # ppm
-                            this_meta_j_line = np.array(this_sheet_Jcouplings.row_values(irowJ))
-                            this_meta_j_line[this_meta_j_line == ''] = np.nan
-                            this_meta_j_line = this_meta_j_line.astype(np.float64)
-                            this_meta_j_line = this_meta_j_line[this_meta_mask]
-                            this_j_list[irowJ][:] = this_meta_j_line
-                    else:
-                        # if no sheet, put all J-couplings to zeroes
-                        this_j_list = np.zeros([len(this_ppm_list), len(this_ppm_list)])
+                        # J couplings
+                        # check if there is a sheet for this metabolite
+                        if(this_meta_name in book_db.sheet_names()):
+                            this_sheet_Jcouplings = book_db.sheet_by_name(this_meta_name)
+                            this_j_list = np.full([len(this_ppm_list), len(this_ppm_list)], np.nan)
+                            for irowJ in range(len(this_ppm_list)):
+                                # ppm
+                                this_meta_j_line = np.array(this_sheet_Jcouplings.row_values(irowJ))
+                                this_meta_j_line[this_meta_j_line == ''] = np.nan
+                                this_meta_j_line = this_meta_j_line.astype(np.float64)
+                                this_meta_j_line = this_meta_j_line[this_meta_mask]
+                                this_j_list[irowJ][:] = this_meta_j_line
+                        else:
+                            # if no sheet, put all J-couplings to zeroes
+                            this_j_list = np.zeros([len(this_ppm_list), len(this_ppm_list)])
 
-                    # filter coupled and non-coupled peaks
-                    if(self.non_coupled_only):
-                        # sum up one axis
-                        this_j_list_summed = np.sum(np.abs(this_j_list), axis=0)
-                        this_j_list_summed_mask = (this_j_list_summed != 0.0)
-                        this_ppm_list[this_j_list_summed_mask] = 100.0
+                        # filter coupled and non-coupled peaks
+                        if(self.non_coupled_only):
+                            # sum up one axis
+                            this_j_list_summed = np.sum(np.abs(this_j_list), axis=0)
+                            this_j_list_summed_mask = (this_j_list_summed != 0.0)
+                            this_ppm_list[this_j_list_summed_mask] = 100.0
 
-                    # append metabolite entry for this metabolite group
-                    this_metagroup_entry["metabolites"][this_meta_name] = {"ppm": this_ppm_list, "iso": this_iso_list, "J": this_j_list}
+                        # append metabolite entry for this metabolite group
+                        this_metagroup_entry["metabolites"][this_meta_name] = {"ppm": this_ppm_list, "iso": this_iso_list, "J": this_j_list}
 
-            # add extra infos to metabolite group
-            # is it a MM?
-            this_MM_bool = (this_metagroup_name in MM_list)
-            this_metagroup_entry["Macromecule"] = this_MM_bool
-            # omg, is it the reference MM?
-            this_ref_MM_bool = (this_metagroup_name == ref_MM_name)
-            this_metagroup_entry["Reference macromolecule"] = this_ref_MM_bool
-            # oh maybe, is it the reference metabolite?
-            this_ref_meta_bool = (this_metagroup_name == ref_meta_name)
-            this_metagroup_entry["Reference metabolite"] = this_ref_meta_bool
-            # min/max concentration
-            this_metagroup_entry["Concentration min"] = c_min[this_metagroup_ind]
-            this_metagroup_entry["Concentration max"] = c_max[this_metagroup_ind]
-            # T1s/T2s
-            this_metagroup_entry["T1"] = T1s[this_metagroup_ind]
-            this_metagroup_entry["T2"] = T2s[this_metagroup_ind]
+                # add extra infos to metabolite group
+                # is it a MM?
+                this_MM_bool = (this_metagroup_name in MM_list)
+                this_metagroup_entry["Macromecule"] = this_MM_bool
+                # omg, is it the reference MM?
+                this_ref_MM_bool = (this_metagroup_name == ref_MM_name)
+                this_metagroup_entry["Reference macromolecule"] = this_ref_MM_bool
+                # oh maybe, is it the reference metabolite?
+                this_ref_meta_bool = (this_metagroup_name == ref_meta_name)
+                this_metagroup_entry["Reference metabolite"] = this_ref_meta_bool
+                # min/max concentration
+                this_metagroup_entry["Concentration min"] = c_min[this_metagroup_ind]
+                this_metagroup_entry["Concentration max"] = c_max[this_metagroup_ind]
+                # T1s/T2s
+                this_metagroup_entry["T1"] = T1s[this_metagroup_ind]
+                this_metagroup_entry["T2"] = T2s[this_metagroup_ind]
 
-            # and add the group to the dict
-            self[this_metagroup_name] = this_metagroup_entry
+                # and add the group to the dict
+                self[this_metagroup_name] = this_metagroup_entry
 
     def _write_header_file(self):
         """Interesting method here... It generates a python .py and writes very usefull aliases to access quickly to a specific metabolite or parameter. Since metabolite indexes depend on the metabolite database, this python header file is regenerated each time the metabolite basis set is initialized."""
