@@ -14,6 +14,7 @@ import suspect
 import suspect.io.twix as sit
 import numpy as np
 import pydicom
+import hashlib
 from scipy import signal
 import scipy.io as sio
 import matplotlib.pylab as plt
@@ -38,6 +39,12 @@ class suspect_phasing_method(Enum):
     MIN_IMAG_INTEGRAL = 2
     ACME = 3
 
+class gating_signal_source(Enum):
+    """The enum gating_signal_source describes the type of gating used during the acquisition."""
+
+    NO_GATING = 0
+    CARDIAC_GATING = 1
+    RESP_GATING = 2
 
 class data_rejection_method(Enum):
     """The enum data_rejection_method describes the type of data rejection method used."""
@@ -46,7 +53,6 @@ class data_rejection_method(Enum):
     AUTO_LINEWIDTH = 1
     AUTO_FREQUENCY = 2
     AUTO_PHASE = 3
-    MANUAL = 4
 
 
 def _dummy_check_func(d, p):
@@ -70,7 +76,7 @@ def _dummy_check_func(d, p):
 
 
 class data_db():
-    """A class used to deal with storage of reconstructed signals with their respective reco pipeline in pkl files. The dumped data consist of a dict with all our processed data, sorted by patient name, dataset name. Also deals with conflicts like already existing patient name/dataset name."""
+    """A class used to deal with storage of reconstructed signals with their respective reco pipeline in pkl files. The database consist of a dict, keys are original data hash codes which are used to deal with conflicts, already existing data, updating/replacing."""
 
     # frozen stuff: a technique to prevent creating new attributes
     # (https://stackoverflow.com/questions/3603502/prevent-creating-new-attributes-outside-init)
@@ -134,37 +140,35 @@ class data_db():
         -------
         dataset_list : list of MRSData2 objects
             Datasets
-        pipeline_list : list of pipeline objects
+        reco_pipeline_list : list of pipeline objects
             Pipelines
         """
         log.info("getting datasets/pipelines using check function [%s]..." % check_func)
 
         # init
         dataset_list = []
-        pipeline_list = []
+        reco_pipeline_list = []
 
         # open pkl file
         pkl_data_dict = self.read()
 
-        # for each patient
-        for pnk in list(pkl_data_dict.keys()):
-            # each dataset
-            for dnk in list(pkl_data_dict[pnk].keys()):
-                d = pkl_data_dict[pnk][dnk]["data"]
-                p = pkl_data_dict[pnk][dnk]["pipeline"]
-                if(check_func is None):
-                    # no check? return everything
-                    dataset_list.append(d)
-                    pipeline_list.append(p)
-                elif(check_func(d, p)):
-                    # return only if passes check coded by user
-                    dataset_list.append(d)
-                    pipeline_list.append(p)
+        # for each dataset
+        for h in list(pkl_data_dict.keys()):
+            d = pkl_data_dict[h]["data"]
+            rp = pkl_data_dict[h]["reco_pipeline"]
+            if(check_func is None):
+                # no check? return everything
+                dataset_list.append(d)
+                pipeline_list.append(rp)
+            elif(check_func(d, p)):
+                # return only if passes check coded by user
+                dataset_list.append(d)
+                pipeline_list.append(rp)
 
         # print extracted datasets
         self.print(check_func, True)
 
-        return(dataset_list, pipeline_list)
+        return(dataset_list, reco_pipeline_list)
 
     def get_latest_dataset(self):
         """
@@ -172,9 +176,9 @@ class data_db():
 
         Returns
         -------
-        dataset : MRSData2 object
+        found_dataset : MRSData2 object
             Found dataset
-        reco_pipe : pipeline object
+        found_reco_pipeline : pipeline object
             Corresponding pipeline
         """
         log.info("looking for latest dataset in db file [%s]..." % self.db_file)
@@ -182,26 +186,25 @@ class data_db():
         # open pkl file
         pkl_data_dict = self.read()
 
-        # for each patient
+        # for each dataset
         ts_diff = timedelta(days=99999999)
-        for pnk in list(pkl_data_dict.keys()):
-            # each dataset
-            for dnk in list(pkl_data_dict[pnk].keys()):
-                this_ts = pkl_data_dict[pnk][dnk]["timestamp"]
-                if(ts_diff > (datetime.now() - this_ts)):
-                    ts_diff = (datetime.now() - this_ts)
-                    found_pnk = pnk
-                    found_dnk = dnk
+        for h in list(pkl_data_dict.keys()):
+            this_ts = pkl_data_dict[h]["timestamp"]
+            if(ts_diff > (datetime.now() - this_ts)):
+                ts_diff = (datetime.now() - this_ts)
+                found_h = h
 
-        log.info("found [%s/%s]! :)" % (found_pnk, found_dnk))
-        latest_data = pkl_data_dict[found_pnk][found_dnk]["data"]
-        latest_pipeline = pkl_data_dict[found_pnk][found_dnk]["pipeline"]
+        found_dataset = pkl_data_dict[found_h]["data"]
+        found_reco_pipeline = pkl_data_dict[found_h]["reco_pipeline"]
 
-        return(latest_data, latest_pipeline)
+        # display
+        log.info("found [%s: %s/%s]! :)" % (found_h, found_dataset.patient_name, found_dataset.display_label))
+
+        return(found_dataset, found_reco_pipeline)
 
     def print(self, check_func=_dummy_check_func, indexed=False):
         """
-        Print a summary of the database content..
+        Print a summary of the database content.
 
         Parameters
         ----------
@@ -212,33 +215,33 @@ class data_db():
         """
         # init
         pn_list = []
-        dn_list = []
+        dl_list = []
         pn_max_len = 0
 
         # open pkl file
         pkl_data_dict = self.read()
 
-        # for each patient
-        for pnk in list(pkl_data_dict.keys()):
-            # each dataset
-            for dnk in list(pkl_data_dict[pnk].keys()):
-                if(check_func(pkl_data_dict[pnk][dnk]["data"], pkl_data_dict[pnk][dnk]["pipeline"])):
-                    pn_list.append(pnk)
-                    dn_list.append(dnk)
-                    if(len(pnk) > pn_max_len):
-                        pn_max_len = len(pnk)
+        # for each dataset
+        for h in list(pkl_data_dict.keys()):
+            if(check_func(pkl_data_dict[h]["data"], pkl_data_dict[h]["reco_pipeline"])):
+                this_pn = pkl_data_dict[h]["data"].patient_name
+                this_dl = pkl_data_dict[h]["data"].display_label
+                pn_list.append(this_pn)
+                dl_list.append(this_dl)
+                if(len(this_pn) > pn_max_len):
+                    pn_max_len = len(this_pn)
 
         if(indexed):
             print("[#]".ljust(4) + "[Patient name]".ljust(pn_max_len) + " [Dataset name]")
             ind_list = np.arange(len(pn_list))
-            for i, pnk, dnk in zip(ind_list, pn_list, dn_list):
-                print(str(i).ljust(4) + pnk.ljust(pn_max_len) + " " + dnk)
+            for i, pn, dl in zip(ind_list, pn_list, dl_list):
+                print(str(i).ljust(4) + pn.ljust(pn_max_len) + " " + dl)
         else:
             print("[Patient name]".ljust(pn_max_len) + " [Dataset name]")
-            for pnk, dnk in zip(pn_list, dn_list):
-                print(pnk.ljust(pn_max_len) + " " + dnk)
+            for pn, dl in zip(pn_list, dl_list):
+                print(pn.ljust(pn_max_len) + " " + dl)
 
-    def save(self, d, p=None):
+    def save(self, d, rp=None):
         """
         Save MRSData2 object and its reco pipeline and deal with conflicts.
 
@@ -246,7 +249,7 @@ class data_db():
         ----------
         d: MRSData2 object
             Reconstructed data to save
-        p: pipeline
+        rp: pipeline
             Reco pipeline used to get this data
         """
         log.debug("saving dataset to file [%s]..." % self.db_file)
@@ -258,25 +261,22 @@ class data_db():
         # let's make a backup of it
         copyfile(self.db_file, self.db_file + ".bak")
 
-        # we already have this patient in the db
-        if(d.patient_name in pkl_data_dict):
-            log.debug("patient name [%s] already exists!" % d.patient_name)
-            nd = len(list(pkl_data_dict[d.patient_name].keys()))
-            log.debug("already contains %d dataset(s)!" % nd)
+        # we already have this dataset in the db
+        if(d.data_file_hash in pkl_data_dict):
+            log.debug("data [%s] already exists!" % d.data_file_hash)
+            log.debug("updating dataset [%s]..." % d.data_file_hash)
         else:
-            # create patient entry
-            pkl_data_dict[d.patient_name] = {}
+            # create new entry
+            pkl_data_dict[d.data_file_hash] = {}
+            log.debug("creating dataset [%s]..." % d.data_file_hash)
 
         # add/update with the dataset
-        log.debug("adding/updating dataset [%s]/[%s]..." % (d.patient_name, d.display_label))
         ts = datetime.now()
-        pkl_data_dict[d.patient_name][d.display_label] = {"data": d, "pipeline": p, "timestamp": ts}
+        pkl_data_dict[d.data_file_hash] = {"data": d, "reco_pipeline": rp, "timestamp": ts}
 
         # write back pkl file
         with open(self.db_file, 'wb') as f:
             pickle.dump([pkl_data_dict], f)
-
-
 
 
 class SIEMENS_data_file_reader():
@@ -416,6 +416,21 @@ class SIEMENS_data_file_reader():
 
         # return it
         return(param_val_float)
+
+    def get_md5_hash(self):
+        """
+        Return a MD5 hash code of the whole binary data file content.
+
+        Returns
+        -------
+        h : string
+            MD5 hexadecimal hash code
+        """
+        hasher = hashlib.md5()
+        with open(self.fullfilepath, 'rb') as f:
+            buf = f.read()
+            hasher.update(buf)
+        return(hasher.hexdigest())
 
     def get_nucleus(self):
         """
@@ -608,6 +623,25 @@ class SIEMENS_data_file_reader():
 
         return(sequence_name)
 
+    def get_gating_mode(self):
+        """
+        Return the gating signal source.
+
+        Returns
+        -------
+        gts : gating_signal_source
+            Type of signal used during gated acquisition
+        """
+        lsig1 = self.read_param_num("lSignal1")
+        if(lsig1 == 1):
+            return(gating_signal_source.NO_GATING)
+        elif(lsig1 == 16):
+            return(gating_signal_source.RESP_GATING)
+        elif(lsig1 == 4):
+            return(gating_signal_source.CARDIAC_GATING)
+        else:
+            log.error("Sorry, I don't recognize what type of gating you used! :(")
+
     def get_timestamp(self):
         """
         Return the acquisition start timestamp.
@@ -632,7 +666,7 @@ class SIEMENS_data_file_reader():
 class MRSData2(suspect.mrsobjects.MRSData):
     """A class based on suspect's MRSData to store MRS data."""
 
-    def __new__(cls, data_filepath, physio_log_file=None, obj=None, dt=None, f0=None, te=None, ppm0=None, voxel_dimensions=None, transform=None, metadata=None, data_ref=None, label="", offset_display=0.0, timestamp=None, patient_name="", patient_birthday=None, patient_sex=None, patient_weight=None, patient_height=None, tr=None, vref=None, shims=None, sequence_obj=None, noise_level=None, na_pre_data_rejection=None, na_post_data_rejection=None, is_concatenated=None, is_dicom=None):
+    def __new__(cls, data_filepath, physio_log_file=None, obj=None, dt=None, f0=None, te=None, ppm0=None, voxel_dimensions=None, transform=None, metadata=None, data_ref=None, label="", offset_display=0.0, timestamp=None, patient_name="", patient_birthday=None, patient_sex=None, patient_weight=None, patient_height=None, tr=None, vref=None, shims=None, sequence_obj=None, noise_level=None, data_rejection=None, gating_mode=None, data_file_hash=None, is_concatenated=None, is_dicom=None):
         """
         Construct a MRSData2 object that inherits of Suspect's MRSData class. In short, the MRSData2 class is a copy of MRSData + my custom methods for post-processing. To create a MRSData2 object, you need give a path that points to a SIEMENS DICOM or a SIEMENS TWIX file.
 
@@ -651,35 +685,37 @@ class MRSData2(suspect.mrsobjects.MRSData):
         offset_display : float
             Y-axis offset display
         timestamp : float
-            timestamp in ms
+            Timestamp in ms
         patient_name : string
-            patient name
+            Patient name
         patient_birthday : int
-            birthyear of patient
+            Birthyear of patient
         patient_sex : string
-            sex of patient ('M', 'F' or 'O')
+            Sex of patient ('M', 'F' or 'O')
         patient_weight : float
-            patient weight in kgs
+            Patient weight in kgs
         patient_height : float
-            patient high in meters
+            Patient high in meters
         tr : float
             TR in ms
         vref : float
-            reference voltage (V)
+            Reference voltage (V)
         shims : list of floats
-            list of shim voltages in volts
+            List of shim voltages in volts
         sequence_obj : sim.mrs_sequence object
-            sequence object
+            Sequence object
         noise_level : float
-            noise level measured on real FID
-        na_pre_data_rejection : int
-            number of averages when reading the data file
-        na_post_data_rejection : int
-            number of averages after data rejection
+            Noise level measured on real FID
+        data_rejection : list of dicts
+            Data rejection results (NA, SNR, LW, etc.)
+        gating_mode : gating_signal_source
+            Acquisition triggering mode
+        data_file_hash : string
+            MD5 hash code of data file content
         is_concatenated : boolean
-            was this signal the result of a concatenation?
+            Was this signal the result of a concatenation?
         is_dicom : boolean
-            was this signal read from a DICOM file?
+            Was this signal read from a DICOM file?
 
         Returns
         -------
@@ -705,8 +741,9 @@ class MRSData2(suspect.mrsobjects.MRSData):
             obj._shims = shims
             obj._sequence = sequence_obj
             obj._noise_level = noise_level
-            obj._na_pre_data_rejection = na_pre_data_rejection
-            obj._na_post_data_rejection = na_post_data_rejection
+            obj._data_rejection = data_rejection
+            obj._gating_mode = gating_mode
+            obj._data_file_hash = data_file_hash
             obj._is_concatenated = is_concatenated
             obj._is_dicom = is_dicom
             # bye
@@ -722,6 +759,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
         mfr = SIEMENS_data_file_reader(data_filepath)
         # read data and get a suspect MRSData object
         MRSData_obj = mfr.read_data()
+        # get hash code
+        hc = mfr.get_md5_hash()
 
         # --- reshape data ---
 
@@ -821,7 +860,11 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         # special timestamp
         ulTimeStamp_ms = mfr.get_timestamp()
-        log.debug("resulting in a timestamp (%.0fms)" % ulTimeStamp_ms)
+        log.debug("found a timestamp (%.0fms)" % ulTimeStamp_ms)
+
+        # gating mode
+        gss = mfr.get_gating_mode()
+        log.debug("extracted gating mode (%d)" % gss.value)
 
         # --- sequence-specific parameters ---
         sequence_name = mfr.get_sequence_name()
@@ -915,8 +958,9 @@ class MRSData2(suspect.mrsobjects.MRSData):
         obj._sequence = sequence_obj
         obj._noise_level = 0.0
         obj._timestamp = ulTimeStamp_ms
-        obj._na_pre_data_rejection = None
-        obj._na_post_data_rejection = None
+        obj._data_rejection = None
+        obj._gating_mode = gss
+        obj._data_file_hash = hc
         obj._is_concatenated = False
         obj._is_dicom = mfr.is_dicom()
 
@@ -1073,8 +1117,9 @@ class MRSData2(suspect.mrsobjects.MRSData):
         self._timestamp = getattr(obj, 'timestamp', None)
         self._sequence = getattr(obj, 'sequence', None)
         self._noise_level = getattr(obj, 'noise_level', None)
-        self._na_pre_data_rejection = getattr(obj, 'na_pre_data_rejection', None)
-        self._na_post_data_rejection = getattr(obj, 'na_post_data_rejection', None)
+        self._data_rejection = getattr(obj, 'data_rejection', None)
+        self._gating_mode = getattr(obj, 'gating_mode', None)
+        self._data_file_hash = getattr(obj, 'data_file_hash', None)
         self._is_concatenated = getattr(obj, 'is_concatenated', None)
         self._is_dicom = getattr(obj, 'is_dicom', None)
 
@@ -1103,8 +1148,9 @@ class MRSData2(suspect.mrsobjects.MRSData):
         obj2._timestamp = getattr(self, 'timestamp', None)
         obj2._sequence = getattr(self, 'sequence', None)
         obj2._noise_level = getattr(self, 'noise_level', 0.0)
-        obj2._na_pre_data_rejection = getattr(self, 'na_pre_data_rejection', 0.0)
-        obj2._na_post_data_rejection = getattr(self, 'na_post_data_rejection', 0.0)
+        obj2._data_rejection = getattr(self, 'data_rejection', None)
+        obj2._gating_mode = getattr(self, 'gating_mode', None)
+        obj2._data_file_hash = getattr(self, 'data_file_hash', None)
         obj2._is_concatenated = getattr(self, 'is_concatenated', 0.0)
         obj2._is_dicom = getattr(self, 'is_dicom', 0.0)
         return(obj2)
@@ -1297,28 +1343,40 @@ class MRSData2(suspect.mrsobjects.MRSData):
         return(self._timestamp)
 
     @property
-    def na_pre_data_rejection(self):
+    def data_rejection(self):
         """
-        Property get function for na_pre_data_rejection.
+        Property get function for data_rejection.
 
         Returns
         -------
-        self._na_pre_data_rejection : int
-            Original number of averages
+        self._data_rejection : list of dict
+            Data rejection results (NA, SNR, LW, etc.)
         """
-        return(self._na_pre_data_rejection)
+        return(self._data_rejection)
 
     @property
-    def na_post_data_rejection(self):
+    def gating_mode(self):
         """
-        Property get function for na_post_data_rejection.
+        Property get function for gating_mode.
 
         Returns
         -------
-        self._na_post_data_rejection : int
-            Number of averages after data rejection
+        self._gating_mode : gating_signal_source
+            Acquisition triggering mode
         """
-        return(self._na_post_data_rejection)
+        return(self._gating_mode)
+
+    @property
+    def data_file_hash(self):
+        """
+        Property get function for data_file_hash.
+
+        Returns
+        -------
+        self._data_file_hash : string
+            MD5 hash code of data file content
+        """
+        return(self._data_file_hash)
 
     @property
     def is_concatenated(self):
@@ -1535,7 +1593,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         return(csd)
 
-    def correct_intensity_scaling_nd(self, scaling_factor=1e8):
+    def correct_intensity_scaling_nd(self, scaling_factor_rawdata=1e8, scaling_factor_dcm=1.0):
         """
         Amplify the FID signals. Sounds useless but can actually help during quantification! Yes, it is not a good idea to fit signals which have intensities around 1e-6 or lower because of various fit tolerances and also digital problems (epsilon).
 
@@ -1543,8 +1601,10 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         Parameters
         ----------
-        scaling_factor : float
-            Amplification factor
+        scaling_factor_rawdata : float
+            Amplification factor if data is raw
+        scaling_factor_dcm : float
+            Amplification factor if data is from a dcm file (already amplified)
 
         Returns
         -------
@@ -1552,8 +1612,14 @@ class MRSData2(suspect.mrsobjects.MRSData):
             Resulting amplified MRSData2 object
         """
         log.debug("intensity scaling [%s]..." % self.display_label)
+
+        if(self.is_dicom):
+            scaling_factor = scaling_factor_dcm
+        else:
+            scaling_factor = scaling_factor_rawdata
+
+        # scale signal
         log.debug("multiplying time-domain signals by %E..." % scaling_factor)
-        # make this louder
         s_sc = self.copy() * scaling_factor
 
         # convert back to MRSData2
@@ -2361,9 +2427,9 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         # done
 
-    def correct_analyze_and_reject_2d(self, peak_range=[4.5, 5], moving_Naverages=1, peak_properties_ranges={"amplitude (%)": None, "linewidth (Hz)": [5.0, 30.0], "chemical shift (ppm)": 0.5, "phase std. factor (%)": 60.0}, peak_properties_rel2mean=True, auto_method=data_rejection_method.MANUAL, auto_adjust_allowed_snr_change=-10.0, display=False):
+    def correct_analyze_and_reject_2d(self, peak_range=[4.5, 5], moving_Naverages=1, peak_properties_ranges={"amplitude (%)": None, "linewidth (Hz)": [5.0, 30.0], "chemical shift (ppm)": 0.5, "phase std. factor (%)": 60.0}, peak_properties_rel2mean=True, auto_method_list=None, auto_adjust_allowed_snr_change=0.0, display=False):
         """
-        Analyze peak in each average in terms intensity, linewidth, chemical shift and phase and reject data if one of these parameters goes out of the min / max bounds. Usefull to understand what the hell went wrong during your acquisition when you have the raw data (TWIX) and to try to improve things a little...
+        Analyze peak in each average in terms intensity, linewidth, chemical shift and phase and reject data if one of these parameters goes out of the min / max bounds. Usefull to understand what the hell went wrong during your acquisition when you have the raw data (TWIX) and to try to improve things a little. You can choose to set the bounds manually or automatically based on a peak property (amplitude, linewidth, frequency, phase). And you can run several automatic adjusment methods, the one giving the highest SNR and/or the lowest peak linewidth will be selected.
 
         * Works only with a 2D [averages,timepoints] signal.
         * Returns a 2D [averages,timepoints] signal.
@@ -2382,8 +2448,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 "phase std. factor (%)": phase changes: keep data if within +/- val/100 * std(phase) rd
         peak_properties_rel2mean : boolean
             Relative peak properties (amplitude, chemical shift and phase) should be caculated based on the mean value over the whole acquisition (True) or only the first acquired point (False)
-        auto_method : data_rejection_method
-            Automatic rejection bounds adjustment method
+        auto_method_list : list of data_rejection_method
+            Automatic rejection bounds adjustment methods
         auto_adjust_allowed_snr_change : float
             Allowed change in SNR (%), a positive or negative relative to the initial SNR without data rejection
         display : boolean
@@ -2401,11 +2467,19 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         # init
         s = self.copy()
-        s._na_pre_data_rejection = s.shape[0]
         if(s.shape[0] == 1):
             log.warning("single-shot signal, nothing to analyze!")
             return(s)
         ppm = s.frequency_axis_ppm()
+
+        # estimate initial SNR and linewidth
+        old_level = log.getLevel()
+        log.setLevel(log.ERROR)
+        initial_snr, _, _ = s.correct_zerofill_nd().correct_realign_2d().correct_average_2d().correct_apodization_nd().analyze_snr_1d(peak_range)
+        initial_lw = s.correct_zerofill_nd().correct_realign_2d().correct_average_2d().correct_apodization_nd().analyze_linewidth_1d(peak_range)
+        log.setLevel(old_level)
+        log.info("* Pre-data-rejection SNR = %.2f" % initial_snr)
+        log.info("* Pre-data-rejection linewidth = %.2f Hz" % initial_lw)
 
         # build moving averaged data
         s_ma = self.correct_zerofill_nd()._build_moving_average_data_2d(moving_Naverages)
@@ -2463,7 +2537,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         phase_std = peak_prop_analyze[:, 3].std()
         phase_std_reject_range = peak_properties_ranges_list[3] / 100.0 * phase_std
 
-        # prepare rejection ranges
+        # prepare rejection min/max vectors
         peak_prop_min = [-peak_properties_ranges_list[0],
                          peak_properties_ranges_list[1][0],
                          -peak_properties_ranges_list[2],
@@ -2475,144 +2549,196 @@ class MRSData2(suspect.mrsobjects.MRSData):
                          +phase_std_reject_range]
 
         # automatic rejection ?
-        if(auto_method != data_rejection_method.MANUAL):
+        if(auto_method_list is not None):
 
             properties_names = list(peak_properties_ranges.keys())
+            auto_method_final_snr_list = [0.0] * 4
+            auto_method_final_lw_list = [np.inf] * 4
+            peak_prop_min_auto_res = peak_prop_min.copy()
+            peak_prop_max_auto_res = peak_prop_max.copy()
 
-            if(auto_method == data_rejection_method.AUTO_LINEWIDTH):
-                this_prop_min = max(peak_prop_analyze[:, 1].min(), peak_properties_ranges_list[1][0])
-                this_prop_max = peak_prop_analyze[:, 1].max()
-            else:
-                this_prop_min = np.abs(peak_prop_analyze[:, auto_method.value]).min()
-                this_prop_max = np.abs(peak_prop_analyze[:, auto_method.value]).max()
+            for this_auto_method in auto_method_list:
 
-            # adjust the number of tries / number of steps depending on criteria
-            if(auto_method == data_rejection_method.AUTO_AMPLITUDE):
-                this_prop_step = 1.0
-            elif(auto_method == data_rejection_method.AUTO_LINEWIDTH):
-                this_prop_step = 1.0
-            elif(auto_method == data_rejection_method.AUTO_FREQUENCY):
-                this_prop_step = 0.001
-            elif(auto_method == data_rejection_method.AUTO_PHASE):
-                this_prop_step = 0.01
-
-            # generate a range of criteria value to test, using the step
-            this_prop_range = np.arange(this_prop_min, this_prop_max, this_prop_step)
-
-            # if that is too long, just generate a list of 50
-            if(this_prop_range.size > 50):
-                this_prop_range = np.linspace(this_prop_min, this_prop_max, 50)
-
-            # iterate between max and min for linewidth, and test the resulting data
-            pbar = log.progressbar("adjusting rejection threshold for [" + properties_names[auto_method.value] + "]", this_prop_range.shape[0])
-
-            test_snr_list = np.zeros(this_prop_range.shape)
-            test_lw_list = np.zeros(this_prop_range.shape)
-            test_nrej_list = np.zeros(this_prop_range.shape)
-            # test each lw
-            for (ilw, this_prop_val) in enumerate(this_prop_range):
-                # rebuild min/max rejection bounds
-                peak_prop_min_auto = peak_prop_min.copy()
-                peak_prop_max_auto = peak_prop_max.copy()
-                peak_prop_max_auto[auto_method.value] = this_prop_val
-
-                # now see what we can reject
-                this_mask_reject_data = np.full([s_ma.shape[0], 4], False)
-                for a in range(0, s_ma.shape[0]):
-                    for p in range(4):
-                        if(peak_prop_analyze[a, p] < peak_prop_min_auto[p]):
-                            this_mask_reject_data[a, p] = True
-                        if(peak_prop_analyze[a, p] > peak_prop_max_auto[p]):
-                            this_mask_reject_data[a, p] = True
-
-                # reject data now
-                this_mask_reject_data_sumup = (this_mask_reject_data.sum(axis=1) > 0)
-                this_s_cor = s[(this_mask_reject_data_sumup == False), :]
-
-                # analyze snr / lw and number of rejections
-                if(this_mask_reject_data_sumup.sum() < s_ma.shape[0]):
-                    old_level = log.getLevel()
-                    log.setLevel(log.ERROR)
-                    test_snr_list[ilw], _, _ = this_s_cor.correct_zerofill_nd().correct_realign_2d().correct_average_2d().correct_apodization_nd().analyze_snr_1d(peak_range)
-                    test_lw_list[ilw] = this_s_cor.correct_zerofill_nd().correct_realign_2d().correct_average_2d().correct_apodization_nd().analyze_linewidth_1d(peak_range)
-                    log.setLevel(old_level)
-                    test_nrej_list[ilw] = this_mask_reject_data_sumup.sum()
-
-                # progression
-                pbar.update(ilw)
-
-            pbar.finish("done")
-
-            # analyze SNR curve
-            snr_initial = test_snr_list[-1]
-            snr_threshold = snr_initial + snr_initial * auto_adjust_allowed_snr_change / 100.0
-
-            # first, try and find a higher SNR than the initial one (best case, we reject crappy data and improved final SNR)
-            if(test_snr_list.max() > snr_initial):
-                log.info("data rejection result: SNR improved compared to original data! :)")
-                ind_max_snr = np.argmax(test_snr_list)
-                optim_prop = this_prop_range[ind_max_snr]
-                log.info("found optimal criteria for data rejection [" + properties_names[auto_method.value] + "] = %.1f" % optim_prop)
-            else:
-                # no higher SNR found, so let's try to find at least a lower linewidth (intermediate case), by respecting the SNR threshold
-                test_snr_list_rel = test_snr_list / snr_initial * 100.0 - 100.0
-                test_snr_list_mask = (test_snr_list_rel > auto_adjust_allowed_snr_change)
-                # check that we have a segment of the curve above the SNR threshold
-                if(not test_snr_list_mask.any()):
-                    # that was a bit ambitious
-                    log.warning("sorry but your exceptation regarding the SNR was a bit ambitious! You are refusing to go under %.0f%% SNR change. While trying to adjust rejection criteria for data rejection, the best we found was a %.0f%% SNR change :(" % (auto_adjust_allowed_snr_change, test_snr_list_rel.max()))
-                    # set optimal LW to max
-                    optim_prop = this_prop_max
+                if(this_auto_method == data_rejection_method.AUTO_LINEWIDTH):
+                    this_prop_min = max(peak_prop_analyze[:, 1].min(), peak_properties_ranges_list[1][0])
+                    this_prop_max = peak_prop_analyze[:, 1].max()
                 else:
-                    # we found SNR values which matches our request
-                    # let's choose the one with the lowest LW
-                    log.info("data rejection result: could not improve SNR but will try to reduce peak linewidth! :)")
-                    ind_min_lw_snr_masked = np.argmin(test_lw_list[test_snr_list_mask])
-                    this_prop_range_masked = this_prop_range[test_snr_list_mask]
-                    optim_prop = this_prop_range_masked[ind_min_lw_snr_masked]
-                    log.info("found optimal criteria for data rejection [" + properties_names[auto_method.value] + "] = %.1f" % optim_prop)
+                    this_prop_min = np.abs(peak_prop_analyze[:, this_auto_method.value]).min()
+                    this_prop_max = np.abs(peak_prop_analyze[:, this_auto_method.value]).max()
 
-            # save the found optimal criteria to rejection critera vector
-            if(auto_method == data_rejection_method.AUTO_LINEWIDTH):
-                peak_prop_max[auto_method.value] = optim_prop
+                # adjust the number of tries / number of steps depending on criteria
+                if(this_auto_method == data_rejection_method.AUTO_AMPLITUDE):
+                    this_prop_step = 1.0
+                elif(this_auto_method == data_rejection_method.AUTO_LINEWIDTH):
+                    this_prop_step = 1.0
+                elif(this_auto_method == data_rejection_method.AUTO_FREQUENCY):
+                    this_prop_step = 0.001
+                elif(this_auto_method == data_rejection_method.AUTO_PHASE):
+                    this_prop_step = 0.01
+                else:
+                    log.error("upsyy! I am not aware of this automatic data rejection method! :(")
+
+                # generate a range of criteria value to test, using the step
+                this_prop_range = np.arange(this_prop_min, this_prop_max, this_prop_step)
+
+                # checking that there is actually a variation and a range to test
+                if(this_prop_range.size == 0):
+                    # let's skip this method
+                    this_prop_range = np.array([this_prop_min])
+                # if that is too short/long, just generate a list of 50
+                if(this_prop_range.size > 50):
+                    this_prop_range = np.linspace(this_prop_min, this_prop_max, 50)
+
+                # iterate between max and min for linewidth, and test the resulting data
+                pbar = log.progressbar("adjusting rejection threshold for [" + properties_names[this_auto_method.value] + "]", this_prop_range.shape[0])
+
+                test_snr_list = np.zeros(this_prop_range.shape)
+                test_lw_list = np.zeros(this_prop_range.shape)
+                test_nrej_list = np.zeros(this_prop_range.shape)
+
+                # test each criteria bound
+                for (i_prop_val, this_prop_val) in enumerate(this_prop_range):
+                    # rebuild min/max rejection bounds
+                    peak_prop_min_auto = peak_prop_min.copy()
+                    peak_prop_max_auto = peak_prop_max.copy()
+                    peak_prop_max_auto[this_auto_method.value] = this_prop_val
+
+                    # now see what we can reject
+                    this_mask_reject_data = np.full([s_ma.shape[0], 4], False)
+                    for a in range(0, s_ma.shape[0]):
+                        for p in range(4):
+                            if(peak_prop_analyze[a, p] < peak_prop_min_auto[p]):
+                                this_mask_reject_data[a, p] = True
+                            if(peak_prop_analyze[a, p] > peak_prop_max_auto[p]):
+                                this_mask_reject_data[a, p] = True
+
+                    # reject data now
+                    this_mask_reject_data_sumup = (this_mask_reject_data.sum(axis=1) > 0)
+                    this_s_cor = s[(this_mask_reject_data_sumup == False), :]
+
+                    # analyze snr / lw and number of rejections
+                    # by default, apply silently zerofilling, realigning, averaging and apodization
+                    # TODO: maybe need to make this customizable?
+                    if(this_mask_reject_data_sumup.sum() < s_ma.shape[0]):
+                        old_level = log.getLevel()
+                        log.setLevel(log.ERROR)
+                        test_snr_list[i_prop_val], _, _ = this_s_cor.correct_zerofill_nd().correct_realign_2d().correct_average_2d().correct_apodization_nd().analyze_snr_1d(peak_range)
+                        test_lw_list[i_prop_val] = this_s_cor.correct_zerofill_nd().correct_realign_2d().correct_average_2d().correct_apodization_nd().analyze_linewidth_1d(peak_range)
+                        log.setLevel(old_level)
+                        test_nrej_list[i_prop_val] = this_mask_reject_data_sumup.sum()
+
+                    # progression
+                    pbar.update(i_prop_val)
+
+                pbar.finish("done")
+
+                # analyze SNR curve
+                test_snr_initial = test_snr_list[-1]
+                test_snr_threshold = test_snr_initial + test_snr_initial * auto_adjust_allowed_snr_change / 100.0
+
+                # first, try and find a higher SNR than the initial one (best case, we reject crappy data and improved final SNR)
+                if(test_snr_list.max() > test_snr_initial):
+                    log.info("data rejection result: SNR improved compared to original data! :)")
+                    ind_max_snr = np.argmax(test_snr_list)
+                    optim_prop = this_prop_range[ind_max_snr]
+                    optim_res_snr = test_snr_list[ind_max_snr]
+                    optim_res_lw = test_lw_list[ind_max_snr]
+                    log.info("found optimal criteria for data rejection [" + properties_names[this_auto_method.value] + "] = %.1f" % optim_prop)
+                else:
+                    # no higher SNR found, so let's try to find at least a lower linewidth (intermediate case), by respecting the SNR threshold
+                    test_snr_list_rel = test_snr_list / test_snr_initial * 100.0 - 100.0
+                    test_snr_list_mask = (test_snr_list_rel > auto_adjust_allowed_snr_change)
+                    # check that we have a segment of the curve above the SNR threshold
+                    if(not test_snr_list_mask.any()):
+                        # that was a bit ambitious
+                        log.warning("sorry but your exceptation regarding the SNR was a bit ambitious! You are refusing to go under %.0f%% SNR change. While trying to adjust rejection criteria for data rejection, the best we found was a %.0f%% SNR change :(" % (auto_adjust_allowed_snr_change, test_snr_list_rel.max()))
+                        # set optimal LW to max
+                        optim_prop = this_prop_max
+                        optim_res_snr = test_snr_list[-1]
+                        optim_res_lw = test_lw_list[-1]
+                    else:
+                        # we found SNR values which matches our request
+                        # let's choose the one with the lowest LW
+                        log.info("data rejection result: could not improve SNR but will try to reduce peak linewidth! :)")
+                        ind_min_lw_snr_masked = np.argmin(test_lw_list[test_snr_list_mask])
+                        optim_prop = this_prop_range[test_snr_list_mask][ind_min_lw_snr_masked]
+                        optim_res_snr = test_snr_list[test_snr_list_mask][ind_min_lw_snr_masked]
+                        optim_res_lw = test_lw_list[test_snr_list_mask][ind_min_lw_snr_masked]
+                        log.info("found optimal criteria for data rejection [" + properties_names[this_auto_method.value] + "] = %.1f" % optim_prop)
+
+                # display and save the final snr and lw
+                log.info("* Post-data-rejection based on [" + properties_names[this_auto_method.value] + "] SNR = %.2f" % optim_res_snr)
+                log.info("* Post-data-rejection based on [" + properties_names[this_auto_method.value] + "] linewidth = %.2f Hz" % optim_res_lw)
+                auto_method_final_snr_list[this_auto_method.value] = optim_res_snr
+                auto_method_final_lw_list[this_auto_method.value] = optim_res_lw
+
+                # plot SNR / LW combinaisons and optimal choice
+                if(display):
+                    fig = plt.figure(131 + this_auto_method.value)
+                    fig.clf()
+                    axs = fig.subplots(1, 2, sharex='all')
+                    ax2 = axs[0].twinx()
+                    ax3 = axs[1].twinx()
+                    fig.canvas.set_window_title("mrs.reco.MRSData2.correct_analyze_and_reject_2d (auto)")
+                    fig.suptitle("adjusting data rejection criteria [" + properties_names[this_auto_method.value] + "] for [%s]" % self.display_label)
+
+                    axs[0].plot(this_prop_range, test_snr_list, 'rx-', label='SNR')
+                    axs[0].axvline(optim_prop, color='m', linestyle='--', label='Optimal')
+                    axs[0].axhline(test_snr_threshold, color='g', linestyle='--', label='SNR threshold')
+                    axs[0].set_xlabel(properties_names[this_auto_method.value][0].upper() + properties_names[this_auto_method.value][1:])
+                    axs[0].set_ylabel('Estimated SNR (u.a)')
+                    axs[0].grid('on')
+                    axs[0].legend(loc='lower left')
+
+                    ax2.plot(this_prop_range, test_lw_list, 'bx-', label='Linewidth')
+                    ax2.set_ylabel('Estimated linewidth (Hz)')
+                    ax2.legend(loc='lower right')
+
+                    axs[1].plot(this_prop_range, test_nrej_list, 'ko-', label='Number of scans rejected')
+                    axs[1].set_xlabel(properties_names[this_auto_method.value][0].upper() + properties_names[this_auto_method.value][1:])
+                    axs[1].set_ylabel('Number of scans rejected')
+                    axs[1].grid('on')
+
+                    ax3.plot(this_prop_range, test_nrej_list / s_ma.shape[0] * 100, 'ko-', label='Total percentage of scans rejected')
+                    ax3.set_ylabel('Estimated linewidth (Hz)')
+                    ax3.set_ylabel('Rejection percentage (%)')
+
+                    fig.subplots_adjust()
+                    fig.show()
+
+                # save the found optimal criteria to rejection critera vector
+                if(this_auto_method == data_rejection_method.AUTO_LINEWIDTH):
+                    peak_prop_max_auto_res[this_auto_method.value] = optim_prop
+                else:
+                    peak_prop_min_auto_res[this_auto_method.value] = -optim_prop
+                    peak_prop_max_auto_res[this_auto_method.value] = optim_prop
+
+            # tried all auto methods, now apply best one
+            # the final snr and lw obtained are in auto_method_final_snr_list and auto_method_final_lw_list
+            # the final bounds are in peak_prop_min_auto_res and peak_prop_max_auto_res
+
+            # find max snr
+            ind_max_snr_auto_method = np.argmax(auto_method_final_snr_list)
+            # is is higher than the initial snr?
+            if(auto_method_final_snr_list[ind_max_snr_auto_method] > initial_snr):
+                # apply this method
+                optim_auto_method = data_rejection_method(ind_max_snr_auto_method)
+                log.info("The automatic method giving the best results was " + str(optim_auto_method) + " (higher SNR!)")
             else:
-                peak_prop_min[auto_method.value] = -optim_prop
-                peak_prop_max[auto_method.value] = optim_prop
+                # could not find a method giving a higher SNR than the initial SNR
+                # let's find a method that gives a lower linewidth ? (the SNR threshold is already included here)
+                ind_min_lw_auto_method = np.argmin(auto_method_final_lw_list)
+                optim_auto_method = data_rejection_method(ind_min_lw_auto_method)
+                log.info("The automatic method giving the best results was " + str(optim_auto_method) + " (lower linewidth!)")
 
+            log.info("* Post-data-rejection SNR = %.2f" % auto_method_final_snr_list[optim_auto_method.value])
+            log.info("* Post-data-rejection linewidth = %.2f Hz" % auto_method_final_lw_list[optim_auto_method.value])
 
-            # plot SNR / LW combinaisons and optimal choice
-            if(display):
-                fig = plt.figure(130)
-                fig.clf()
-                axs = fig.subplots(1, 2, sharex='all')
-                ax2 = axs[0].twinx()
-                ax3 = axs[1].twinx()
-                fig.canvas.set_window_title("mrs.reco.MRSData2.correct_analyze_and_reject_2d (auto)")
-                fig.suptitle("adjusting data rejection criteria [" + properties_names[auto_method.value] + "] for [%s]" % self.display_label)
-
-                axs[0].plot(this_prop_range, test_snr_list, 'rx-', label='SNR')
-                axs[0].axvline(optim_prop, color='m', linestyle='--', label='Optimal')
-                axs[0].axhline(snr_threshold, color='g', linestyle='--', label='SNR threshold')
-                axs[0].set_xlabel(properties_names[auto_method.value][0].upper() + properties_names[auto_method.value][1:])
-                axs[0].set_ylabel('Estimated SNR (u.a)')
-                axs[0].grid('on')
-                axs[0].legend(loc='lower left')
-
-                ax2.plot(this_prop_range, test_lw_list, 'bx-', label='Linewidth')
-                ax2.set_ylabel('Estimated linewidth (Hz)')
-                ax2.legend(loc='lower right')
-
-                axs[1].plot(this_prop_range, test_nrej_list, 'ko-', label='Number of scans rejected')
-                axs[1].set_xlabel(properties_names[auto_method.value][0].upper() + properties_names[auto_method.value][1:])
-                axs[1].set_ylabel('Number of scans rejected')
-                axs[1].grid('on')
-
-                ax3.plot(this_prop_range, test_nrej_list / s_ma.shape[0] * 100, 'ko-', label='Total percentage of scans rejected')
-                ax3.set_ylabel('Estimated linewidth (Hz)')
-                ax3.set_ylabel('Rejection percentage (%)')
-
-                fig.subplots_adjust()
-                fig.show()
+            # apply automatically optimized bounds to rejection vectors
+            peak_prop_min[optim_auto_method.value] = peak_prop_min_auto_res[optim_auto_method.value]
+            peak_prop_max[optim_auto_method.value] = peak_prop_max_auto_res[optim_auto_method.value]
+        else:
+            optim_auto_method = None
 
         # for each average, check if peak parameters are in the min / max bounds
         mask_reject_data = np.full([s_ma.shape[0], 4], False)
@@ -2645,7 +2771,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         # final display
         if(display):
 
-            fig = plt.figure(131)
+            fig = plt.figure(130)
             fig.clf()
             axs = fig.subplots(2, 3, sharex='all')
             fig.canvas.set_window_title("mrs.reco.MRSData2.correct_analyze_and_reject_2d")
@@ -2711,8 +2837,45 @@ class MRSData2(suspect.mrsobjects.MRSData):
         if(mask_reject_data_sumup.sum() == s.shape[0]):
             log.error("all data is rejected! You need to readjust your rejection bounds...")
 
-        # keep the amount of data we reject in mind
-        s_cor._na_post_data_rejection = s_cor.shape[0]
+        # estimate final SNR and linewidth
+        old_level = log.getLevel()
+        log.setLevel(log.ERROR)
+        final_snr, _, _ = s_cor.correct_zerofill_nd().correct_realign_2d().correct_average_2d().correct_apodization_nd().analyze_snr_1d(peak_range)
+        final_lw = s_cor.correct_zerofill_nd().correct_realign_2d().correct_average_2d().correct_apodization_nd().analyze_linewidth_1d(peak_range)
+        log.setLevel(old_level)
+        log.info("* Final post-data-rejection SNR = %.2f" % final_snr)
+        log.info("* Final post-data-rejection linewidth = %.2f Hz" % final_lw)
+
+        # fill up dict about this data rejection
+        data_rej_dict = {}
+        data_rej_dict["Pre-rejection"] = {}
+        data_rej_dict["Pre-rejection"]["snr"] = initial_snr
+        data_rej_dict["Pre-rejection"]["lw"] = initial_lw
+        data_rej_dict["Pre-rejection"]["na"] = s.shape[0]
+        data_rej_dict["Pre-rejection"]["useful scantime"] = s.shape[0] * s._tr
+        data_rej_dict["Post-rejection"] = {}
+        data_rej_dict["Post-rejection"]["snr"] = final_snr
+        data_rej_dict["Post-rejection"]["lw"] = final_lw
+        data_rej_dict["Post-rejection"]["na"] = s_cor.shape[0]
+        data_rej_dict["Pre-rejection"]["useful scantime"] = s_cor.shape[0] * s_cor._tr
+        # final rejection bounds
+        final_peak_properties_ranges = peak_properties_ranges.copy()
+        final_peak_properties_ranges["amplitude (%)"] = np.abs(peak_prop_max[0])
+        final_peak_properties_ranges["linewidth (Hz)"] = [peak_prop_min[1], peak_prop_max[1]]
+        final_peak_properties_ranges["chemical shift (ppm)"] = np.abs(peak_prop_max[2])
+        final_peak_properties_ranges["phase std. factor (%)"] = np.abs(peak_prop_max[3]) / phase_std * 100.0  # special for phase
+        data_rej_dict["Rejection bounds"] = final_peak_properties_ranges
+        # auto methods
+        data_rej_dict["Automatic data rejection methods"] = {}
+        data_rej_dict["Automatic data rejection methods"]["Methods tried"] = auto_method_list
+        data_rej_dict["Automatic data rejection methods"]["Best method"] = optim_auto_method
+        data_rej_dict["Automatic data rejection methods"]["SNR change threshold (%)"] = auto_adjust_allowed_snr_change
+
+        # check if empty or not (if first data rejection or not)
+        if(s_cor._data_rejection is None):
+            s_cor._data_rejection = [data_rej_dict]
+        else:
+            s_cor._data_rejection.append(data_rej_dict)
 
         return(s_cor)
 
@@ -3108,7 +3271,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         return(s_apo)
 
-    def correct_crop_1d(self, nPoints_final=4096, display=False, display_range=[1, 6]):
+    def correct_crop_1d(self, nPoints_final=6144, display=False, display_range=[1, 6]):
         """
         Crop signal in time-domain to remove last points.
 
@@ -3890,7 +4053,7 @@ class pipeline:
                                 # use reference data is available?
                                 "using_ref_data": True,
                                 # ppm range to look fo peak used to estimate phase
-                                "POI_range_ppm": [1.5, 2.5],
+                                "POI_range_ppm": [4.5, 5.2],
                                 # average all averages per channel
                                 "average_per_channel_mode": False,
                                 # measure phase from 1st time point
@@ -3907,7 +4070,8 @@ class pipeline:
         # --- job: amplification ---
         self.jobs["scaling"] = {0:
                                 {"func": MRSData2.correct_intensity_scaling_nd, "name": "scaling intensity"},
-                                "scaling_factor": 1e8
+                                "scaling_factor_rawdata": 1e8,
+                                "scaling_factor_dcm": 1.0
                                 }
 
         # --- job: FID modulus ---
@@ -3971,9 +4135,9 @@ class pipeline:
                                        # for amplitude, chemical shift and phase, the rejection of data is based on ranges of relative changes of those metrics. Relative to what? The mean value over the whole acquisition (True) or the first acquired point (False)
                                        "rel2mean": True,
                                        # method for automatic adjustement
-                                       "auto_method": data_rejection_method.MANUAL,
+                                       "auto_method_list": None,
                                        # minimum allowed SNR change (%) when adjusting the linewidth criteria, this can be positive (we want to increase SNR +10% by rejecting crappy data) or negative (we are ok in decreasing the SNR -10% in order to get better resolved spectra)
-                                       "auto_allowed_snr_change": -10.0,
+                                       "auto_allowed_snr_change": 0.0,
                                        # display all this process to check what the hell is going on
                                        "display": True
                                        }
@@ -4047,7 +4211,7 @@ class pipeline:
         self.jobs["cropping"] = {0:
                                  {"func": MRSData2.correct_crop_1d, "name": "cropping"},
                                  # final number of signal points after crop
-                                 "final_npts": 4096,
+                                 "final_npts": 6144,
                                  # display all this process to check what the hell is going on
                                  "display": True,
                                  "display_range_ppm": self.jobs["displaying"]["range_ppm"]
@@ -4220,6 +4384,10 @@ class pipeline:
 
         # output and store SNR
         job_label = "post-" + current_job[0]["name"]
+        if(job_label in list(self._analyze_results_dict[data.display_label]["snr"].keys())):
+            # not the first time we apply this job?
+            job_label = job_label + " (#2)"
+
         log.info(job_label + " SNR of [%s] = %.2f" % (data.display_label, data_snr))
         self._analyze_results_dict[data.display_label]["snr"][job_label] = data_snr
 
@@ -4635,7 +4803,7 @@ class pipeline:
             # run job on this dataset
             self._run_job(disp_job, d)
 
-    def save(self, rdb):
+    def save(self, rdb, data_index=None):
         """
         Save each data set and the current pipeline to the PKL data storage file.
 
@@ -4643,12 +4811,18 @@ class pipeline:
         ----------
         rdb: data_db object
             Data storage object
+        data_index: int
+            Index of dataset to save
         """
-        log.info("saving %d dataset(s) to file [%s]..." % (len(self._data_list), rdb.db_file))
-
-        # for each dataset
-        for d in self._data_list:
-            rdb.save(d, self)
+        if(data_index is None):
+            # for each dataset
+            log.info("saving all datasets to file [%s]..." % rdb.db_file)
+            for d in self._data_list:
+                rdb.save(d, self)
+        else:
+            # only one dataset
+            log.info("saving dataset #%d to file [%s]..." % (data_index, rdb.db_file))
+            rdb.save(self._data_list[data_index], self)
 
 
 class voi_pipeline:
