@@ -2472,6 +2472,14 @@ class MRSData2(suspect.mrsobjects.MRSData):
             return(s)
         ppm = s.frequency_axis_ppm()
 
+        # check if we did data rejection before
+        if(self.data_rejection is None):
+            log.info("This is the 1st time we perform data rejection on this signal!")
+            iround_data_rej = 1
+        else:
+            iround_data_rej = len(self.data_rejection) + 1
+            log.info("This is the %dth time we perform data rejection on this signal!" % iround_data_rej)
+
         # estimate initial SNR and linewidth
         old_level = log.getLevel()
         log.setLevel(log.ERROR)
@@ -2551,6 +2559,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         # automatic rejection ?
         if(auto_method_list is not None):
 
+            display_axes_ready = [False, False]
             properties_names = list(peak_properties_ranges.keys())
             auto_method_final_snr_list = [0.0] * 4
             auto_method_final_lw_list = [np.inf] * 4
@@ -2576,7 +2585,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 elif(this_auto_method == data_rejection_method.AUTO_PHASE):
                     this_prop_step = 0.01
                 else:
-                    log.error("upsyy! I am not aware of this automatic data rejection method! :(")
+                    log.error("upsyy! I am not aware of this automatic data rejection method: " + str(this_auto_method))
 
                 # generate a range of criteria value to test, using the step
                 this_prop_range = np.arange(this_prop_min, this_prop_max, this_prop_step)
@@ -2651,7 +2660,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                     # check that we have a segment of the curve above the SNR threshold
                     if(not test_snr_list_mask.any()):
                         # that was a bit ambitious
-                        log.warning("sorry but your exceptation regarding the SNR was a bit ambitious! You are refusing to go under %.0f%% SNR change. While trying to adjust rejection criteria for data rejection, the best we found was a %.0f%% SNR change :(" % (auto_adjust_allowed_snr_change, test_snr_list_rel.max()))
+                        log.warning("sorry but your exceptation regarding the SNR was a bit ambitious! You are refusing to go under %.2f%% SNR change. While trying to adjust rejection criteria for data rejection, the best we found was a %.2f%% SNR change :(" % (auto_adjust_allowed_snr_change, test_snr_list_rel.max()))
                         # set optimal LW to max
                         optim_prop = this_prop_max
                         optim_res_snr = test_snr_list[-1]
@@ -2674,34 +2683,52 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
                 # plot SNR / LW combinaisons and optimal choice
                 if(display):
-                    fig = plt.figure(131 + this_auto_method.value)
-                    fig.clf()
-                    axs = fig.subplots(1, 2, sharex='all')
-                    ax2 = axs[0].twinx()
-                    ax3 = axs[1].twinx()
-                    fig.canvas.set_window_title("mrs.reco.MRSData2.correct_analyze_and_reject_2d (auto)")
-                    fig.suptitle("adjusting data rejection criteria [" + properties_names[this_auto_method.value] + "] for [%s]" % self.display_label)
+                    # plot the SNRs versus LWs
+                    fig = plt.figure(129 + (iround_data_rej - 1) * 3 + 1)
+                    if(not display_axes_ready[0]):
+                        # we just created the figure, let's create the axes
+                        fig.clf()
+                        fig.canvas.set_window_title("mrs.reco.MRSData2.correct_analyze_and_reject_2d (auto 1/2)")
+                        fig.suptitle("adjusting data rejection criteria for [%s] (round #%d)"  % (self.display_label, iround_data_rej))
+                        fig.subplots(2, 2)
+                        for a in fig.axes:
+                            a.twinx()
+                        display_axes_ready[0] = True
 
-                    axs[0].plot(this_prop_range, test_snr_list, 'rx-', label='SNR')
-                    axs[0].axvline(optim_prop, color='m', linestyle='--', label='Optimal')
-                    axs[0].axhline(test_snr_threshold, color='g', linestyle='--', label='SNR threshold')
-                    axs[0].set_xlabel(properties_names[this_auto_method.value][0].upper() + properties_names[this_auto_method.value][1:])
-                    axs[0].set_ylabel('Estimated SNR (u.a)')
-                    axs[0].grid('on')
-                    axs[0].legend(loc='lower left')
+                    fig.axes[this_auto_method.value].plot(this_prop_range, test_snr_list, 'rx-', label='SNR')
+                    fig.axes[this_auto_method.value].axvline(optim_prop, color='m', linestyle='--', label='Optimal')
+                    fig.axes[this_auto_method.value].axhline(test_snr_threshold, color='g', linestyle='--', label='SNR threshold')
+                    fig.axes[this_auto_method.value].set_xlabel(properties_names[this_auto_method.value][0].upper() + properties_names[this_auto_method.value][1:])
+                    fig.axes[this_auto_method.value].set_ylabel('Estimated SNR (u.a)')
+                    fig.axes[this_auto_method.value].grid('on')
+                    fig.axes[this_auto_method.value].legend(loc='lower left')
 
-                    ax2.plot(this_prop_range, test_lw_list, 'bx-', label='Linewidth')
-                    ax2.set_ylabel('Estimated linewidth (Hz)')
-                    ax2.legend(loc='lower right')
+                    fig.axes[this_auto_method.value + 4].plot(this_prop_range, test_lw_list, 'bx-', label='Linewidth')
+                    fig.axes[this_auto_method.value + 4].set_ylabel('Estimated linewidth (Hz)')
+                    fig.axes[this_auto_method.value + 4].legend(loc='lower right')
 
-                    axs[1].plot(this_prop_range, test_nrej_list, 'ko-', label='Number of scans rejected')
-                    axs[1].set_xlabel(properties_names[this_auto_method.value][0].upper() + properties_names[this_auto_method.value][1:])
-                    axs[1].set_ylabel('Number of scans rejected')
-                    axs[1].grid('on')
+                    fig.subplots_adjust()
+                    fig.show()
 
-                    ax3.plot(this_prop_range, test_nrej_list / s_ma.shape[0] * 100, 'ko-', label='Total percentage of scans rejected')
-                    ax3.set_ylabel('Estimated linewidth (Hz)')
-                    ax3.set_ylabel('Rejection percentage (%)')
+                    # plot the data rejection percentage
+                    fig = plt.figure(129 + (iround_data_rej - 1) * 3 + 2)
+                    if(not display_axes_ready[1]):
+                        # we just created the figure, let's create the axes
+                        fig.clf()
+                        fig.canvas.set_window_title("mrs.reco.MRSData2.correct_analyze_and_reject_2d (auto 2/2)")
+                        fig.suptitle("estimating data rejection rates for [%s] (round #%d)"  % (self.display_label, iround_data_rej))
+                        fig.subplots(2, 2)
+                        for a in fig.axes:
+                            a.twinx()
+                        display_axes_ready[1] = True
+
+                    fig.axes[this_auto_method.value].plot(this_prop_range, test_nrej_list, 'ko-', label='Number of scans rejected')
+                    fig.axes[this_auto_method.value].set_xlabel(properties_names[this_auto_method.value][0].upper() + properties_names[this_auto_method.value][1:])
+                    fig.axes[this_auto_method.value].set_ylabel('Number of scans rejected')
+                    fig.axes[this_auto_method.value].grid('on')
+
+                    fig.axes[this_auto_method.value + 4].plot(this_prop_range, test_nrej_list / s_ma.shape[0] * 100, 'ko-', label='Total percentage of scans rejected')
+                    fig.axes[this_auto_method.value + 4].set_ylabel('Rejection percentage (%)')
 
                     fig.subplots_adjust()
                     fig.show()
@@ -2723,13 +2750,13 @@ class MRSData2(suspect.mrsobjects.MRSData):
             if(auto_method_final_snr_list[ind_max_snr_auto_method] > initial_snr):
                 # apply this method
                 optim_auto_method = data_rejection_method(ind_max_snr_auto_method)
-                log.info("The automatic method giving the best results was " + str(optim_auto_method) + " (higher SNR!)")
+                log.info("The automatic method giving the best results was " + str(optim_auto_method) + " (higher SNR!) (round #%d)"  % iround_data_rej)
             else:
                 # could not find a method giving a higher SNR than the initial SNR
                 # let's find a method that gives a lower linewidth ? (the SNR threshold is already included here)
                 ind_min_lw_auto_method = np.argmin(auto_method_final_lw_list)
                 optim_auto_method = data_rejection_method(ind_min_lw_auto_method)
-                log.info("The automatic method giving the best results was " + str(optim_auto_method) + " (lower linewidth!)")
+                log.info("The automatic method giving the best results was " + str(optim_auto_method) + " (lower linewidth!) (round #%d)"  % iround_data_rej)
 
             log.info("* Post-data-rejection SNR = %.2f" % auto_method_final_snr_list[optim_auto_method.value])
             log.info("* Post-data-rejection linewidth = %.2f Hz" % auto_method_final_lw_list[optim_auto_method.value])
@@ -2755,7 +2782,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         pbar.finish("done")
 
         # stats regarding data rejection, how many, for what reasons, overall percentage
-        log.info("data rejection: summary")
+        log.info("data rejection: summary (round #%d)"  % iround_data_rej)
         log.info("number of averages rejected because of...")
         log.info("amplitude = %d" % mask_reject_data[:, 0].sum())
         log.info("linewidth = %d" % mask_reject_data[:, 1].sum())
@@ -2771,11 +2798,11 @@ class MRSData2(suspect.mrsobjects.MRSData):
         # final display
         if(display):
 
-            fig = plt.figure(130)
+            fig = plt.figure(129 + (iround_data_rej - 1) * 3 + 3)
             fig.clf()
             axs = fig.subplots(2, 3, sharex='all')
             fig.canvas.set_window_title("mrs.reco.MRSData2.correct_analyze_and_reject_2d")
-            fig.suptitle("analyzing data and rejecting some for [%s]" % self.display_label)
+            fig.suptitle("analyzing data and rejecting some for [%s] (round #%d)" % (self.display_label, iround_data_rej))
 
             k = 0
             for ix in range(2):
