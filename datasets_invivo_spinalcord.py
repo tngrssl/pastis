@@ -58,6 +58,7 @@ p_conc.job_list = [ p_conc.jobs["phasing"],
                     p_conc.jobs["apodizing"],
                     p_conc.jobs["realigning"],
                     p_conc.jobs["data-rejecting"],
+                    p_conc.jobs["data-rejecting"],
                     p_conc.jobs["averaging"],
                     p_conc.jobs["calibrating"],
                     # p_conc.jobs["water-removal"],
@@ -68,6 +69,26 @@ p_conc.jobs["data-rejecting"]["auto_method_list"] = [   reco.data_rejection_meth
                                                         reco.data_rejection_method.AUTO_LINEWIDTH,
                                                         reco.data_rejection_method.AUTO_FREQUENCY,
                                                         reco.data_rejection_method.AUTO_PHASE]
+
+p_333 = reco.pipeline()
+p_333.job_list = [  # p_333.jobs["phasing"],
+                    p_333.jobs["scaling"],
+                    # p_333.jobs["FID modulus"],
+                    p_333.jobs["channel-combining"],
+                    # p_333.jobs["concatenate"],
+                    p_333.jobs["noise-estimation"],
+                    p_333.jobs["zero-filling"],
+                    # p_333.jobs["physio-analysis"],
+                    p_333.jobs["apodizing"],
+                    # p_333.jobs["realigning"],
+                    # p_333.jobs["data-rejecting"],
+                    # p_333.jobs["data-rejecting"],
+                    p_333.jobs["averaging"],
+                    # p_333.jobs["calibrating"],
+                    # p_333.jobs["water-removal"],
+                    p_333.jobs["cropping"],
+                    p_333.jobs["displaying"]]
+
 
 # %% 15/03/2019 - 291-vs-moelle-spectro-p1 - concatenated STEAM #1 :(
 get_ipython().magic("clear")
@@ -500,31 +521,30 @@ p.save(rdb)
 get_ipython().magic("clear")
 plt.close("all")
 
-p.data_filepaths = ["/home/tangir/crmbm/acq_twix/333-sc-p1-moelle/meas_MID123_slaser_R_N=20+_1_longTE_SNR++++_FID47359.dat",
+p_333.data_filepaths = ["/home/tangir/crmbm/acq_twix/333-sc-p1-moelle/meas_MID123_slaser_R_N=20+_1_longTE_SNR++++_FID47359.dat",
                     "/home/tangir/crmbm/acq_twix/333-sc-p1-moelle/meas_MID126_slaser_R_N=20+_1_longTE_SNR++++_FID47362.dat",
                     "/home/tangir/crmbm/acq/333-sc-p1-moelle/20191126/01_0008_slaser-r-n",
                     "/home/tangir/crmbm/acq/333-sc-p1-moelle/20191126/01_0009_slaser-r-n"]
 
-p.data_ref_filepaths = ["",
+p_333.data_ref_filepaths = ["",
                         "",
                         "/home/tangir/crmbm/acq/333-sc-p1-moelle/20191126/01_0010_slaser-r-n",
                         "/home/tangir/crmbm/acq/333-sc-p1-moelle/20191126/01_0010_slaser-r-n"]
 
-p.data_physio_filepaths = []
+p_333.data_physio_filepaths = []
 
-p.display_legends = ["sLASER 20:1 (TWIX)",
+p_333.display_legends = ["sLASER 20:1 (TWIX)",  # corrupted :(
                      "sLASER 20:1 IR (TWIX)",
                      "sLASER 20:1 (DCM)",
                      "sLASER 20:1 IR (DCM)"]
 
-p.run()
-p.save(rdb, 0)
+p_333.data_process_only_this_data_index = [2]
+p_333.run()
+p_333.save(rdb)
 
 # %% 09/12/2019 - 336-nb-p1-moelle - Naouelle :)
 get_ipython().magic("clear")
 plt.close("all")
-
-p = reco.pipeline()
 
 p.data_filepaths = """
 /home/tangir/crmbm/acq_twix/336-nb-p1-moelle/meas_MID72_slaser_R_N=20+_1_longTE_SNR++++_FID48203.dat
@@ -709,6 +729,7 @@ p.display_legends = ["sLASER 20/1 NA=128 trig",
                      "sLASER 10/2 NA=64 notrig",
                      "sLASER 5/1 NA=64 notrig"]
 
+p.data_process_only_this_data_index = [0]
 p.run()
 p.save(rdb)
 
