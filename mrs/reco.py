@@ -160,11 +160,11 @@ class data_db():
             if(check_func is None):
                 # no check? return everything
                 dataset_list.append(d)
-                pipeline_list.append(rp)
-            elif(check_func(d, p)):
+                reco_pipeline_list.append(rp)
+            elif(check_func(d, rp)):
                 # return only if passes check coded by user
                 dataset_list.append(d)
-                pipeline_list.append(rp)
+                reco_pipeline_list.append(rp)
 
         # print extracted datasets
         self.print(check_func, True)
@@ -669,7 +669,7 @@ class SIEMENS_data_file_reader():
 class MRSData2(suspect.mrsobjects.MRSData):
     """A class based on suspect's MRSData to store MRS data."""
 
-    def __new__(cls, data_filepath, physio_log_file=None, obj=None, dt=None, f0=None, te=None, ppm0=None, voxel_dimensions=None, transform=None, metadata=None, data_ref=None, label="", offset_display=0.0, timestamp=None, patient_name="", patient_birthday=None, patient_sex=None, patient_weight=None, patient_height=None, tr=None, vref=None, shims=None, sequence_obj=None, noise_level=None, data_rejection=None, gating_mode=None, data_file_hash=None, is_concatenated=None, is_dicom=None):
+    def __new__(cls, data_filepath, physio_log_file=None, obj=None, dt=None, f0=None, te=None, tr=None, ppm0=None, voxel_dimensions=None, transform=None, metadata=None, data_ref=None, label="", offset_display=0.0, timestamp=None, patient_name="", patient_birthday=None, patient_sex=None, patient_weight=None, patient_height=None, vref=None, shims=None, sequence_obj=None, noise_level=None, data_rejection=None, gating_mode=None, data_file_hash=None, is_concatenated=None, is_dicom=None):
         """
         Construct a MRSData2 object that inherits of Suspect's MRSData class. In short, the MRSData2 class is a copy of MRSData + my custom methods for post-processing. To create a MRSData2 object, you need give a path that points to a SIEMENS DICOM or a SIEMENS TWIX file.
 
@@ -679,7 +679,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             Full absolute file path pointing to the stored signal (DCM or TWIX file) or the folder assuming that a dcm file named "original-primary_e09_0001.dcm" is stored inside.
         physio_log_file : string
             Full absolute file path pointing to a IDEA VB17 respiratory log file
-        obj,dt,f0,te,ppm0,voxel_dimensions,transform,metadata
+        obj,dt,f0,te,tr,ppm0,voxel_dimensions,transform,metadata
             Please check suspect's MRSData class for those arguments
         data_ref : MRSData2 object
             Reference data acquired for this signal
@@ -699,8 +699,6 @@ class MRSData2(suspect.mrsobjects.MRSData):
             Patient weight in kgs
         patient_height : float
             Patient high in meters
-        tr : float
-            TR in ms
         vref : float
             Reference voltage (V)
         shims : list of floats
@@ -728,7 +726,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         if(data_filepath == []):
             # calling the parent class' constructor
             pdb.set_trace()
-            obj = super(suspect.mrsobjects.MRSData, cls).__new__(cls, obj, dt, f0, te, ppm0, voxel_dimensions, transform, metadata)
+            obj = super(suspect.mrsobjects.MRSData, cls).__new__(cls, obj, dt, f0, te, tr, ppm0, voxel_dimensions, transform, metadata)
             # adding attributes
             obj.data_ref = data_ref
             obj._display_label = label
@@ -798,7 +796,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         # --- build MRSData object ---
         # calling the parent class' constructor
-        obj = super(suspect.mrsobjects.MRSData, cls).__new__(cls, MRSData_obj, MRSData_obj.dt, MRSData_obj.f0, MRSData_obj.te, MRSData_obj.ppm0, MRSData_obj.voxel_dimensions, MRSData_obj.transform, MRSData_obj.metadata)
+        obj = super(suspect.mrsobjects.MRSData, cls).__new__(cls, MRSData_obj, MRSData_obj.dt, MRSData_obj.f0, MRSData_obj.te, MRSData_obj.tr, MRSData_obj.ppm0, MRSData_obj.voxel_dimensions, MRSData_obj.transform, MRSData_obj.metadata)
 
         # --- get extra parameters ---
 
@@ -821,11 +819,6 @@ class MRSData2(suspect.mrsobjects.MRSData):
         # patient height
         patient_height_m = mfr.get_patient_height()
         log.debug("extracted patient height (%.2fm)" % patient_height_m)
-
-        # TR
-        TR_ms = mfr.read_param_num("alTR[0]") / 1000.0
-        if(TR_ms is not None):
-            log.debug("extracted TR value (%.0fms)" % TR_ms)
 
         # reference voltage
         vref_v = mfr.read_param_num("flReferenceAmplitude")
@@ -955,7 +948,6 @@ class MRSData2(suspect.mrsobjects.MRSData):
         obj._patient_sex = patient_sex_str
         obj._patient_weight = patient_weight_kgs
         obj._patient_height = patient_height_m
-        obj._tr = TR_ms
         obj._vref = vref_v
         obj._shims = shims_values
         obj._sequence = sequence_obj
@@ -1114,7 +1106,6 @@ class MRSData2(suspect.mrsobjects.MRSData):
         self._patient_name = getattr(obj, 'patient_name', None)
         self._patient_weight = getattr(obj, 'patient_weight', None)
         self._patient_height = getattr(obj, 'patient_height', None)
-        self._tr = getattr(obj, 'tr', None)
         self._vref = getattr(obj, 'vref', None)
         self._shims = getattr(obj, 'shims', None)
         self._timestamp = getattr(obj, 'timestamp', None)
@@ -1137,7 +1128,6 @@ class MRSData2(suspect.mrsobjects.MRSData):
         """
         obj2 = super().inherit(obj)
         obj2.data_ref = getattr(self, 'data_ref', None)
-        obj2._tr = getattr(self, 'tr', None)
         obj2._display_label = getattr(self, 'display_label', None)
         obj2._display_offset = getattr(self, 'display_offset', 0.0)
         obj2._patient_birthday = getattr(self, 'patient_birthday', None)
