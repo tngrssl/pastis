@@ -43,8 +43,9 @@ class gating_signal_source(Enum):
     """The enum gating_signal_source describes the type of gating used during the acquisition."""
 
     NO_GATING = 0
-    CARDIAC_GATING = 1
-    RESP_GATING = 2
+    CARDIAC_ECG = 2
+    CARDIAC_GATING = 4
+    RESP_GATING = 16
 
 class data_rejection_method(Enum):
     """The enum data_rejection_method describes the type of data rejection method used."""
@@ -639,6 +640,8 @@ class SIEMENS_data_file_reader():
             return(gating_signal_source.RESP_GATING)
         elif(lsig1 == 4):
             return(gating_signal_source.CARDIAC_GATING)
+        elif(lsig1 == 2):
+            return(gating_signal_source.CARDIAC_ECG)
         else:
             log.error("Sorry, I don't recognize what type of gating you used! :(")
 
