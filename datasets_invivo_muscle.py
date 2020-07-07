@@ -150,7 +150,7 @@ C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID189_eja_svs_pre
 C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID203_eja_svs_press_VAPOR_BHVOX2REPRO_FID29374.dat
 C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID200_eja_svs_slaser_VAPOR_FB_FID29371.dat
 C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID196_eja_svs_steam_VAPOR_FB_FID29367.dat
-/crmbm/data_seq/users/JS/2020_1H_MRS/200526_1hmrs_lp010/meas_MID195_eja_svs_press_VAPOR_FB_FID29366.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID195_eja_svs_press_VAPOR_FB_FID29366.dat
 C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/meas_MID61_eja_svs_slaser_NOVAPOR_VOX4_FID28498.dat
 C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/meas_MID63_eja_svs_steam_NOVAPOR_VOX4_FID28500.dat
 C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/meas_MID64_eja_svs_press_NOVAPOR_VOX4_FID28501.dat
@@ -183,8 +183,38 @@ C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_013zb/meas_MID128_eja_svs_pre
 C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_013zb/meas_MID120_eja_svs_slaser_VAPOR_FB_FID30931.dat
 C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_013zb/meas_MID124_eja_svs_steam_VAPOR_FB_FID30935.dat
 C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_013zb/meas_MID122_eja_svs_press_VAPOR_FB_FID30933.dat
-Y:/data/users/js/verio/1h_mrs/012-vc/20200605/01_0043_eja-svs-slaser-vapor-bh-repro/original-primary_e09_0001.dcm
+Y:/data/users/js/verio/1h_mrs/012-vc/20200605/01_0015_eja-svs-press-vapor-bh/original-primary_e09_0001.dcm
 Y:/data/users/js/verio/1h_mrs/007-js2/20200528/01_0059_eja-svs-press-vapor-bh-rep/original-primary_e09_0001.dcm
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200701_1hmrs_014al/meas_MID99_eja_svs_slaser_VAPOR_BH_FID33268.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200701_1hmrs_014al/meas_MID108_eja_svs_slaser_VAPOR_BH_REPRO_FID33277.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200701_1hmrs_014al/meas_MID98_eja_svs_steam_VAPOR_BH_FID33267.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200701_1hmrs_014al/meas_MID112_eja_svs_steam_VAPOR_BH_FID33281.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200701_1hmrs_014al/meas_MID97_eja_svs_press_VAPOR_BH_FID33266.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200701_1hmrs_014al/meas_MID109_eja_svs_press_VAPOR_BH_REPRO_FID33278.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200701_1hmrs_014al/meas_MID105_eja_svs_slaser_VAPOR_FB_FID33274.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200701_1hmrs_014al/meas_MID107_eja_svs_steam_VAPOR_FB_FID33276.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200701_1hmrs_014al/meas_MID106_eja_svs_press_VAPOR_FB_FID33275.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_015fk/meas_MID48_eja_svs_slaser_VAPOR_BH_FID33500.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_015fk/meas_MID53_eja_svs_slaser_VAPOR_BH_FID33505.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_015fk/meas_MID52_eja_svs_steam_VAPOR_BH_FID33504.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_015fk/meas_MID67_eja_svs_steam_VAPOR_BH_REPRO_FID33519.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_015fk/meas_MID50_eja_svs_press_VAPOR_BH_FID33502.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_015fk/meas_MID66_eja_svs_press_VAPOR_BH_REPRO_FID33518.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_015fk/meas_MID58_eja_svs_slaser_VAPOR_FB_FID33510.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_015fk/meas_MID62_eja_svs_steam_VAPOR_FB_FID33514.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_015fk/meas_MID60_eja_svs_press_VAPOR_FB_FID33512.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_016_ConcCr/meas_MID115_eja_svs_slaser_VAPOR_BH_FID33567.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_016_ConcCr/meas_MID120_eja_svs_steam_VAPOR_TUBE1_FID33572.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_016_ConcCr/meas_MID118_eja_svs_press_VAPOR_TUBE1_FID33570.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_016_ConcCr/meas_MID129_eja_svs_slaser_VAPOR_TUBE2to_use_FID33581.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_016_ConcCr/meas_MID134_eja_svs_steam_VAPOR_TUBE2_to_use_FID33586.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_016_ConcCr/meas_MID132_eja_svs_press_VAPOR_TUBE2_to_use_FID33584.dat
+Y:/data/users/js/verio/1h_mrs/016-conc-cr/20200702/01_0008_eja-svs-slaser-vapor-bh/original-primary_e09_0001.dcm
+Y:/data/users/js/verio/1h_mrs/016-conc-cr/20200702/01_0016_eja-svs-steam-vapor-tube1/original-primary_e09_0001.dcm
+Y:/data/users/js/verio/1h_mrs/016-conc-cr/20200702/01_0012_eja-svs-press-vapor-tube1/original-primary_e09_0001.dcm
+Y:/data/users/js/verio/1h_mrs/016-conc-cr/20200702/01_0024_eja-svs-slaser-vapor-tube2to-use/original-primary_e09_0001.dcm
+Y:/data/users/js/verio/1h_mrs/016-conc-cr/20200702/01_0034_eja-svs-steam-vapor-tube2-to-use/original-primary_e09_0001.dcm
+Y:/data/users/js/verio/1h_mrs/016-conc-cr/20200702/01_0030_eja-svs-press-vapor-tube2-to-use/original-primary_e09_0001.dcm
 """
 
 # file paths to non water-suppressed raw data
@@ -310,7 +340,7 @@ C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID192_eja_svs_pre
 C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID192_eja_svs_press_NOVAPOR_FID29363.dat
 C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID191_eja_svs_slaser_NOVAPOR_FID29362.dat
 C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID193_eja_svs_steam_NOVAPOR_FID29364.dat
-/crmbm/data_seq/users/JS/2020_1H_MRS/200526_1hmrs_lp010/meas_MID192_eja_svs_press_NOVAPOR_FID29363.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/202605_1hmrs_lp010/meas_MID192_eja_svs_press_NOVAPOR_FID29363.dat
 C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/meas_MID61_eja_svs_slaser_NOVAPOR_VOX4_FID28498.dat
 C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/meas_MID63_eja_svs_steam_NOVAPOR_VOX4_FID28500.dat
 C:/Users/jsourdon/Desktop/2020_1H_MRS/201405_1hmrs_phantom001/meas_MID64_eja_svs_press_NOVAPOR_VOX4_FID28501.dat
@@ -345,6 +375,36 @@ C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_013zb/meas_MID129_eja_svs_ste
 C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_013zb/meas_MID115_eja_svs_press_NOVAPOR_BH_FID30926.dat
 C:/Users/jsourdon/Desktop/2020_1H_MRS/200506_1hmrs_012vc/meas_MID80_eja_svs_slaser_NOVAPOR_BH_REPRO_FID30891.dat
 Y:/data/users/js/verio/1h_mrs/009-pv/20200525/01_0015_eja-svs-slaser-vapor-bh/original-primary_e09_0001.dcm
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200701_1hmrs_014al/meas_MID102_eja_svs_slaser_NOVAPOR_BH_FID33271.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200701_1hmrs_014al/meas_MID114_eja_svs_slaser_NOVAPOR_BH_TO_USE_FID33283.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200701_1hmrs_014al/meas_MID104_eja_svs_steam_NOVAPOR_BH_FID33273.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200701_1hmrs_014al/meas_MID113_eja_svs_steam_NOVAPOR_BH_FID33282.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200701_1hmrs_014al/meas_MID103_eja_svs_press_NOVAPOR_BH_FID33272.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200701_1hmrs_014al/meas_MID111_eja_svs_press_NOVAPOR_BH_FID33280.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200701_1hmrs_014al/meas_MID102_eja_svs_slaser_NOVAPOR_BH_FID33271.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200701_1hmrs_014al/meas_MID104_eja_svs_steam_NOVAPOR_BH_FID33273.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200701_1hmrs_014al/meas_MID103_eja_svs_press_NOVAPOR_BH_FID33272.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_015fk/meas_MID56_eja_svs_slaser_NOVAPOR_BH_FID33508.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_015fk/meas_MID56_eja_svs_slaser_NOVAPOR_BH_FID33508.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_015fk/meas_MID57_eja_svs_steam_NOVAPOR_BH_FID33509.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_015fk/meas_MID70_eja_svs_steam_NOVAPOR_BH_FID33522.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_015fk/meas_MID55_eja_svs_press_NOVAPOR_BH_FID33507.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_015fk/meas_MID69_eja_svs_press_NOVAPOR_BH_FID33521.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_015fk/meas_MID56_eja_svs_slaser_NOVAPOR_BH_FID33508.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_015fk/meas_MID57_eja_svs_steam_NOVAPOR_BH_FID33509.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_015fk/meas_MID55_eja_svs_press_NOVAPOR_BH_FID33507.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_016_ConcCr/meas_MID116_eja_svs_slaser_NOVAPOR_TUBE1_FID33568.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_016_ConcCr/meas_MID121_eja_svs_steam_NOVAPOR_TUBE1_FID33573.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_016_ConcCr/meas_MID119_eja_svs_press_NOVAPOR_TUBE1_FID33571.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_016_ConcCr/meas_MID131_eja_svs_slaser_NOVAPOR_TUBE2to_use++_FID33583.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_016_ConcCr/meas_MID135_eja_svs_steam_NOVAPOR_TUBE2_to_use_FID33587.dat
+C:/Users/jsourdon/Desktop/2020_1H_MRS/200702_1hmrs_016_ConcCr/meas_MID133_eja_svs_press_NOVAPOR_TUBE2_to_use_FID33585.dat
+Y:/data/users/js/verio/1h_mrs/016-conc-cr/20200702/01_0010_eja-svs-slaser-novapor-tube1/original-primary_e09_0001.dcm
+Y:/data/users/js/verio/1h_mrs/016-conc-cr/20200702/01_0018_eja-svs-steam-novapor-tube1/original-primary_e09_0001.dcm
+Y:/data/users/js/verio/1h_mrs/016-conc-cr/20200702/01_0014_eja-svs-press-novapor-tube1/original-primary_e09_0001.dcm
+Y:/data/users/js/verio/1h_mrs/016-conc-cr/20200702/01_0026_eja-svs-slaser-novapor-tube2to-use/original-primary_e09_0001.dcm
+Y:/data/users/js/verio/1h_mrs/016-conc-cr/20200702/01_0032_eja-svs-press-novapor-tube2-to-use/original-primary_e09_0001.dcm
+Y:/data/users/js/verio/1h_mrs/016-conc-cr/20200702/01_0036_eja-svs-steam-novapor-tube2-to-use/original-primary_e09_0001.dcm
 """
 
 # legend captions
@@ -505,11 +565,41 @@ display_legends = """
 153_1hmrs_013_pressFB
 154_137_dicom
 155_dicom
+156_1hmrs_014_slaser1
+157_1hmrs_014_slaser2
+158_1hmrs_014_steam1
+159_1hmrs_014_steam2
+160_1hmrs_014_press1
+161_1hmrs_014_press2
+162_1hmrs_014_slaserFB
+163_1hmrs_014_steamFB
+164_1hmrs_014_pressFB
+165_1hmrs_015_slaser1
+166_1hmrs_015_slaser2
+167_1hmrs_015_steam1
+168_1hmrs_015_steam2
+169_1hmrs_015_press1
+170_1hmrs_015_press2
+171_1hmrs_015_slaserFB
+172_1hmrs_015_steamFB
+173_1hmrs_015_pressFB
+174_1hmrs_016_slaserTUBE1
+175_1hmrs_016_steamTUBE1
+176_1hmrs_016_pressTUBE1
+177_1hmrs_016_slaserTUBE2
+178_1hmrs_016_steamTUBE2
+179_1hmrs_016_pressTUBE2
+180_1hmrs_016_slaserTUBE1_dicom
+181_1hmrs_016_steamTUBE1_dicom
+182_1hmrs_016_pressTUBE1_dicom
+183_1hmrs_016_slaserTUBE2_dicom
+184_1hmrs_016_steamTUBE2_dicom
+185_1hmrs_016_pressTUBE2_dicom
 """
 
 # the data lists above, which data index should we process (starting from 0)
 # [] means process all
-index_to_process = 141
+index_to_process = 183
 
 # --- process the water-suppressed (WS) data ---
 p = reco.pipeline()
@@ -524,17 +614,18 @@ p.job_list = [  p.jobs["phasing"],
                 p.jobs["noise-estimation"],
                 p.jobs["zero-filling"],
                 p.jobs["apodizing"],
-                p.jobs["data-rejecting"],
+                #p.jobs["data-rejecting"],
+                #p.jobs["data-rejecting"],
                 #p.jobs["realigning"],
                 p.jobs["averaging"],
                 p.jobs["cropping"],
-                # p.jobs["water-removal"],
+                #p.jobs["water-removal"],
                 p.jobs["calibrating"],
                 #p.jobs["phasing (suspect)"],
                 p.jobs["displaying"]
                 ]
 
-p.analyze_enable = False
+p.analyze_enable = True
 p.analyze_job_list = [  p.jobs["channel-combining"],
                         p.jobs["zero-filling"],
                         #p.jobs["realigning"],
@@ -543,14 +634,14 @@ p.analyze_job_list = [  p.jobs["channel-combining"],
                         ]
 
 # self-phasing the WS spectrum using the the big lipid peak at ~1.5ppm (Here you can choose btw Lipid and Cr for phasing)
-p.jobs["phasing"]["POI_range_ppm"] = [4, 5.2]  # find this peak in this ppm range
+p.jobs["phasing"]["POI_range_ppm"] = [4, 5]  # find this peak in this ppm range
 p.jobs["phasing"]["offset"] = 0.0  # manual phase offset
 p.jobs["phasing"]["average_per_channel_mode"] = False
 p.jobs["phasing"]["first_point_fid_mode"] = False
 p.jobs["phasing"]["using_ref_data"] = False
 p.jobs["phasing"]["display"] = False
-
-p.jobs["channel-combining"]["phasing"] = False
+ 
+p.jobs["channel-combining"]["phasing"] = True
 p.jobs["channel-combining"]["using_ref_data"] = True
 
 # reject bad data
@@ -558,13 +649,13 @@ p.jobs["data-rejecting"]["moving_averages"] = 1
 p.jobs["data-rejecting"]["POI_range_ppm"] = [4, 5.2]
 # rejection ranges
 #p.jobs["data-rejecting"]["ranges"]["amplitude (%)"] = 50  # do not reject on amplitude changes
-p.jobs["data-rejecting"]["ranges"]["linewidth (Hz)"] = 1080  # max linewidth acceptable
+p.jobs["data-rejecting"]["ranges"]["linewidth (Hz)"] = [-1, 80]  # max linewidth acceptable
 p.jobs["data-rejecting"]["ranges"]["chemical shift (ppm)"] = 0.5  # +/- ppm
-p.jobs["data-rejecting"]["ranges"]["phase std. factor (%)"] = 1060.0  # stan's phase +/- 60% of std criteria (see doi:10.1002/jmri.26802)
+#p.jobs["data-rejecting"]["ranges"]["phase std. factor (%)"] = 60.0  # stan's phase +/- 60% of std criteria (see doi:10.1002/jmri.26802)
 # auto rejection based on linewidth?
-p.jobs["data-rejecting"]["auto_method"] = reco.data_rejection_method.MANUAL
+p.jobs["data-rejecting"]["auto_method_list"] = [reco.data_rejection_method.AUTO_AMPLITUDE, reco.data_rejection_method.AUTO_LINEWIDTH, reco.data_rejection_method.AUTO_FREQUENCY, reco.data_rejection_method.AUTO_PHASE]
 # minimum allowed SNR change (%) when adjusting the linewidth criteria
-#p.jobs["data-rejecting"]["auto_allowed_snr_change"] = -10.0
+p.jobs["data-rejecting"]["auto_allowed_snr_change"] = 0.0
 
 # frequency realignement
 p.jobs["realigning"]["POI_range_ppm"] = [4, 5.2]
@@ -573,7 +664,7 @@ p.jobs["realigning"]["inter_corr_mode"] = True
 # select number of excitations to average
 # p.jobs["averaging"]["na"] = 8
 # let's denoize a little (5Hz exponential apodization)
-p.jobs["apodizing"]["damping_hz"] = 20
+p.jobs["apodizing"]["damping_hz"] = 10
 # let's calibrate ppm scale so that water residue is at 4.7ppm
 p.jobs["calibrating"]["POI_true_ppm"] = 4.7
 p.jobs["calibrating"]["POI_range_ppm"] = [4, 5.2]
@@ -603,11 +694,11 @@ p._data_list[0].display_spectrum_1d()
 p.save(rdb)
 
 # %% print data rejection stuff + NOVAPOR water lw
-if(p._data_list[0].na_pre_data_rejection is None):
+if(p._data_list[0].data_rejection is None):
     print(">>> No data rejection jowjow!")
 else:
-    n_initial = p._data_list[0].na_pre_data_rejection
-    n_final = p._data_list[0].na_post_data_rejection
+    n_initial = p._data_list[0].data_rejection[0]['Pre-rejection']['na']
+    n_final = p._data_list[0].data_rejection[-1]['Post-rejection']['na']
     n_rejected = n_initial - n_final
     rejection_rate = n_rejected / n_initial * 100.0
     print(">>> Data rejected = %d/%d (%.2f%%)" % (n_rejected, n_initial, rejection_rate))
