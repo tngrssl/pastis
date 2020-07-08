@@ -2200,6 +2200,9 @@ class metabolite_basis_set(dict):
         self.ppm_range = [0, 6]
         # include only non-coupled peaks
         self.non_coupled_only = False
+        # set all metabolites to have only one peak (first chemical shift) and one proton
+        # one proton only for each metabolite
+        self.one_proton_mode = False
         # to know if the object is initialized
         self._ready = False
 
@@ -2224,7 +2227,6 @@ class metabolite_basis_set(dict):
         """
         # check keys
         if(d1.keys() != d2.keys()):
-            pdb.set_trace()
             return(False)
         # check key values
         for k in list(d1.keys()):
@@ -2237,7 +2239,6 @@ class metabolite_basis_set(dict):
                 r = (d1[k] == d2[k])
 
             if(not r):
-                pdb.set_trace()
                 return(False)
 
         return(True)
@@ -2506,4 +2507,13 @@ class metabolite_basis_set(dict):
         self.clear()
         self._read_xls_file()
         self._write_header_file()
+
+        # single proton AMARES style?
+        if(self.one_proton_mode):
+            for m in list(self.keys()):
+                for sm in list(self[m]["metabolites"].keys()):
+                    self[m]["metabolites"][sm]["ppm"] = np.array([self[m]["metabolites"][sm]["ppm"][0]])
+                    self[m]["metabolites"][sm]["iso"] = np.array([self[m]["metabolites"][sm]["iso"][0]])
+                    self[m]["metabolites"][sm]["J"] = np.array([[self[m]["metabolites"][sm]["J"][0][0]]])
+
         self._ready = True
