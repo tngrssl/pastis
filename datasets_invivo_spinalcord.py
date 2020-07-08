@@ -752,33 +752,65 @@ p.save(rdb)
 get_ipython().magic("clear")
 plt.close("all")
 
-p.data_filepaths = ["/home/tangir/crmbm/acq_twix/313-ft-p2-moelle/meas_MID239_slaser_R_N=20+_1_longTE_SNR++++_FID57752.dat"]
+p.data_filepaths = ["/home/tangir/crmbm/acq/313-ft-p2-moelle/20200615/01_0011_slaser-r-n/original-primary_e09_0001.dcm",
+    "/home/tangir/crmbm/acq_twix/313-ft-p2-moelle/meas_MID239_slaser_R_N=20+_1_longTE_SNR++++_FID57752.dat"]
 
-p.data_ref_filepaths = ["/home/tangir/crmbm/acq_twix/313-ft-p2-moelle/meas_MID240_slaser_R_N=20+_1_longTE_SNR++++_FID57753.dat"]
+p.data_ref_filepaths = ["/home/tangir/crmbm/acq/313-ft-p2-moelle/20200615/01_0012_slaser-r-n/original-primary_e09_0001.dcm",
+    "/home/tangir/crmbm/acq_twix/313-ft-p2-moelle/meas_MID240_slaser_R_N=20+_1_longTE_SNR++++_FID57753.dat"]
 
 p.data_physio_filepaths = []
 
-p.display_legends = ["sLASER 20/1"]
+p.display_legends = ["sLASER 20/1 (DCM)",
+                     "sLASER 20/1"]
 
 p.run()
 p.save(rdb)
 
-# %% 19/06/2020 - 333-sc-p2-moelle - Shirley P2
+# %% 19/06/2020 - 333-sc-p2-moelle - Shirley P2 :|
 get_ipython().magic("clear")
 plt.close("all")
 
-p.data_filepaths = ["/home/tangir/crmbm/acq_twix/333-sc-p2-moelle/meas_MID180_slaser_R_N=20+_1_longTE_SNR++++_FID58587.dat"]
+p.data_filepaths = ["/home/tangir/crmbm/acq/333-sc-p2-moelle/20200619/01_0008_slaser-r-n/original-primary_e09_0001.dcm",
+                    "/home/tangir/crmbm/acq_twix/333-sc-p2-moelle/meas_MID180_slaser_R_N=20+_1_longTE_SNR++++_FID58587.dat"
+                    ]
 
-p.data_ref_filepaths = ["/home/tangir/crmbm/acq_twix/333-sc-p2-moelle/meas_MID181_slaser_R_N=20+_1_longTE_SNR++++_FID58588.dat"]
+p.data_ref_filepaths = ["/home/tangir/crmbm/acq/333-sc-p2-moelle/20200619/01_0009_slaser-r-n/original-primary_e09_0001.dcm",
+                        "/home/tangir/crmbm/acq_twix/333-sc-p2-moelle/meas_MID181_slaser_R_N=20+_1_longTE_SNR++++_FID58588.dat"
+                        ]
 
 p.data_physio_filepaths = []
 
-p.display_legends = ["sLASER 20/1"]
+p.display_legends = ["sLASER 20/1 (DCM)",
+                     "sLASER 20/1"
+                     ]
+
+p.job_list = [  p.jobs["phasing"],
+                p.jobs["scaling"],
+                # p.jobs["FID modulus"],
+                p.jobs["channel-combining"],
+                # p.jobs["concatenate"],
+                p.jobs["noise-estimation"],
+                p.jobs["zero-filling"],
+                # p.jobs["physio-analysis"],
+                p.jobs["apodizing"],
+                p.jobs["data-rejecting"],
+                p.jobs["data-rejecting"],
+                # p.jobs["realigning"],
+                p.jobs["averaging"],
+                p.jobs["calibrating"],
+                # p.jobs["water-removal"],
+                p.jobs["cropping"],
+                p.jobs["displaying"]]
+
+# water peak ver small and close to 5ppm artefact
+p.jobs["analyzing-lw"]["range_ppm"] = [4.5, 4.8]
+p.jobs["phasing"]["POI_range_ppm"] = [4.5, 4.8]
+p.jobs["data-rejecting"]["POI_range_ppm"] = [4.5, 4.8]
 
 p.run()
 p.save(rdb)
 
-# %% 25/06/2020 - 314-yt-p2-moelle - Yolanda P2
+# %% 25/06/2020 - 314-yt-p2-moelle - Yolanda P2 :))) 39.69     	11.39
 get_ipython().magic("clear")
 plt.close("all")
 
