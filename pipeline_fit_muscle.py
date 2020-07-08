@@ -60,6 +60,7 @@ fit_result_csv_filename = "fit_results.csv"
 meta_bs = sim.metabolite_basis_set()
 meta_bs.basis_set_xls_file = "./metabolite_basis_sets/muscle_7T.xls"
 meta_bs.non_coupled_only = True
+meta_bs.one_proton_mode = True
 meta_bs.initialize()
 
 # sequence
