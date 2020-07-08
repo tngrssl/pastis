@@ -45,6 +45,19 @@ SHRIMP can be used to process and quantify single-voxel Magnetic Resonance SPect
 
 ## TODO
 
+- Recode the way we input filepaths, legends etc. in dict way:
+p.dataset_list["legend"]["raw-data"]["water-suppressed"] = "/..."
+p.dataset_list["legend"]["raw-data"]["non-water-suppressed"] = "/..."
+p.dataset_list["legend"]["dicoms"]["water-suppressed"] = "/..."
+p.dataset_list["legend"]["dicoms"]["non-water-suppressed"] = "/..."
+p.dataset_list["legend"]["physio"] = "/..."
+p.dataset_list["legend"]["physio"] = "/..."
+
+ + write code to convert all existing entries !
+
+- better handling of POI ppm for processing: automatic and single
+- data rejection fails on SC/P2, why ?
+- find a way to save templates for reco pipeline (pkl?)
 - Use a gitable non-binary format for the metabolite db and basis sets (thinking of FODS)
 - HDF5/ISMRMD format save/load: for now, only save the MRS signal with a few attributes. If needed, will complete implementation
 - Implement partial volume stuff for absolute quantification
