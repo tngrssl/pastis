@@ -21,7 +21,7 @@ SHRIMP can be used to process and quantify single-voxel Magnetic Resonance SPect
 	- Automatic phasing
 	- Automatic channel combination
 	- Zero-filling
-	- Semi/fully automatic data rejection
+	- Fully automatic data rejection
 	- Automatic frequency realignment
 	- Apodization
 	- Peak HSVD removal
@@ -46,7 +46,7 @@ SHRIMP can be used to process and quantify single-voxel Magnetic Resonance SPect
 ## TODO
 
 - Use a gitable non-binary format for the metabolite db and basis sets (thinking of FODS)
-- HDF5 format save/load: for now, only save the MRS signal with a few attributes. If needed, will complete implementation
+- HDF5/ISMRMD format save/load: for now, only save the MRS signal with a few attributes. If needed, will complete implementation
 - Implement partial volume stuff for absolute quantification
 - Merge with Yasmin's code for DW MRS
 + check # TODO tags in the code :)
