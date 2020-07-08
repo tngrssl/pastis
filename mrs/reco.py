@@ -2011,7 +2011,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         return(s_phased)
 
-    def correct_combine_channels_3d(self, use_ref_data=True, phasing=True, channels_onoff=[True]):
+    def correct_combine_channels_3d(self, use_ref_data=True, phasing=False, channels_onoff=[True]):
         """
         Recombine Rx channels using SVD stuff. If no reference signal is specified, the recombination weights will be calculated from the signal of interest (not optimal).
 
@@ -2554,8 +2554,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
             display_axes_ready = [False, False]
             properties_names = list(peak_properties_ranges.keys())
-            auto_method_final_snr_list = [0.0] * 4
-            auto_method_final_lw_list = [np.inf] * 4
+            auto_method_final_snr_list = np.array([0.0] * 4)
+            auto_method_final_lw_list = np.array([np.inf] * 4)
             peak_prop_min_auto_res = peak_prop_min.copy()
             peak_prop_max_auto_res = peak_prop_max.copy()
 
@@ -2637,23 +2637,24 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 # analyze SNR curve
                 test_snr_initial = test_snr_list[-1]
                 test_snr_threshold = test_snr_initial + test_snr_initial * auto_adjust_allowed_snr_change / 100.0
+                test_snr_list_rel = test_snr_list / test_snr_initial * 100.0 - 100.0
 
                 # first, try and find a higher SNR than the initial one (best case, we reject crappy data and improved final SNR)
-                if(test_snr_list.max() > test_snr_initial):
-                    log.info("data rejection result: SNR improved compared to original data! :)")
+                if(test_snr_list_rel.max() > auto_adjust_allowed_snr_change):
+                    log.info("SNR change above threshold: %.2f%% > %.2f%% threshold! :)" % (test_snr_list_rel.max(), auto_adjust_allowed_snr_change))
                     ind_max_snr = np.argmax(test_snr_list)
                     optim_prop = this_prop_range[ind_max_snr]
                     optim_res_snr = test_snr_list[ind_max_snr]
                     optim_res_lw = test_lw_list[ind_max_snr]
-                    log.info("found optimal criteria for data rejection [" + properties_names[this_auto_method.value] + "] = %.1f" % optim_prop)
+                    log.info("optimal [" + properties_names[this_auto_method.value] + "] = %.1f" % optim_prop)
                 else:
-                    # no higher SNR found, so let's try to find at least a lower linewidth (intermediate case), by respecting the SNR threshold
-                    test_snr_list_rel = test_snr_list / test_snr_initial * 100.0 - 100.0
-                    test_snr_list_mask = (test_snr_list_rel > auto_adjust_allowed_snr_change)
-                    # check that we have a segment of the curve above the SNR threshold
+                    # no SNR above threshold found, so let's try to find at least a lower linewidth (intermediate case), for the same SNR or more
+                    # check that we have a segment of the curve above the initial SNR
+                    test_snr_list_mask = (test_snr_list_rel >= 0.0)
                     if(not test_snr_list_mask.any()):
                         # that was a bit ambitious
-                        log.warning("sorry but your exceptation regarding the SNR was a bit ambitious! You are refusing to go under %.2f%% SNR change. While trying to adjust rejection criteria for data rejection, the best we found was a %.2f%% SNR change :(" % (auto_adjust_allowed_snr_change, test_snr_list_rel.max()))
+                        log.info("sorry, this is only making your SNR worse...")
+                        log.debug("the best SNR change we found was %.2f%% compared to initial :(" % test_snr_list_rel.max())
                         # set optimal LW to max
                         optim_prop = this_prop_max
                         optim_res_snr = test_snr_list[-1]
@@ -2661,12 +2662,12 @@ class MRSData2(suspect.mrsobjects.MRSData):
                     else:
                         # we found SNR values which matches our request
                         # let's choose the one with the lowest LW
-                        log.info("data rejection result: could not improve SNR but will try to reduce peak linewidth! :)")
+                        log.info("could not improve SNR above threshold but will reduce peak linewidth! :)")
                         ind_min_lw_snr_masked = np.argmin(test_lw_list[test_snr_list_mask])
                         optim_prop = this_prop_range[test_snr_list_mask][ind_min_lw_snr_masked]
                         optim_res_snr = test_snr_list[test_snr_list_mask][ind_min_lw_snr_masked]
                         optim_res_lw = test_lw_list[test_snr_list_mask][ind_min_lw_snr_masked]
-                        log.info("found optimal criteria for data rejection [" + properties_names[this_auto_method.value] + "] = %.1f" % optim_prop)
+                        log.info("optimal [" + properties_names[this_auto_method.value] + "] = %.1f" % optim_prop)
 
                 # display and save the final snr and lw
                 log.info("* Post-data-rejection based on [" + properties_names[this_auto_method.value] + "] SNR = %.2f" % optim_res_snr)
@@ -2709,7 +2710,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                         # we just created the figure, let's create the axes
                         fig.clf()
                         fig.canvas.set_window_title("mrs.reco.MRSData2.correct_analyze_and_reject_2d (auto 2/2)")
-                        fig.suptitle("estimating data rejection rates for [%s] (round #%d)"  % (self.display_label, iround_data_rej))
+                        fig.suptitle("estimating data rejection rates for [%s] (round #%d)" % (self.display_label, iround_data_rej))
                         fig.subplots(2, 2)
                         for a in fig.axes:
                             a.twinx()
@@ -2737,19 +2738,35 @@ class MRSData2(suspect.mrsobjects.MRSData):
             # the final snr and lw obtained are in auto_method_final_snr_list and auto_method_final_lw_list
             # the final bounds are in peak_prop_min_auto_res and peak_prop_max_auto_res
 
-            # find max snr
-            ind_max_snr_auto_method = np.argmax(auto_method_final_snr_list)
-            # is is higher than the initial snr?
-            if(auto_method_final_snr_list[ind_max_snr_auto_method] > initial_snr):
+            # relative SNR change
+            auto_method_final_snr_list_rel = auto_method_final_snr_list / test_snr_initial * 100.0 - 100.0
+
+            # is this higher than the initial snr?
+            if(auto_method_final_snr_list_rel.max() > auto_adjust_allowed_snr_change):
                 # apply this method
+                ind_max_snr_auto_method = np.argmax(auto_method_final_snr_list)
                 optim_auto_method = data_rejection_method(ind_max_snr_auto_method)
-                log.info("The automatic method giving the best results was " + str(optim_auto_method) + " (higher SNR!) (round #%d)"  % iround_data_rej)
+                log.info("best adjustment done with " + str(optim_auto_method) + " regarding SNR! (round #%d)" % iround_data_rej)
             else:
-                # could not find a method giving a higher SNR than the initial SNR
-                # let's find a method that gives a lower linewidth ? (the SNR threshold is already included here)
-                ind_min_lw_auto_method = np.argmin(auto_method_final_lw_list)
-                optim_auto_method = data_rejection_method(ind_min_lw_auto_method)
-                log.info("The automatic method giving the best results was " + str(optim_auto_method) + " (lower linewidth!) (round #%d)"  % iround_data_rej)
+                # check that we have a segment of the curve above the initial SNR
+                auto_method_final_snr_list_mask = (auto_method_final_snr_list_rel >= 0.0)
+                if(not auto_method_final_snr_list_mask.any()):
+                    # that was a bit ambitious
+                    log.info("sorry but only made your SNR worse...")
+                    log.debug("the best SNR change we found was %.2f%% compared to initial :(" % auto_method_final_snr_list_rel.max())
+                    log.info("automatic data rejection failed, no optimal method found, sorry! :(")
+                    # no optimal method!
+                    optim_auto_method = None
+                else:
+                    # we found SNR values which matches our request
+                    # let's choose the one with the lowest LW
+                    log.info("could not find a method that improves SNR above threshold but will reduce the peak linewidth! :)")
+
+                    # could not find a method giving a higher SNR than the initial SNR
+                    # let's find a method that gives a lower linewidth ?
+                    ind_min_lw_auto_method = np.argmin(auto_method_final_lw_list[auto_method_final_snr_list_mask])
+                    optim_auto_method = data_rejection_method(ind_min_lw_auto_method)
+                    log.info("best adjustment done with " + str(optim_auto_method) + " regarding linewidth! (round #%d)" % iround_data_rej)
 
             log.info("* Post-data-rejection SNR = %.2f" % auto_method_final_snr_list[optim_auto_method.value])
             log.info("* Post-data-rejection linewidth = %.2f Hz" % auto_method_final_lw_list[optim_auto_method.value])
@@ -4105,7 +4122,7 @@ class pipeline:
                                           # use non water-suppressed data to recombine and rephase channels
                                           "using_ref_data": True,
                                           # should we rephase (0th order) data while combining?
-                                          "phasing": True,
+                                          "phasing": False,
                                           # boolean mask to switch on/off some Rx channels
                                           "weights": [True]
                                           }
@@ -4149,15 +4166,15 @@ class pipeline:
                                        # chemical shift changes: keep data is within +/-val ppm
                                        # phase changes: keep data if within +/-val/100 * std(phase) rd
                                        "ranges": {"amplitude (%)": None,
-                                                  "linewidth (Hz)": [5.0, 30.0],
-                                                  "chemical shift (ppm)": 0.5,
+                                                  "linewidth (Hz)": None,
+                                                  "chemical shift (ppm)": None,
                                                   "phase std. factor (%)": None},
                                        # for amplitude, chemical shift and phase, the rejection of data is based on ranges of relative changes of those metrics. Relative to what? The mean value over the whole acquisition (True) or the first acquired point (False)
                                        "rel2mean": True,
                                        # method for automatic adjustement
                                        "auto_method_list": None,
                                        # minimum allowed SNR change (%) when adjusting the linewidth criteria, this can be positive (we want to increase SNR +10% by rejecting crappy data) or negative (we are ok in decreasing the SNR -10% in order to get better resolved spectra)
-                                       "auto_allowed_snr_change": 0.0,
+                                       "auto_allowed_snr_change": 1.0,
                                        # display all this process to check what the hell is going on
                                        "display": True
                                        }
@@ -4176,7 +4193,7 @@ class pipeline:
                                    "display_range_ppm": self.jobs["displaying"]["range_ppm"]
                                    }
 
-        # --- job: automatic data frequency realignment ---
+        # --- job: spectral filering ---
         self.jobs["filtering"] = {0:
                                   {"func": MRSData2.correct_bandpass_filtering_1d, "name": "FFT filtering"},
                                   # ppm range to keep
