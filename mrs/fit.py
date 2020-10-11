@@ -7,9 +7,9 @@ A fit_tool class that deals with the quantification of MRS data based on the sci
 """
 
 import numpy as np
-import mrs.sim as sim
-import mrs.log as log
-import mrs.aliases as xxx
+from mrs import sim
+from mrs import log
+from mrs import aliases as xxx
 import matplotlib.pylab as plt
 import scipy.optimize as optimize
 import matplotlib._color_data as mcd
@@ -34,6 +34,34 @@ class fit_plot_type(Enum):
     TIME_DOMAIN = 7
 
 
+import os
+import pickle
+from datetime import datetime, timedelta
+from shutil import copyfile
+
+
+def _dummy_check_func(d, rp, fp, dp):
+    """
+    Return true if you want to select this dataset/pipeline when getting data from database using the get_datasets method. This is only a dummy example. Please feel free to recode a function with the same prototype to select for example only 3T scans, or short-TE scans, etc.
+
+    Parameters
+    ----------
+    d : MRSData2 object
+        Function with two arguments (MRSData2 object, pipeline object) that you should code and which returns True if you want to get it this dataset/pipeline out of the database.
+    rp : reco pipeline object
+    fp : fit pipeline object
+    dp : dict of parameter results
+
+    Returns
+    -------
+    r : boolean
+        True if we keep this dataset/pipeline
+    """
+    r = (d.te > 0.0 and
+         d.na > 0)  # that is stupid, just an example
+    return(r)
+
+
 class prefit_tool:
     """The prefit_tool class is used to perfom area integration of peaks in the spectrum."""
 
@@ -44,7 +72,7 @@ class prefit_tool:
     def __setattr__(self, key, value):
         """Overload of __setattr__ method to check that we are not creating a new attribute."""
         if self.__isfrozen and not hasattr(self, key):
-            raise TypeError("You are trying to dynamically create a new attribute (%s) to this object and that is not cool! I will not let you do that because I believe it is a bad habit and can lead to terrible bugs. A clean way of doing this is to initialize your attribute (%s) in the __init__ method of this class. Bisou, bye :)" % (key, key))
+            log.error_new_attribute(key)
         object.__setattr__(self, key, value)
 
     def __init__(self, data, seq=None):
@@ -272,7 +300,7 @@ class fit_tool:
     def __setattr__(self, key, value):
         """Overload of __setattr__ method to check that we are not creating a new attribute."""
         if self.__isfrozen and not hasattr(self, key):
-            raise TypeError("You are trying to dynamically create a new attribute (%s) to this object and that is not cool! I will not let you do that because I believe it is a bad habit and can lead to terrible bugs. A clean way of doing this is to initialize your attribute (%s) in the __init__ method of this class. Bisou, bye :)" % (key, key))
+            log.error_new_attribute(key)
         object.__setattr__(self, key, value)
 
     def __init__(self, data, seq=None):
@@ -364,15 +392,6 @@ class fit_tool:
         # --- display options ---
         # should we show the CRBs error bars during the fit?
         self.display_CRBs = True
-        # should we nomalize the concentrations displayed during the fit?
-        self.display_normalized = False
-        # if yes, use those T2 and T1 values from metabolite database
-        self.display_normalized_T2_key = "T2s_human_brain_7T"
-        self.display_normalized_T1_key = "T1s_human_brain_7T"
-        # if yes, use those parameters estimated on reference non water suppressed data
-        self.display_normalized_abs_ref_params = sim.params(self._meta_bs)
-        # and assume a water concentration in mmol/L
-        self.display_normalized_abs_water_concentration = 55000.0
 
         # to know if the object is initialized
         self._ready = False
@@ -494,36 +513,25 @@ class fit_tool:
             fig.canvas.set_window_title("mrs.fit.lsqfit._minimizeThis")
 
             # display real-time bargraphs
-
-            # prepare bar values
-            if(self.display_normalized):
-                params_T2norm = params.correct_T2s(self.data.te, self.display_normalized_T2_key)
-                params_T2norm_T1norm = params_T2norm.correct_T1s(self.data.tr, self.display_normalized_T1_key)
-                params_T2norm_T1norm_abs = params_T2norm_T1norm.correct_absolute(self.display_normalized_abs_ref_params, self.display_normalized_abs_water_concentration)
-                params_val_list = [self.params_min, self.params_max, params_T2norm_T1norm_abs]
-            else:
-                params_val_list = [self.params_min, self.params_max, params]
-
             # real-time CRBs
             if(self.display_CRBs):
-                params_CRBs_abs, params_CRBs_rel = self.get_CRBs(params)
-            else:
-                params_CRBs_abs = params * 0.0
+                params_CRBs_abs, _ = self.get_CRBs(params)
+                params._errors = params_CRBs_abs
 
-            params_std_list = [self.params_min * 0.0, self.params_max * 0.0, params_CRBs_abs]
+            params_val_list = [self.params_min, self.params_max, params]
             params_leg_list = ['lower bounds', 'upper bounds', 'current']
 
             # let's display the subplots as required by self.display_subplots_types
             axs_list = [axs[0, 2], axs[0, 3], axs[1, 2], axs[1, 3]]
             for ax, plt_type in zip(axs_list, self.display_subplots_types):
                 if(plt_type == fit_plot_type.BARGRAPH_CM):
-                    disp_bargraph(ax, params_val_list, params_std_list, params_leg_list, True, True, self._water_only, True, xxx.p_cm)
+                    disp_bargraph(ax, params_val_list, params_leg_list, True, True, self._water_only, True, xxx.p_cm)
                 elif(plt_type == fit_plot_type.BARGRAPH_DD):
-                    disp_bargraph(ax, params_val_list, params_std_list, params_leg_list, True, True, self._water_only, True, xxx.p_dd)
+                    disp_bargraph(ax, params_val_list, params_leg_list, True, True, self._water_only, True, xxx.p_dd)
                 elif(plt_type == fit_plot_type.BARGRAPH_DF):
-                    disp_bargraph(ax, params_val_list, params_std_list, params_leg_list, True, True, self._water_only, True, xxx.p_df)
+                    disp_bargraph(ax, params_val_list, params_leg_list, True, True, self._water_only, True, xxx.p_df)
                 elif(plt_type == fit_plot_type.BARGRAPH_DP):
-                    disp_bargraph(ax, params_val_list, params_std_list, params_leg_list, True, True, self._water_only, True, xxx.p_dp)
+                    disp_bargraph(ax, params_val_list, params_leg_list, True, True, self._water_only, True, xxx.p_dp)
                 elif(plt_type == fit_plot_type.COST_FUNCTION):
                     ax.plot(self._cost_function, 'k-')
                     ax.set_xlabel('iterations')
@@ -609,10 +617,6 @@ class fit_tool:
         -------
         params_fit : params object
             Estimated metabolic parameters using the fitting algorithm
-        params_CRBs_abs : params object
-            Estimated absolute Cramér-Rao Lower Bounds for each parameter
-        params_CRBs_rel : params object
-            Estimated relative Cramér-Rao Lower Bounds for each parameter (%)
         optim_result : 'OptimizeResult' object returned by scipy.optimize.least_squares
             Numerical optimization parameters, includes the R^2 coefficients [rsq_t and rsq_f] and the FQN coefficient [fqn]
         """
@@ -656,7 +660,8 @@ class fit_tool:
         params_fit = self.params_init.copy()
         params_fit = params_fit.toFullParams(optim_result.x)
         # final CRBs
-        params_CRBs_abs, params_CRBs_rel = self.get_CRBs(params_fit)
+        params_CRBs_abs, _ = self.get_CRBs(params_fit)
+        params_fit._errors = params_CRBs_abs
 
         # add fit criteria to optim_result
         rsq_t, rsq_f = self.get_Rsq(params_fit)
@@ -667,7 +672,7 @@ class fit_tool:
         # switch back to not ready
         self._ready = False
 
-        return(params_fit, params_CRBs_abs, params_CRBs_rel, optim_result)
+        return(params_fit, optim_result)
 
     def get_CRBs(self, params):
         """
@@ -696,7 +701,15 @@ class fit_tool:
         F = np.dot(j_free, np.transpose(j_free))
 
         # covariance
-        covar = np.linalg.inv(np.real(F))
+        try:
+            covar = np.linalg.inv(np.real(F))
+        except:
+            # it happens that F is a singular matrix
+            # I believe it is just bad luck but I am not really sure how to handle this error...
+            # for now, I just had some little salt to F
+            log.warning("weird singular matrix bug while inverting Fisher matrix during CRB calculation!")
+            F[0, 0] = F[0, 0] + 1e-6
+            covar = np.linalg.inv(np.real(F))
 
         # CRBs
         CRBs = np.zeros(covar.shape[0])
@@ -743,12 +756,12 @@ class fit_tool:
         # and the R coeff in TIME DOMAIN
         c = np.corrcoef(self.data, mod)
         r_t = c[0, 1]
-        r2_t = r_t**2
+        r2_t = np.abs(r_t**2)
 
         # and the R coeff in FREQUENCY DOMAIN
         c = np.corrcoef(self.data.spectrum(), mod.spectrum())
         r_f = c[0, 1]
-        r2_f = r_f**2
+        r2_f = np.abs(r_f**2)
 
         return(r2_t, r2_f)
 
@@ -860,7 +873,7 @@ class fit_tool:
         return(params_cor)
 
 
-def disp_bargraph(ax, params_val_list, params_std_list, params_leg_list, colored_LLs=True, bMM=False, bWater=False, bFitMode=False, pIndex=xxx.p_cm, mIndex_list=None, width=0.3):
+def disp_bargraph(ax, params_val_list, params_leg_list, colored_LLs=True, bMM=False, bWater=False, bFitMode=False, pIndex=xxx.p_cm, mIndex_list=None, width=0.3):
     """
     Plot a bargraph of concentrations.
 
@@ -870,8 +883,6 @@ def disp_bargraph(ax, params_val_list, params_std_list, params_leg_list, colored
         Axis to use for plotting
     params_val_list : list of params objects
         List of parameter arrays to display as bars
-    params_std_list : list of params objects
-        List of parameter arrays to display as error bars
     params_leg_list : list of params objects
         List of legend caption for each bar
     colored_LLs : boolean
@@ -929,7 +940,7 @@ def disp_bargraph(ax, params_val_list, params_std_list, params_leg_list, colored
     # filter data now
     params_val_list = [p[meta_mask] for p in params_val_list]
     params_LL_list = [p.linklock[meta_mask] for p in params_val_list]
-    params_std_list = [p[meta_mask] for p in params_std_list]
+    params_std_list = [p._errors[meta_mask] for p in params_val_list]
     meta_names = params_val_list[0].get_meta_names()
     meta_names = [meta_names[i] for i in range(len(meta_names)) if meta_mask[i, pIndex]]
 

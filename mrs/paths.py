@@ -16,4 +16,7 @@ DEFAULT_META_DB_FILE = "./mrs/metabolites_db.xls"
 DEFAULT_META_BASIS_SET_FILE = "./metabolite_basis_sets/human_brain_7T.xls"
 
 # pkl file where all the processed data is stored
-DEFAULT_RECO_DATA_DB_FILE = "/home/tangir/crmbm/data_reco/db.pkl"
+DEFAULT_RECO_DATA_DB_FILE = "/home/tangir/crmbm/acq_db/db.pkl"
+
+# folder to save reco pipeline templates (pkl files)
+DEFAULT_RECO_TEMPLATE_FOLDER = "./reco_templates/"
