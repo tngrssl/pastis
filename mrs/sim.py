@@ -30,10 +30,10 @@ import pathlib
 from xlrd import open_workbook
 from termcolor import cprint
 from enum import Enum
-import mrs.reco as reco
-import mrs.aliases as xxx
-import mrs.log as log
-import mrs.paths as default_paths
+from mrs import reco
+from mrs import aliases as xxx
+from mrs import log
+from mrs import paths as default_paths
 
 import pdb
 
@@ -46,6 +46,15 @@ class sequence_exc_type(Enum):
     SPIN_ECHO = 3
 
 
+class gating_signal_source(Enum):
+    """The enum gating_signal_source describes the type of gating used during the acquisition."""
+
+    NO_GATING = 0
+    CARDIAC_ECG = 2
+    CARDIAC_GATING = 4
+    RESP_GATING = 16
+
+
 class params(np.ndarray):
     """A class that stores the parameters used to modelize a MR spectrum during simulation or fit."""
 
@@ -56,7 +65,7 @@ class params(np.ndarray):
     def __setattr__(self, key, value):
         """Overload of __setattr__ method to check that we are not creating a new attribute."""
         if self.__isfrozen and not hasattr(self, key):
-            raise TypeError("You are trying to dynamically create a new attribute (%s) to this object and that is not cool! I will not let you do that because I believe it is a bad habit and can lead to terrible bugs. A clean way of doing this is to initialize your attribute (%s) in the __init__ method of this class. Bisou, bye :)" % (key, key))
+            log.error_new_attribute(key)
         object.__setattr__(self, key, value)
 
     def __init__(self, meta_bs):
@@ -75,6 +84,8 @@ class params(np.ndarray):
         self._linklock = np.zeros(self.shape)
         # the ratio vector
         self._ratios = np.ones(self.shape)
+        # the error vector
+        self._errors = np.zeros(self.shape)
 
         # freeze
         self.__isfrozen = True
@@ -108,6 +119,7 @@ class params(np.ndarray):
         self._meta_bs = getattr(obj, 'meta_bs', None)
         self._linklock = getattr(obj, 'linklock', None)
         self._ratios = getattr(obj, 'ratios', None)
+        self._errors = getattr(obj, 'errors', None)
 
     @property
     def meta_bs(self):
@@ -123,6 +135,11 @@ class params(np.ndarray):
     def ratios(self):
         """Property method for ratios."""
         return(self._ratios)
+
+    @property
+    def errors(self):
+        """Property method for errors."""
+        return(self._errors)
 
     def get_meta_names(self):
         """
@@ -149,17 +166,17 @@ class params(np.ndarray):
 
         LL_list = np.unique(self.linklock)
         LL_list = LL_list[LL_list >= +2]
-        for l in LL_list:
+        for this_LL in LL_list:
             # count number of master
-            tmp = (self.linklock == -l)
+            tmp = (self.linklock == -this_LL)
             n_masters = np.sum(tmp[:])
 
             # count number of slaves
-            tmp = (self.linklock == +l)
+            tmp = (self.linklock == +this_LL)
             n_slaves = np.sum(tmp[:])
 
             # master ratio values should be all equal to one
-            tmp = (self.linklock == -l)
+            tmp = (self.linklock == -this_LL)
             if(np.any(tmp[:]) != 1.0):
                 all_right = False
 
@@ -208,8 +225,8 @@ class params(np.ndarray):
         # find unique LL values
         LL_list = np.unique(p.linklock)
         LL_list = LL_list[LL_list >= +2]
-        for l in LL_list:
-            p[p.linklock == +l] = p[p.linklock == -l] * p.ratios[p.linklock == +l]
+        for this_LL in LL_list:
+            p[p.linklock == +this_LL] = p[p.linklock == -this_LL] * p.ratios[p.linklock == +this_LL]
 
         return(p)
 
@@ -239,7 +256,10 @@ class params(np.ndarray):
         params_T2s = np.array(params_T2s)
 
         # apply T2w for given TE
-        p[:, xxx.p_cm] = p[:, xxx.p_cm] * np.exp(-te / params_T2s)
+        multiplication_factor = np.exp(-te / params_T2s)
+        p[:, xxx.p_cm] = p[:, xxx.p_cm] * multiplication_factor
+        # to errors too
+        p._errors[:, xxx.p_cm] = p.errors[:, xxx.p_cm] * multiplication_factor
         return(p)
 
     def correct_T2s(self, te):
@@ -268,7 +288,10 @@ class params(np.ndarray):
         params_T2s = np.array(params_T2s)
 
         # finding real concentration values at TE=0ms
-        p[:, xxx.p_cm] = p[:, xxx.p_cm] / np.exp(-te / params_T2s)
+        multiplication_factor = 1 / np.exp(-te / params_T2s)
+        p[:, xxx.p_cm] = p[:, xxx.p_cm] * multiplication_factor
+        # to errors too
+        p._errors[:, xxx.p_cm] = p.errors[:, xxx.p_cm] * multiplication_factor
         return(p)
 
     def correct_T1s(self, tr):
@@ -297,17 +320,57 @@ class params(np.ndarray):
         params_T1s = np.array(params_T1s)
 
         # finding real concentration values at TE=0ms
-        p[:, xxx.p_cm] = p[:, xxx.p_cm] / (1 - np.exp(-tr / params_T1s))
+        multiplication_factor = 1 / (1 - np.exp(-tr / params_T1s))
+        p[:, xxx.p_cm] = p[:, xxx.p_cm] * multiplication_factor
+        # to errors too
+        p._errors[:, xxx.p_cm] = p.errors[:, xxx.p_cm] * multiplication_factor
         return(p)
 
-    def _correct_normalize_concentrations(self, multiplication_factor):
+    def get_relative_to_meta(self, mIndex=xxx.m_Water, m_concentration_mmolkg=55000.0, params_ref=None):
         """
-        Multiply the concentrations by a factor.
+        Calculate the metabolic concentration values relative to a metabolite. The metabolite relative concentration can be taken from the current params vector or another params vector (params_ref), assuming the absolute metabolite concentration value. Usefull to get concentrations relative to water (called absolute concentrations).
 
         Parameters
         ----------
-        multiplication_factor : float
-            Multiplication factor
+        mIndex : int
+            Index of metabolite of reference
+        water_concentration : float
+            Assumed water concentration used to calculate absolute concentration estimates (mmol/kg)
+        params_ref : params object
+            Array of parameters used to get the concentration estimate of the reference metabolite
+
+        Returns
+        -------
+        self.copy() : params object
+            Full array of parameters
+        """
+        # init: check ref params
+        if(params_ref is None):
+            params_ref = self.copy()
+
+        # init: we are working on copies
+        p1 = self.copy()
+        p2 = self.copy()
+
+        # do the maths
+        multiplication_factor = m_concentration_mmolkg / params_ref[mIndex, xxx.p_cm]
+        p2[:, xxx.p_cm] = p1[:, xxx.p_cm] * multiplication_factor
+
+        # deal with errors too
+        # we are dividing errors:
+        # dp2 = p2 * (dp1/p1 + dpref/pref)
+        p2._errors[:, xxx.p_cm] = p2[:, xxx.p_cm] * (p1.errors[:, xxx.p_cm] / p1[:, xxx.p_cm] + params_ref.errors[mIndex, xxx.p_cm] / params_ref[mIndex, xxx.p_cm])
+
+        return(p2)
+
+    def get_ratios(self, mIndex=xxx.m_Cr_CH3):
+        """
+        Calculate the metabolite ratios.
+
+        Parameters
+        ----------
+        mIndex : int
+            Index of metabolite of reference used as the denominator
 
         Returns
         -------
@@ -315,45 +378,18 @@ class params(np.ndarray):
             Full array of parameters
         """
         # init: we are working on a copy
-        p = self.copy()
-        p[:, xxx.p_cm] = p[:, xxx.p_cm] * multiplication_factor
-        return(p)
+        p1 = self.copy()
+        p2 = self.copy()
 
-    def correct_absolute(self, params_water, water_concentration=55000.0):
-        """
-        Calculate the absolute metabolic concentration values knowing the relative water concentration value and its assumed concentration.
+        # ratio
+        p2[:, xxx.p_cm] = p1[:, xxx.p_cm] / p1[mIndex, xxx.p_cm]
 
-        Parameters
-        ----------
-        params_water : params object
-            Array of parameters obtained from the fit a non water suppressed MRS data (reference scan)
-        water_concentration : float
-            Assumed water concentration used to calculate absolute concentration estimates (mmol/kg)
+        # deal with errors too
+        # we are dividing errors:
+        # dp2 = p2 * (dp1/p1 + dpref/pref)
+        p2._errors[:, xxx.p_cm] = p2[:, xxx.p_cm] * (p1.errors[:, xxx.p_cm] / p1[:, xxx.p_cm] + p1.errors[mIndex, xxx.p_cm] / p1[mIndex, xxx.p_cm])
 
-        Returns
-        -------
-        self.copy() : params object
-            Full array of parameters
-        """
-        return(self._correct_normalize_concentrations(water_concentration / params_water[xxx.m_Water, xxx.p_cm]))
-
-    def correct_relative(self, params_water, water_concentration=55000.0):
-        """
-        Calculate the relative metabolic concentration values knowing the relative water concentration value and its assumed concentration.
-
-        Parameters
-        ----------
-        params_water : params object
-            Array of parameters obtained from the fit a non water suppressed MRS data (reference scan)
-        water_concentration : float
-            Assumed water concentration used to calculate absolute concentration estimates (mmol/kg)
-
-        Returns
-        -------
-        self.copy() : params object
-            Full array of parameters
-        """
-        return(self._correct_normalize_concentrations(params_water[xxx.m_Water, xxx.p_cm] / water_concentration))
+        return(p2)
 
     def _set_default_min(self):
         """
@@ -630,10 +666,10 @@ class mrs_sequence:
     def __setattr__(self, key, value):
         """Overload of __setattr__ method to check that we are not creating a new attribute."""
         if self.__isfrozen and not hasattr(self, key):
-            raise TypeError("You are trying to dynamically create a new attribute (%s) to this object and that is not cool! I will not let you do that because I believe it is a bad habit and can lead to terrible bugs. A clean way of doing this is to initialize your attribute (%s) in the __init__ method of this class. Bisou, bye :)" % (key, key))
+            log.error_new_attribute(key)
         object.__setattr__(self, key, value)
 
-    def __init__(self, te, tr=3500.0, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, scaling_factor=1.0):
+    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0):
         """
         Initialize the sequence.
 
@@ -643,6 +679,10 @@ class mrs_sequence:
             Echo time (ms)
         tr : float
             Repetition time (ms)
+        na : int
+            Number of averages/excitations
+        ds : int
+            Number of summy scans
         nuclei : string
             Observed nuclei. Examples: "1H", "31P", etc.
         npts : int
@@ -651,6 +691,16 @@ class mrs_sequence:
             Acquisition bandwidth (Hz)
         f0 : float
             Water Larmor frequency (MHz)
+        vref : float
+            Reference voltage (V)
+        shims : list of floats
+            List of shim voltages in volts
+        timestamp : float
+            Timestamp in ms
+        gating_mode : gating_signal_source
+            Acquisition triggering mode
+        eff_acquisition_time : float
+            Effective acquisition time (s)
         scaling_factor : float
             Scaling FID intensity factor
         """
@@ -663,6 +713,10 @@ class mrs_sequence:
         self.te = te
         # repetition time (ms)
         self.tr = tr
+        # number of averages
+        self.na = na
+        # number of dummy scans
+        self.ds = ds
         # which nuclei we are pulsing on/looking at (examples: '1H', '31P')
         self.nuclei = nuclei
         # number of acquired time points (int)
@@ -671,6 +725,16 @@ class mrs_sequence:
         self.fs = fs
         # larmor frequency of water (MHz)
         self.f0 = f0
+        # reference voltage (V)
+        self.vref = vref
+        # shim vector
+        self.shims = shims
+        # start timestamp
+        self.timestamp = timestamp
+        # gating mode
+        self.gating_mode = gating_mode
+        # effective acquisition time
+        self.eff_acquisition_time = eff_acquisition_time
         # kind of receiver gain
         self.scaling_factor = scaling_factor
         # ppm shift (ppm)
@@ -1199,7 +1263,7 @@ class mrs_sequence:
 class mrs_seq_press(mrs_sequence):
     """A class that represents a general PRESS sequence."""
 
-    def __init__(self, te, tr=3500.0, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, scaling_factor=1.0, te1=None, te2=None):
+    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0, te1=np.nan, te2=np.nan):
         """
         Initialize a virtual PRESS sequence.
 
@@ -1209,6 +1273,10 @@ class mrs_seq_press(mrs_sequence):
             Echo time (ms)
         tr : float
             Repetition time (ms)
+        na : int
+            Number of averages/excitations
+        ds : int
+            Number of summy scans
         nuclei : string
             Observed nuclei. Examples: "1H", "31P", etc.
         npts : int
@@ -1217,6 +1285,16 @@ class mrs_seq_press(mrs_sequence):
             Acquisition bandwidth (Hz)
         f0 : float
             Water Larmor frequency (MHz)
+        vref : float
+            Reference voltage (V)
+        shims : list of floats
+            List of shim voltages in volts
+        timestamp : float
+            Timestamp in ms
+        gating_mode : gating_signal_source
+            Acquisition triggering mode
+        eff_acquisition_time : float
+            Effective acquisition time (s)
         scaling_factor : float
             Scaling FID intensity factor
         te1 : float
@@ -1224,19 +1302,19 @@ class mrs_seq_press(mrs_sequence):
         te2 : float
             Second part of TE (ms)
         """
-        super().__init__(te, tr, nuclei, npts, fs, f0, scaling_factor)
+        super().__init__(te, tr, na, ds, nuclei, npts, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor)
         # name of sequence
         self.name = "press (not specific)"
         # type
         self.exc_type = sequence_exc_type.SPIN_ECHO
         # TE timing
         self.te = te
-        if(te1 is not None and te2 is not None):
+        if(te1 is not np.nan and te2 is not np.nan):
             self.te1 = te1
             self.te2 = te2
         else:
-            self.te1 = None
-            self.te2 = None
+            self.te1 = np.nan
+            self.te2 = np.nan
 
         # flip phase for PRESS
         self.additional_phi0 = np.pi
@@ -1275,7 +1353,7 @@ class mrs_seq_press(mrs_sequence):
         # PRESS timing implementation
         # 90-a-180-b-c-180-d-FID
         # all in ms
-        if(self.te1 is None and self.te2 is None):
+        if(self.te1 is np.nan and self.te2 is np.nan):
             # not TE1/TE2 specified, assume a symmetric scheme
             a = self.te / 4.0
             bc = self.te / 2.0
@@ -1324,7 +1402,7 @@ class mrs_seq_press(mrs_sequence):
 class mrs_seq_steam(mrs_sequence):
     """A class that represents a general STEAM sequence."""
 
-    def __init__(self, te, tr=3500.0, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, scaling_factor=1.0, tm=20.0):
+    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0, tm=20.0):
         """
         Initialize a virtual STEAM sequence.
 
@@ -1334,6 +1412,10 @@ class mrs_seq_steam(mrs_sequence):
             Echo time (ms)
         tr : float
             Repetition time (ms)
+        na : int
+            Number of averages/excitations
+        ds : int
+            Number of summy scans
         nuclei : string
             Observed nuclei. Examples: "1H", "31P", etc.
         npts : int
@@ -1342,12 +1424,22 @@ class mrs_seq_steam(mrs_sequence):
             Acquisition bandwidth (Hz)
         f0 : float
             Water Larmor frequency (MHz)
+        vref : float
+            Reference voltage (V)
+        shims : list of floats
+            List of shim voltages in volts
+        timestamp : float
+            Timestamp in ms
+        gating_mode : gating_signal_source
+            Acquisition triggering mode
+        eff_acquisition_time : float
+            Effective acquisition time (s)
         scaling_factor : float
             Scaling FID intensity factor
         tm : float
             Mixing time (ms)
         """
-        super().__init__(te, tr, nuclei, npts, fs, f0, scaling_factor)
+        super().__init__(te, tr, na, ds, nuclei, npts, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor)
         # name of sequence
         self.name = "steam (not specific)"
         # type
@@ -1469,7 +1561,7 @@ class mrs_seq_steam(mrs_sequence):
 class mrs_seq_eja_svs_slaser(mrs_sequence):
     """A class that represents the semi-LASER sequence from CMRR."""
 
-    def __init__(self, te, tr=3500.0, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, scaling_factor=1.0, exc_pulse_duration=2.0, exc_pulse_voltage=350.0, rfc_pulse_duration=9.0, rfc_pulse_fa=180.0, rfc_pulse_r=20.0, rfc_pulse_n=1.0, rfc_pulse_voltage=350.0, ref_pulse_voltage=300.0, spoiler_duration=1.0):
+    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0, exc_pulse_duration=2.0, exc_pulse_voltage=350.0, rfc_pulse_duration=9.0, rfc_pulse_fa=180.0, rfc_pulse_r=20.0, rfc_pulse_n=1.0, rfc_pulse_voltage=350.0, ref_pulse_voltage=300.0, spoiler_duration=1.0):
         """
         Initialize a virtual semi-LASER sequence.
 
@@ -1479,6 +1571,10 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
             Echo time (ms)
         tr : float
             Repetition time (ms)
+        na : int
+            Number of averages/excitations
+        ds : int
+            Number of summy scans
         nuclei : string
             Observed nuclei. Examples: "1H", "31P", etc.
         npts : int
@@ -1487,6 +1583,16 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
             Acquisition bandwidth (Hz)
         f0 : float
             Water Larmor frequency (MHz)
+        vref : float
+            Reference voltage (V)
+        shims : list of floats
+            List of shim voltages in volts
+        timestamp : float
+            Timestamp in ms
+        gating_mode : gating_signal_source
+            Acquisition triggering mode
+        eff_acquisition_time : float
+            Effective acquisition time (s)
         scaling_factor : float
             Scaling FID intensity factor
         exc_pulse_duration : float
@@ -1503,12 +1609,10 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
             AHP HSn refocussing pulse N
         rfc_pulse_voltage : float
             AHP HSn refocussing pulse voltage (V)
-        ref_pulse_voltage : float
-            Reference voltage (V)
         spoiler_duration : float
             Spoiler duration (ms)
         """
-        super().__init__(te, tr, nuclei, npts, fs, f0, scaling_factor)
+        super().__init__(te, tr, na, ds, nuclei, npts, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor)
         # name of sequence
         self.name = "eja_svs_slaser"
         # type
@@ -1521,7 +1625,6 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
         self.pulse_rfc_n = rfc_pulse_n
         self.pulse_rfc_voltage = rfc_pulse_voltage
         self.pulse_rfc_npts = None  # no default number of points
-        self.pulse_ref_voltage = ref_pulse_voltage
         # spoiler properties
         self.spoiler_duration = spoiler_duration
 
@@ -1569,7 +1672,7 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
     def _asech(self, x):
         return(ma.acosh(1 / x))
 
-    def _rf_pulse_hsn(self, N: int, n: int, tbw, Tp, trunc=0.01):
+    def _rf_pulse_hsn(self, N: int, n: int, tbw, Tp, trunc=0.01, display=False):
         """
         Return a n-order hyperbolic secant (HSn) RF pulse. This function was 100% taken from the MATLAB FID-A (Jamie Near's code) toolbox and tranlated to Python. It is based on the method of gradient modulated offset-independent adiabaticity as first described by Tannus and Garwood in NMR Biomed 1997; 10:423-434.
 
@@ -1585,6 +1688,8 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
             Duration of the RF pulse (ms)
         trunc : float
             Truncation of the amplitude modulation function
+        display : bool
+            Display resulting time and frequency pulse profiles
 
         Returns
         -------
@@ -1629,6 +1734,37 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
 
         # create phase modulation function
         pulse_phi = np.cumsum(FM) * dt * 360.0
+
+        # display
+        if(display):
+            # display
+            fig = plt.figure(11)
+            fig.clf()
+            axs = fig.subplots(3, 1)
+            fig.canvas.set_window_title("mrs.sim.mrs_seq_eja_svs_slaser._rf_pulse_hsn")
+            fig.suptitle("HSn pulse generation | %.2f ms, BW = %.2f Hz, TBW/R = %.2f, n-order = %d, %d pts" % (Tp, bw, tbw, n, N))
+
+            axs[0].plot(t * 1000.0, pulse_amp, 'k-', linewidth=1)
+            axs[0].set_xlabel('time (ms)')
+            axs[0].set_ylabel('pulse amplitude')
+            axs[0].grid('on')
+
+            axs[1].plot(t * 1000.0, pulse_phi, 'k-', linewidth=1)
+            axs[1].set_ylabel('phase profile')
+            axs[1].grid('on')
+
+            # frequency profile
+            f = np.fft.fftshift(np.fft.fftfreq(int(N), d=(t[1] - t[0])))
+            pulse_cmplx = pulse_amp * np.exp(pulse_phi * 1j)
+            pulse_freq_abs = np.abs(np.fft.fftshift(np.fft.fft(pulse_cmplx)))
+
+            axs[2].plot(f / 1000.0, pulse_freq_abs, 'k-', linewidth=1)
+            axs[2].set_xlabel('frequency (kHz)')
+            axs[2].set_ylabel('frequency profile (magnitude)')
+            axs[2].grid('on')
+
+            fig.subplots_adjust()
+            fig.show()
 
         return(pulse_amp, pulse_phi)
 
@@ -1681,12 +1817,12 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
 
         # find real RF power that was used
         w1_ref_pulse_degs = 180 / (360 * 1e-3)  # deg/s
-        w1_rfc_pulse_degs = self.pulse_rfc_voltage * w1_ref_pulse_degs / self.pulse_ref_voltage  # deg/s
+        w1_rfc_pulse_degs = self.pulse_rfc_voltage * w1_ref_pulse_degs / self.vref  # deg/s
         w1_rfc_pulse_hz = w1_rfc_pulse_degs / (360.0 * pulse_rfc_area)
 
         log.debug("HSn pulse voltage is set to %.2fV" % self.pulse_rfc_voltage)
         log.debug("HSn pulse flip angle is set to %.2fdeg" % self.pulse_rfc_flipangle)
-        log.debug("reference voltage is %.2fV" % self.pulse_ref_voltage)
+        log.debug("reference voltage is %.2fV" % self.vref)
         log.debug("this means the HSn pulse w1max is %.2fHz" % w1_rfc_pulse_hz)
 
         return(w1_rfc_pulse_hz)
@@ -1709,12 +1845,12 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
 
         # find real RF power that was used
         w1_ref_pulse_degs = 180 / (360 * 1e-3)  # deg/s
-        w1_rfc_pulse_degs = self.pulse_rfc_voltage * w1_ref_pulse_degs / self.pulse_ref_voltage  # deg/s
+        w1_rfc_pulse_degs = self.pulse_rfc_voltage * w1_ref_pulse_degs / self.vref  # deg/s
         w1_rfc_pulse_hz = w1_rfc_pulse_degs / (360.0 * pulse_rfc_area)
 
         # prepare RF power triple axis
         w1_range_V = np.linspace(self.pulse_rfc_optim_power_voltage_range[0], self.pulse_rfc_optim_power_voltage_range[1], self.pulse_rfc_optim_power_voltage_n)
-        w1_range_Hz = (w1_range_V * w1_ref_pulse_degs / self.pulse_ref_voltage) / (360.0 * pulse_rfc_area)
+        w1_range_Hz = (w1_range_V * w1_ref_pulse_degs / self.vref) / (360.0 * pulse_rfc_area)
 
         # in uT?
         # gamma = GAMMA_DICT[self.nuclei]
@@ -1762,7 +1898,7 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
 
         # convert back to voltage (usefull for virtual pulse calibration)
         w1_range_degs_optim = w1_range_Hz_optim * 360.0 * pulse_rfc_area  # deg/s
-        self.pulse_rfc_optim_power_voltage = w1_range_degs_optim * self.pulse_ref_voltage / w1_ref_pulse_degs  # V
+        self.pulse_rfc_optim_power_voltage = w1_range_degs_optim * self.vref / w1_ref_pulse_degs  # V
 
         # what would that be in deg?
         # flip angles are linear with voltages
@@ -1824,7 +1960,7 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
 
         log.debug("HSn pulse voltage is set to %.2fV" % self.pulse_rfc_voltage)
         log.debug("HSn pulse flip angle is set to %.2fdeg" % self.pulse_rfc_flipangle)
-        log.debug("reference voltage is %.2fV" % self.pulse_ref_voltage)
+        log.debug("reference voltage is %.2fV" % self.vref)
         log.debug("which is equivalent to a w1max of %.2fHz" % w1_rfc_pulse_hz)
         log.debug("the optimization process gave however something different...")
         log.debug("the optimal w1max found is %.2fHz" % w1_range_Hz_optim)
@@ -1991,7 +2127,7 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
 class mrs_seq_eja_svs_press(mrs_seq_press):
     """A class that represents the PRESS sequence from CMRR."""
 
-    def __init__(self, te, tr=3500.0, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, scaling_factor=1.0, te1=None, te2=None):
+    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0, te1=np.nan, te2=np.nan):
         """
         Initialize a virtual STEAM sequence.
 
@@ -2001,6 +2137,10 @@ class mrs_seq_eja_svs_press(mrs_seq_press):
             Echo time (ms)
         tr : float
             Repetition time (ms)
+        na : int
+            Number of averages/excitations
+        ds : int
+            Number of summy scans
         nuclei : string
             Observed nuclei. Examples: "1H", "31P", etc.
         npts : int
@@ -2009,6 +2149,16 @@ class mrs_seq_eja_svs_press(mrs_seq_press):
             Acquisition bandwidth (Hz)
         f0 : float
             Water Larmor frequency (MHz)
+        vref : float
+            Reference voltage (V)
+        shims : list of floats
+            List of shim voltages in volts
+        timestamp : float
+            Timestamp in ms
+        gating_mode : gating_signal_source
+            Acquisition triggering mode
+        eff_acquisition_time : float
+            Effective acquisition time (s)
         scaling_factor : float
             Scaling FID intensity factor
         te1 : float
@@ -2016,7 +2166,7 @@ class mrs_seq_eja_svs_press(mrs_seq_press):
         te2 : float
             Second part of TE (ms)
         """
-        super().__init__(te, tr, nuclei, npts, fs, f0, scaling_factor, te1, te2)
+        super().__init__(te, tr, na, ds, nuclei, npts, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor, te1, te2)
         # name of sequence
         self.name = "eja_svs_press"
 
@@ -2024,7 +2174,7 @@ class mrs_seq_eja_svs_press(mrs_seq_press):
 class mrs_seq_eja_svs_steam(mrs_seq_steam):
     """A class that represents the STEAM sequence from CMRR."""
 
-    def __init__(self, te, tr=3500.0, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, scaling_factor=1.0, tm=20.0):
+    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0, tm=20.0):
         """
         Initialize a virtual STEAM sequence.
 
@@ -2034,6 +2184,10 @@ class mrs_seq_eja_svs_steam(mrs_seq_steam):
             Echo time (ms)
         tr : float
             Repetition time (ms)
+        na : int
+            Number of averages/excitations
+        ds : int
+            Number of summy scans
         nuclei : string
             Observed nuclei. Examples: "1H", "31P", etc.
         npts : int
@@ -2042,12 +2196,22 @@ class mrs_seq_eja_svs_steam(mrs_seq_steam):
             Acquisition bandwidth (Hz)
         f0 : float
             Water Larmor frequency (MHz)
+        vref : float
+            Reference voltage (V)
+        shims : list of floats
+            List of shim voltages in volts
+        timestamp : float
+            Timestamp in ms
+        gating_mode : gating_signal_source
+            Acquisition triggering mode
+        eff_acquisition_time : float
+            Effective acquisition time (s)
         scaling_factor : float
             Scaling FID intensity factor
         tm : float
             Mixing time (ms)
         """
-        super().__init__(te, tr, nuclei, npts, fs, f0, scaling_factor, tm)
+        super().__init__(te, tr, na, ds, nuclei, npts, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor, tm)
         # name of sequence
         self.name = "eja_svs_steam"
 
@@ -2055,7 +2219,7 @@ class mrs_seq_eja_svs_steam(mrs_seq_steam):
 class mrs_seq_fid(mrs_sequence):
     """A class that represents the pulse-acquire sequence (fid), which is actually a clone of the super class."""
 
-    def __init__(self, te, tr=3500.0, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, scaling_factor=1.0):
+    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0):
         """
         Initialize a virtual FID sequence.
 
@@ -2065,6 +2229,10 @@ class mrs_seq_fid(mrs_sequence):
             Echo time (ms)
         tr : float
             Repetition time (ms)
+        na : int
+            Number of averages/excitations
+        ds : int
+            Number of summy scans
         nuclei : string
             Observed nuclei. Examples: "1H", "31P", etc.
         npts : int
@@ -2073,10 +2241,22 @@ class mrs_seq_fid(mrs_sequence):
             Acquisition bandwidth (Hz)
         f0 : float
             Water Larmor frequency (MHz)
+        vref : float
+            Reference voltage (V)
+        shims : list of floats
+            List of shim voltages in volts
+        timestamp : float
+            Timestamp in ms
+        gating_mode : gating_signal_source
+            Acquisition triggering mode
+        eff_acquisition_time : float
+            Effective acquisition time (s)
+        scaling_factor : float
+            Scaling FID intensity factor
         scaling_factor : float
             Scaling FID intensity factor
         """
-        super().__init__(te, tr, nuclei, npts, fs, f0, scaling_factor)
+        super().__init__(te, tr, na, ds, nuclei, npts, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor)
         # name of sequence
         self.name = "fid"
 
@@ -2084,7 +2264,7 @@ class mrs_seq_fid(mrs_sequence):
 class mrs_seq_svs_se(mrs_seq_press):
     """A class that represents the PRESS sequence from SIEMENS."""
 
-    def __init__(self, te, tr=3500.0, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, scaling_factor=1.0, te1=None, te2=None):
+    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0, te1=np.nan, te2=np.nan):
         """
         Initialize a virtual STEAM sequence.
 
@@ -2094,6 +2274,10 @@ class mrs_seq_svs_se(mrs_seq_press):
             Echo time (ms)
         tr : float
             Repetition time (ms)
+        na : int
+            Number of averages/excitations
+        ds : int
+            Number of summy scans
         nuclei : string
             Observed nuclei. Examples: "1H", "31P", etc.
         npts : int
@@ -2102,6 +2286,16 @@ class mrs_seq_svs_se(mrs_seq_press):
             Acquisition bandwidth (Hz)
         f0 : float
             Water Larmor frequency (MHz)
+        vref : float
+            Reference voltage (V)
+        shims : list of floats
+            List of shim voltages in volts
+        timestamp : float
+            Timestamp in ms
+        gating_mode : gating_signal_source
+            Acquisition triggering mode
+        eff_acquisition_time : float
+            Effective acquisition time (s)
         scaling_factor : float
             Scaling FID intensity factor
         te1 : float
@@ -2109,7 +2303,7 @@ class mrs_seq_svs_se(mrs_seq_press):
         te2 : float
             Second part of TE (ms)
         """
-        super().__init__(te, tr, nuclei, npts, fs, f0, scaling_factor, te1, te2)
+        super().__init__(te, tr, na, nuclei, npts, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor, te1, te2)
         # name of sequence
         self.name = "svs_se"
 
@@ -2117,7 +2311,7 @@ class mrs_seq_svs_se(mrs_seq_press):
 class mrs_seq_svs_st(mrs_seq_steam):
     """A class that represents the STEAM sequence from SIEMENS."""
 
-    def __init__(self, te, tr=3500.0, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, scaling_factor=1.0, tm=20.0):
+    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0, tm=20.0):
         """
         Initialize a virtual STEAM sequence.
 
@@ -2127,6 +2321,10 @@ class mrs_seq_svs_st(mrs_seq_steam):
             Echo time (ms)
         tr : float
             Repetition time (ms)
+        na : int
+            Number of averages/excitations
+        ds : int
+            Number of summy scans
         nuclei : string
             Observed nuclei. Examples: "1H", "31P", etc.
         npts : int
@@ -2135,12 +2333,22 @@ class mrs_seq_svs_st(mrs_seq_steam):
             Acquisition bandwidth (Hz)
         f0 : float
             Water Larmor frequency (MHz)
+        vref : float
+            Reference voltage (V)
+        shims : list of floats
+            List of shim voltages in volts
+        timestamp : float
+            Timestamp in ms
+        gating_mode : gating_signal_source
+            Acquisition triggering mode
+        eff_acquisition_time : float
+            Effective acquisition time (s)
         scaling_factor : float
             Scaling FID intensity factor
         tm : float
             Mixing time (ms)
         """
-        super().__init__(te, tr, nuclei, npts, fs, f0, scaling_factor, tm)
+        super().__init__(te, tr, na, ds, nuclei, npts, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor, tm)
         # name of sequence
         self.name = "svs_st"
 
@@ -2148,7 +2356,7 @@ class mrs_seq_svs_st(mrs_seq_steam):
 class mrs_seq_svs_st_vapor_643(mrs_seq_steam):
     """A class that represents the STEAM sequence from SIEMENS WiP 643."""
 
-    def __init__(self, te, tr=3500.0, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, scaling_factor=1.0, tm=20.0):
+    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0, tm=20.0):
         """
         Initialize a virtual STEAM sequence.
 
@@ -2158,6 +2366,10 @@ class mrs_seq_svs_st_vapor_643(mrs_seq_steam):
             Echo time (ms)
         tr : float
             Repetition time (ms)
+        na : int
+            Number of averages/excitations
+        ds : int
+            Number of summy scans
         nuclei : string
             Observed nuclei. Examples: "1H", "31P", etc.
         npts : int
@@ -2166,12 +2378,22 @@ class mrs_seq_svs_st_vapor_643(mrs_seq_steam):
             Acquisition bandwidth (Hz)
         f0 : float
             Water Larmor frequency (MHz)
+        vref : float
+            Reference voltage (V)
+        shims : list of floats
+            List of shim voltages in volts
+        timestamp : float
+            Timestamp in ms
+        gating_mode : gating_signal_source
+            Acquisition triggering mode
         scaling_factor : float
             Scaling FID intensity factor
+        eff_acquisition_time : float
+            Effective acquisition time (s)
         tm : float
             Mixing time (ms)
         """
-        super().__init__(te, tr, nuclei, npts, fs, f0, scaling_factor, tm)
+        super().__init__(te, tr, na, ds, nuclei, npts, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor, tm)
         # name of sequence
         self.name = "svs_st_vapor_643"
 
@@ -2186,7 +2408,7 @@ class metabolite_basis_set(dict):
     def __setattr__(self, key, value):
         """Overload of __setattr__ method to check that we are not creating a new attribute."""
         if self.__isfrozen and not hasattr(self, key):
-            raise TypeError("You are trying to dynamically create a new attribute (%s) to this object and that is not cool! I will not let you do that because I believe it is a bad habit and can lead to terrible bugs. A clean way of doing this is to initialize your attribute (%s) in the __init__ method of this class. Bisou, bye :)" % (key, key))
+            log.error_new_attribute(key)
         object.__setattr__(self, key, value)
 
     def __init__(self):

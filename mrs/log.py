@@ -158,6 +158,19 @@ def error(s):
     raise Exception(s)
 
 
+def error_new_attribute(a):
+    """
+    Print a special error relative to new attribute creation.
+
+    Parameters
+    ----------
+    a : string
+        Attribute name
+    """
+    s = "Sorry, you cannot create a new attribute (%s) to this object!" % a
+    error(s)
+
+
 class progressbar:
     """A class that deals with console progressbars to show the progression of a process."""
 

@@ -47,38 +47,7 @@ SHRIMP can be used to process and quantify single-voxel Magnetic Resonance SPect
 
 - Find a gitable non-binary format to store the metabolite db and basis sets (I was thinking of FODS but it is not really implemented in conda...)
 
-- Recode the way we input filepaths, legends etc. in dict way and adapt pipeline
-- Write code to convert all existing entries using a fake class
-
-- Subclass reco_db to build a fit_db
-- Reorganize db files for stats:
---- numero inclusion
-    -- P1
-    -- P2
-       -- original hash?
-       -- dataset recopipe, fitpipe
-
-- Find effective acquisition duration !!!
-
-- Add methods to reco to get hand of the analyze results, especially final SNR/LW
-
-- When evaluate water FWHM, also check on non WS data
-
-- Show averaged rejected spectrum to see what crap we are getting out of the signal
-- Recode data rejection with sub-methods + optimize code to speed up? Done, right?
-- Save amplitude, LW, freq, and phase measurement results BEFORE and AFTER
-
-- Better handling of POI ppm for processing: automatic and single
-
-- Find a way to save templates for reco pipeline (pkl?)
-- Optimize reco pipeline parameters by observing raw data SNR and linewidth. ex: no realignment or data-reject based on a poor SNR peak (reasons for so many failures up to now)
-
-- slASER GAMMA implementation: impact for fit on not? check in vitro, etc.
-- Simuler les HSn avec profiles en temps et fréquences, condition d'adiabacité, etc. could help me understand what is wrong with my simulations...
-
----
-
-- implement indivudual spectra phasing
+- Implement individual spectra phasing ?
 
 - HDF5/ISMRMD format save/load: for now, only save the MRS signal with a few attributes. If needed, will complete implementation
 
@@ -87,6 +56,19 @@ SHRIMP can be used to process and quantify single-voxel Magnetic Resonance SPect
 - Merge with Yasmin's code for DW MRS
 
 ## Questions and things to try for the paper
+
+
+- slASER GAMMA implementation: impact for fit on not? check in vitro, etc.
+
+- Process new data 349_AP_P2_MOELLE
+
+- Show group-averaged rejected spectrum
+
+- Evaluate data rejection approach with peak properties estimated before and after
+
+- Compare theory and effective acquisition durations
+
+- Check WS and noWS water FWHM
 
 - Did 2nd order shim help? Check notebooks
 
@@ -105,6 +87,8 @@ SHRIMP can be used to process and quantify single-voxel Magnetic Resonance SPect
 - When doing this, normalize SNR per volume, NA, include NA rejected ? already done? voxel size, position ?
 
 - SNR according to NA plot, normalized or not
+
+- check for intra-subject repro if any data
 
 - What does CRB errors depend on? scatter plots CRBS(met) = f(SNR, FWHM)
 -- Use this to choose which metabolites to include, how many NA are really needed
