@@ -135,16 +135,19 @@ class data_db(dict):
         # for each dataset
         for patient_key in self:
             for study_key in self[patient_key]:
-                study_entry = self[patient_key][study_key]
-                if(check_func(study_entry)):
-                    # passed the test --> adding this study to the new db
+                for hash_key in self[patient_key][study_key]:
+                    this_entry = self[patient_key][study_key][hash_key]
+                    if(check_func(this_entry)):
+                        # passed the test --> adding this study to the new db
 
-                    # init patient if needed
-                    if(patient_key not in list(selected_data_db.keys())):
-                       selected_data_db[patient_key] = {}
+                        # init patient if needed
+                        if(patient_key not in list(selected_data_db.keys())):
+                           selected_data_db[patient_key] = {}
+                        if(study_key not in list(selected_data_db[patient_key].keys())):
+                           selected_data_db[patient_key][study_key] = {}
 
-                    # add study
-                    selected_data_db[patient_key][study_entry] = study_entry
+                        # add study
+                        selected_data_db[patient_key][study_key][hash_key] = this_entry
 
         # print extracted datasets
         selected_data_db.print()
@@ -166,6 +169,7 @@ class data_db(dict):
         selected_data_db = data_db(None)
         found_patient_key = None
         found_study_key = None
+        found_hash_key = None
 
         # reload db file if needed
         if(self._is_linked_to_file()):
@@ -175,16 +179,19 @@ class data_db(dict):
         ts_diff = timedelta(days=99999999)
         for patient_key in self:
             for study_key in self[patient_key]:
-                study_entry = self[patient_key][study_key]
-                this_ts = study_entry["timestamp"]
-                if(ts_diff > (datetime.now() - this_ts)):
-                    ts_diff = (datetime.now() - this_ts)
-                    found_patient_key = patient_key
-                    found_study_key = study_key
+                for hash_key in self[patient_key][study_key]:
+                    this_entry = self[patient_key][study_key][hash_key]
+                    this_ts = this_entry["timestamp"]
+                    if(ts_diff > (datetime.now() - this_ts)):
+                        ts_diff = (datetime.now() - this_ts)
+                        found_patient_key = patient_key
+                        found_study_key = study_key
+                        found_hash_key = hash_key
 
         # add found study
         selected_data_db[found_patient_key] = {}
-        selected_data_db[found_patient_key][found_study_key] = self[found_patient_key][found_study_key]
+        selected_data_db[found_patient_key][found_study_key] = {}
+        selected_data_db[found_patient_key][found_study_key][found_hash_key] = self[found_patient_key][found_study_key][found_hash_key]
 
         return(selected_data_db)
 
@@ -208,16 +215,18 @@ class data_db(dict):
             patient_key_max_len = 10
 
         # now browse and print
-        print("[Patient]".ljust(patient_key_max_len) + "[Study]".ljust(10) + "[RAW]".ljust(10) + "[DCM]".ljust(10) + "[RECO]".ljust(10) + "[FIT]".ljust(10))
+        print("[Patient]".ljust(patient_key_max_len) + "[Study]".ljust(10) + "[hash]".ljust(34) + "[RAW]".ljust(6) + "[DCM]".ljust(6) + "[RECO]".ljust(7) + "[FIT]".ljust(6))
         for patient_key in self:
             for study_key in self[patient_key]:
-                study_entry = self[patient_key][study_key]
-                print(str(patient_key).ljust(patient_key_max_len) +
-                      str(study_key).ljust(10) +
-                      str(study_entry["dataset"]["raw"] is not None).replace("True", " x ").replace("False", "").ljust(10) +
-                      str(study_entry["dataset"]["dcm"] is not None).replace("True", " x ").replace("False", "").ljust(10) +
-                      str(study_entry["reco_pipeline"] is not None).replace("True", " x ").replace("False", "").ljust(10) +
-                      str(study_entry["fit_pipeline"] is not None).replace("True", " x ").replace("False", "").ljust(10))
+                for hash_key in self[patient_key][study_key]:
+                    this_entry = self[patient_key][study_key][hash_key]
+                    print(str(patient_key).ljust(patient_key_max_len) +
+                          str(study_key).ljust(10) +
+                          str(hash_key).ljust(34) +
+                          str(this_entry["dataset"]["raw"] is not None).replace("True", " x ").replace("False", "").ljust(6) +
+                          str(this_entry["dataset"]["dcm"] is not None).replace("True", " x ").replace("False", "").ljust(6) +
+                          str(this_entry["reco_pipeline"] is not None).replace("True", " x ").replace("False", "").ljust(7) +
+                          str(this_entry["fit_pipeline"] is not None).replace("True", " x ").replace("False", "").ljust(6))
 
     def _extract_patient_study_num(self, d):
         """
@@ -294,24 +303,37 @@ class data_db(dict):
             study_id = 0
             log.warning("using patient name instead: [#%d / P%d] !" % (patient_id, study_id))
 
-        # check if dataset already stored, based in patient/study IDs
+        # find hash
+        if(d["raw"]["data"] is None):
+            h = d["dcm"]["data"].data_file_hash
+        else:
+            h = d["raw"]["data"].data_file_hash
+
+        # check if dataset already stored, based in patient/study IDs/hash
         if(patient_id in list(self.keys())):
             if(study_id in list(self[patient_id].keys())):
-                log.debug("dataset [#%d / P%d] already exists!" % (patient_id, study_id))
-                log.debug("--> updating dataset!")
+                log.debug("study [#%d / P%d] already exists!" % (patient_id, study_id))
+                log.debug("--> updating study!")
+                if(h in list(self[patient_id][study_id].keys())):
+                    log.debug("dataset [#%d / P%d / %s] already exists!" % (patient_id, study_id, h))
+                    log.debug("--> updating dataset!")
             else:
                 log.debug("dataset patient [#%d] already exists!" % patient_id)
                 log.debug("--> adding dataset as a new study [P%d]!" % study_id)
+                self[patient_id][study_id] = {}
         else:
             log.debug("--> creating new patient [#%d] already exists!" % patient_id)
             log.debug("--> adding dataset as a new study [P%d]!" % study_id)
             # creating key
             self[patient_id] = {}
+            self[patient_id][study_id] = {}
 
         # add/update with the dataset
         ts = datetime.now()
-        self[patient_id][study_id] = {"patient": patient_id,
+
+        self[patient_id][study_id][h] = {"patient": patient_id,
                                       "study": study_id,
+                                      "hash": h,
                                       "dataset": d,
                                       "reco_pipeline": rp,
                                       "fit_pipeline": None,

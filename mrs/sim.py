@@ -1255,7 +1255,7 @@ class mrs_sequence:
         # adding a few attributes
         s._te = self.te
         s._sequence = self
-        s._noise_level = s.analyze_noise_1d()
+        s._noise_level = s.analyze_noise_nd()
         s.set_display_label(lbl)
         return(s)
 

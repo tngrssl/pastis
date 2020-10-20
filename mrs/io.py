@@ -8,6 +8,7 @@ Stuff related to MRS data file reading.
 
 import suspect
 import suspect.io.twix as sit
+import mapvbvd
 import numpy as np
 from mrs import sim
 from mrs import log
@@ -18,6 +19,7 @@ import os
 import pydicom
 import hashlib
 
+import pdb
 
 class data_file_reader(metaclass=ABCMeta):
     """A virtual class used to read data and acquisition parameters from files. Subclasses depending on MRI constructors."""
@@ -178,7 +180,7 @@ class SIEMENS_data_file_reader(data_file_reader):
                 # well maybe it is broken, maybe the acquisition was interrupted
                 # let's try to read it using this modified verion of suspect.io.load_twix
                 log.debug("reading broken TWIX file...")
-                MRSData_obj = self._load_broken_twix_vb()
+                MRSData_obj = self._load_broken_twix()
         elif(self.file_ext == '.dcm'):
             log.debug("reading DICOM file...")
             MRSData_obj = suspect.io.load_siemens_dicom(self.fullfilepath)
@@ -669,9 +671,46 @@ class SIEMENS_data_file_reader(data_file_reader):
 
         return(acq_time)
 
-    def _load_broken_twix_vb(self):
+    def _load_broken_twix(self):
         """
-        Read broken TWIX files. A modified version of the load_twix / load_twix_vb function from the suspect library. I added some acq_end exception handling to deal with broken twix files that are obtained after interrupting an acquisition.
+        Read broken TWIX files.
+
+        Returns
+        -------
+        broken_data : MRSData oject
+            Data read from file
+        """
+        # try suspect lib
+        # probably reads the header ok but the data will be corrupted
+        broken_raw_data = self._load_broken_twix_suspect()
+
+        # get the actual data
+        broken_raw_data_numpy = self._load_broken_twix_vbvd()
+        broken_raw_data_numpy = np.transpose(broken_raw_data_numpy, (2, 1, 0))
+
+        # doubling dt: somehow vbvd reads twice less points...
+        broken_raw_data.inherit(broken_raw_data_numpy)
+        broken_raw_data._dt = broken_raw_data._dt * 2
+
+        return(broken_raw_data)
+
+    def _load_broken_twix_vbvd(self):
+        """
+        Read broken TWIX files using mapVBVD lib (python >=3.7 only).
+
+        Returns
+        -------
+        broken_data : MRSData oject
+            Data read from file
+        """
+        vbvd_rawdata = mapvbvd.mapVBVD(self.fullfilepath)
+        vbvd_rawdata_sq = np.squeeze(vbvd_rawdata.image[:, :, 0, 0, 0, 0, 0, 0, 0, :, 0, 0, 0, 0, 0, 0])
+
+        return(vbvd_rawdata_sq)
+
+    def _load_broken_twix_suspect(self):
+        """
+        Read broken TWIX files using mapVBVD lib (python >=3.7 only).
 
         Returns
         -------
@@ -722,8 +761,7 @@ class SIEMENS_data_file_reader(data_file_reader):
                 # pack_flag = (temp >> 25) & 1
                 # PCI_rx = temp >> 26
 
-                meas_uid, scan_counter, time_stamp, pmu_time_stamp = struct.unpack(
-                    "IIII", fin.read(16))
+                meas_uid, scan_counter, time_stamp, pmu_time_stamp = struct.unpack("IIII", fin.read(16))
 
                 # next long int is actually a lot of bit flags
                 # a lot of them don't seem to be relevant for spectroscopy
@@ -817,7 +855,7 @@ def read_physio_file(physio_filepath):
     Parameters
     ----------
     physio_filepath: string
-        Full absolute file path pointing to phusio log file
+        Full absolute file path pointing to physio log file
 
     Returns
     -------

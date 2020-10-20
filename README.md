@@ -45,9 +45,9 @@ SHRIMP can be used to process and quantify single-voxel Magnetic Resonance SPect
 
 ## TODO
 
-- Find a gitable non-binary format to store the metabolite db and basis sets (I was thinking of FODS but it is not really implemented in conda...)
+- Parallelize stuff: data rejecting approaches
 
-- Implement individual spectra phasing ?
+- Find a gitable non-binary format to store the metabolite db and basis sets (I was thinking of FODS but it is not really implemented in conda...)
 
 - HDF5/ISMRMD format save/load: for now, only save the MRS signal with a few attributes. If needed, will complete implementation
 
@@ -57,6 +57,7 @@ SHRIMP can be used to process and quantify single-voxel Magnetic Resonance SPect
 
 ## Questions and things to try for the paper
 
+- easy: check SNR threshold for which we need to but NA=2 or 4 moving average during processing
 
 - slASER GAMMA implementation: impact for fit on not? check in vitro, etc.
 
