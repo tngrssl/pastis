@@ -10,7 +10,6 @@ A user script related to simulation.
 from IPython import get_ipython
 import matplotlib.pylab as plt
 import mrs.aliases as xxx
-import mrs.reco as reco
 import mrs.sim as sim
 import mrs.fit as fit
 import mrs.log as log
@@ -32,7 +31,6 @@ plt.rcParams['figure.max_open_warning'] = 1000
 plt.rcParams['font.size'] = 9
 log.setLevel(log.DEBUG)
 
-rdb = reco.data_db()
 # %% generate sequence database
 
 # metabolite db

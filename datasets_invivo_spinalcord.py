@@ -35,7 +35,6 @@ p.job_list = [  p.job["phasing"],
                 p.job["apodizing"],
                 p.job["realigning"],
                 p.job["data-rejecting"],
-                p.job["data-rejecting"],
                 p.job["averaging"],
                 p.job["calibrating"],
                 # p.job["water-removal"],
@@ -63,7 +62,6 @@ p.job_list = [  p.job["phasing"],
                 p.job["apodizing"],
                 p.job["realigning"],
                 p.job["data-rejecting"],
-                p.job["data-rejecting"],
                 p.job["averaging"],
                 p.job["calibrating"],
                 # p.job["water-removal"],
@@ -90,7 +88,6 @@ p.job_list = [  p.job["phasing"],
                 p.job["apodizing"],
                 p.job["realigning"],
                 p.job["data-rejecting"],
-                p.job["data-rejecting"],
                 p.job["averaging"],
                 p.job["calibrating"],
                 # p.job["water-removal"],
@@ -101,6 +98,7 @@ p.job_list = [  p.job["phasing"],
 p.save_template("sc_std_nows_noadj")
 
 # %% 15/03/2019 - 291-vs-moelle-spectro-p1 - concatenated STEAM #1 :(
+# not included in group, the protocol was not ead, RFC pulses were too short...
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -122,10 +120,12 @@ p.dataset[3]["legend"] = "STEAM #1"
 p.dataset[3]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/291-vs-moelle-spectro-p1/meas_MID110_svs_st_vapor_643_optim_trig_FID29473.dat",
                                 "/home/tangir/crmbm/acq_twix/291-vs-moelle-spectro-p1/meas_MID109_svs_st_vapor_643_optim_trig_FID29472.dat"]
 
-p.run()
-p.save_datasets(rdb)
+# p.run()
+# p.check_analyze_results()
+# p.save_datasets(rdb)
 
 # %% 15/03/2019 - 291-vs-moelle-spectro-p1 - concatenated sLASER #1 :(
+# not included in group, the protocol was not ead, RFC pulses were too short...
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -147,11 +147,12 @@ p.dataset[3]["legend"] = "sLASER #1"
 p.dataset[3]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/291-vs-moelle-spectro-p1/meas_MID122_eja_svs_slaser_optim_trig_FID29485.dat",
                                 "/home/tangir/crmbm/acq_twix/291-vs-moelle-spectro-p1/meas_MID121_eja_svs_slaser_optim_trig_FID29484.dat"]
 
-p.run()
-p.save_datasets(rdb)
+# p.run()
+# p.check_analyze_results()
+# p.save_datasets(rdb)
 
 # %% 15/03/2019 - 291-vs-moelle-spectro-p1 - sLASER #2 :(
-# RFC pulses were too short...
+# not included in group, the protocol was not ead, RFC pulses were too short...
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -160,11 +161,15 @@ p = reco.pipeline("sc_std_nows")
 p.dataset[0]["legend"] = "sLASER #2"
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/291-vs-moelle-spectro-p1/meas_MID146_eja_svs_slaser_optim_trig_FID29509.dat",
                                 "/home/tangir/crmbm/acq_twix/291-vs-moelle-spectro-p1/meas_MID145_eja_svs_slaser_optim_trig_FID29508.dat"]
+p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/291-vs-moelle-spectro-p1/20190315/01_0043_eja-svs-slaser-optim-trig",
+                                "/home/tangir/crmbm/acq/291-vs-moelle-spectro-p1/20190315/01_0042_eja-svs-slaser-optim-trig"]
 
-p.run()
-p.save_datasets(rdb)
+# p.run()
+# p.check_analyze_results()
+# p.save_datasets(rdb)
 
 # %% 26/06/2019 - 296_ym_p1_brainmoelle - Yasmin :)
+# STEAM is shit, sLASER is ok
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -182,7 +187,9 @@ p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/296_ym_p1_brainmoelle/29
 p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/296_ym_p1_brainmoelle/meas_MID157_slaser_R_N=20+_1_longTE_SNR++++_FID34191.dat",
                                 "/home/tangir/crmbm/acq_twix/296_ym_p1_brainmoelle/meas_MID155_slaser_R_N=20+_1_longTE_SNR++++_FID34189.dat"]
 
+p.job["data-rejecting"]["auto_method_list"] = None
 p.run()
+p.check_analyze_results(True)
 p.save_datasets(rdb)
 
 # %% 16/07/2019 - 300-pm-p1-moelle - Pelayo :)
@@ -200,6 +207,7 @@ p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/300-pm-p1-moelle/2019071
 p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/300-pm-p1-moelle/meas_MID63_slaser_R_N=20+_1_longTE_SNR++++_FID35516.dat"]
 
 p.run()
+p.check_analyze_results()
 p.save_datasets(rdb)
 
 # %% 14/08/2019 - 304-ka-p1-moelle - Karen :(
@@ -211,9 +219,8 @@ p = reco.pipeline("sc_std_nows")
 p.dataset[0]["legend"] = "crappy"
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/304-ka-p1-moelle/20190814/01_0013_slaser-r-n/original-primary_e09_0001.dcm"]
 
-p.job["apodizing"]["damping_hz"] = 20
-
 p.run()
+p.check_analyze_results()
 p.save_datasets(rdb)
 
 # %% 21/08/2019 - 307-ap-p1-moelle - Ariane :)
@@ -240,13 +247,17 @@ p.dataset[2]["dcm"]["files"] = ["/home/tangir/crmbm/acq/307-ap-p1-moelle/2019082
 p.dataset[2]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/307-AP-P1-MOELLE/meas_MID106_slaser_R_N=20+_1_longTE_SNR++++_FID38627.dat",
                                 "/home/tangir/crmbm/acq_twix/307-AP-P1-MOELLE/meas_MID107_slaser_R_N=20+_1_longTE_SNR++++_FID38628.dat"]
 
-p.dataset[3]["legend"] = "sLASER 10:1 repos. + resp trig (DCM)"
+p.dataset[3]["legend"] = "sLASER 10:2 repos. + resp trig"
 p.dataset[3]["dcm"]["files"] = ["/home/tangir/crmbm/acq/307-ap-p1-moelle/20190821/01_0018_slaser-r-n",
                                 "/home/tangir/crmbm/acq/307-ap-p1-moelle/20190821/01_0019_slaser-r-n"]
 p.dataset[3]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/307-AP-P1-MOELLE/meas_MID123_slaser_R_N=10_2_longTE_SNR+++_FID38644.dat",
                                 "/home/tangir/crmbm/acq_twix/307-AP-P1-MOELLE/meas_MID124_slaser_R_N=10_2_longTE_SNR+++_FID38645.dat"]
 
+p.job["realigning"]["moving_averages"] = 2
+p.job["data-rejecting"]["moving_averages"] = 2
+
 p.run()
+p.check_analyze_results(True)
 p.save_datasets(rdb)
 
 # %% 27/08/2019 - 308-rs-p1-moelle - Ocha :)
@@ -255,16 +266,20 @@ plt.close("all")
 
 p = reco.pipeline("sc_std_nows")
 
-p.dataset[0]["legend"] = "sLASER 20:1 resp trig (DCM)"
+p.dataset[0]["legend"] = "sLASER 20:1 resp trig"
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/308-rs-p1-moelle/20190827/01_0008_slaser-r-n/original-primary_e09_0001.dcm",
                                 "/home/tangir/crmbm/acq/308-rs-p1-moelle/20190827/01_0009_slaser-r-n/original-primary_e09_0001.dcm"]
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/308-rs-p1-moelle/meas_MID165_slaser_R_N=20+_1_longTE_SNR++++_FID38910.dat",
                                 "/home/tangir/crmbm/acq_twix/308-rs-p1-moelle/meas_MID166_slaser_R_N=20+_1_longTE_SNR++++_FID38911.dat"]
 
-p.job["calibrating"]["POI_range_ppm"] = [3, 3.3]
-p.job["calibrating"]["POI_true_ppm"] = 3.02
+p.settings["POI_range_ppm"] = [4.5, 4.8]
+p.job["realigning"]["moving_averages"] = 2
+p.job["data-rejecting"]["auto_method_list"] = [reco.data_rejection_method.AUTO_AMPLITUDE,
+                                               reco.data_rejection_method.AUTO_LINEWIDTH,
+                                               reco.data_rejection_method.AUTO_FREQUENCY]
 
 p.run()
+p.check_analyze_results()
 p.save_datasets(rdb)
 
 # %% 29/08/2019 - 310-mg-p1-moelle - Maxime :s
@@ -279,10 +294,15 @@ p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/310-mg-p1-moelle/2019082
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/310-mg-p1-moelle/meas_MID140_slaser_R_N=20+_1_longTE_SNR++++_FID39212.dat",
                                 "/home/tangir/crmbm/acq_twix/310-mg-p1-moelle/meas_MID142_slaser_R_N=20+_1_longTE_SNR++++_FID39214.dat"]
 
+# do not realign
+p.job_list.remove(p.job["realigning"])
+p.job["data-rejecting"]["moving_averages"] = 8
+
 p.run()
+p.check_analyze_results(True)
 p.save_datasets(rdb)
 
-# %% 05/09/2019 - 311-sl-p1-moelle - Simon :)
+# %% 05/09/2019 - 311-sl-p1-moelle - Simon :))
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -295,6 +315,7 @@ p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/311-sl-p1-moelle/me
                                 "/home/tangir/crmbm/acq_twix/311-sl-p1-moelle/meas_MID124_slaser_R_N=20+_1_longTE_SNR++++_FID39736.dat"]
 
 p.run()
+p.check_analyze_results(True)
 p.save_datasets(rdb)
 
 # %% 23/09/2019 - 313-ft-p1-moelle - Fransiska :|
@@ -309,10 +330,15 @@ p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/313-ft-p1-moelle/2019092
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/313-ft-p1-moelle/meas_MID68_slaser_R_N=20+_1_longTE_SNR++++_FID41500.dat",
                                 "/home/tangir/crmbm/acq_twix/313-ft-p1-moelle/meas_MID65_slaser_R_N=20+_1_longTE_SNR++++_FID41497.dat"]
 
+p.job["realigning"]["moving_averages"] = 2
+p.job["data-rejecting"]["moving_averages"] = 2
+
 p.run()
+p.check_analyze_results(True)
 p.save_datasets(rdb)
 
 # %% 25/09/2019 - 314-yt-p1-moelle - Yolanda :)))
+# lw reduced, snr slight loss
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -331,10 +357,15 @@ p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/314-yt-p1-moelle/2019092
 p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/314-yt-p1-moelle/meas_MID88_slaser_R_N=5_5+_shortTE_SNR++_FID41686.dat",
                                 "/home/tangir/crmbm/acq_twix/314-yt-p1-moelle/meas_MID86_slaser_R_N=5_5+_shortTE_SNR++_FID41684.dat"]
 
+p.job["realigning"]["moving_averages"] = 2
+p.job["data-rejecting"]["moving_averages"] = 2
+
 p.run()
+p.check_analyze_results(True)
 p.save_datasets(rdb)
 
 # %% 03/10/2019 - 316-ap-p1-moelle - Anissa :)
+# ok for me
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -354,10 +385,16 @@ p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/316-ap-p1-moelle/me
                                 "/home/tangir/crmbm/acq_twix/316-ap-p1-moelle/meas_MID47_slaser_R_N=5_5+_shortTE_SNR++_FID42206.dat"]
 p.dataset[1]["physio-file"] = "/home/tangir/crmbm/acq_physio/316_AP_P1_MOELLE.resp"
 
+p.settings["POI_range_ppm"] = [4.5, 4.8]
+p.settings["POI_shift_range_ppm"] = [4.5, 4.8]
+p.settings["POI_LW_range_ppm"] = [4.5, 4.8]
+
 p.run()
+p.check_analyze_results(True)
 p.save_datasets(rdb)
 
 # %% 17/10/2019 - 319-fc-p1-moelle - Fernando :)
+# passing ok, LWdcm = LWraw
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -375,13 +412,12 @@ p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/319-fc-p1-moelle/2019101
 p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/319-fc-p1-moelle/meas_MID147_slaser_R_N=10_2_longTE_SNR+++_FID43725.dat",
                                 "/home/tangir/crmbm/acq_twix/319-fc-p1-moelle/meas_MID145_slaser_R_N=10_2_longTE_SNR+++_FID43723.dat"]
 
-# probably bad ref scan: only NA=1, no phase cycling
-p.job["channel-combining"]["using_ref_data"] = False
-
 p.run()
+p.check_analyze_results(True)
 p.save_datasets(rdb)
 
 # %% 05/11/2019 - 328-af-p1-moelle - Anne :)
+#
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -393,28 +429,37 @@ p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/328-af-p1-moelle/2019110
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/328-af-p1-moelle/meas_MID64_slaser_R_N=20+_1_longTE_SNR++++_FID45771.dat",
                                 "/home/tangir/crmbm/acq_twix/328-af-p1-moelle/meas_MID66_slaser_R_N=20+_1_longTE_SNR++++_FID45773.dat"]
 
+p.job["realigning"]["moving_averages"] = 4
+p.job["data-rejecting"]["moving_averages"] = 1
+
 p.run()
+p.check_analyze_results(True)
 p.save_datasets(rdb)
 
 # %% 08/11/2019 - 329-pi-p1-moelle - Pujalina :)
+# dcm better than raw, but ok
 get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline("sc_std_nows")
 
 p.dataset[0]["legend"] = "sLASER 20:1"
-p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/329-pi-p1-moelle/20191108/01_0008_slaser-r-n/original-primary_e09_0001.dcm",
-                                "/home/tangir/crmbm/acq/329-pi-p1-moelle/20191108/01_0009_slaser-r-n/original-primary_e09_0001.dcm"]
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/329-pi-p1-moelle/meas_MID169_slaser_R_N=20+_1_longTE_SNR++++_FID46233.dat",
                                 "/home/tangir/crmbm/acq_twix/329-pi-p1-moelle/meas_MID170_slaser_R_N=20+_1_longTE_SNR++++_FID46234.dat"]
+p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/329-pi-p1-moelle/20191108/01_0008_slaser-r-n/original-primary_e09_0001.dcm",
+                                "/home/tangir/crmbm/acq/329-pi-p1-moelle/20191108/01_0009_slaser-r-n/original-primary_e09_0001.dcm"]
 
 p.dataset[1]["legend"] = "sLASER 10:2"
-p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/329-pi-p1-moelle/20191108/01_0012_slaser-r-n/original-primary_e09_0001.dcm",
-                                "/home/tangir/crmbm/acq/329-pi-p1-moelle/20191108/01_0013_slaser-r-n/original-primary_e09_0001.dcm"]
 p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/329-pi-p1-moelle/meas_MID180_slaser_R_N=10_2_longTE_SNR+++_FID46244.dat",
                                 "/home/tangir/crmbm/acq_twix/329-pi-p1-moelle/meas_MID181_slaser_R_N=10_2_longTE_SNR+++_FID46245.dat"]
+p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/329-pi-p1-moelle/20191108/01_0012_slaser-r-n/original-primary_e09_0001.dcm",
+                                "/home/tangir/crmbm/acq/329-pi-p1-moelle/20191108/01_0013_slaser-r-n/original-primary_e09_0001.dcm"]
+
+p.job["realigning"]["moving_averages"] = 2
+p.job["data-rejecting"]["moving_averages"] = 2
 
 p.run()
+p.check_analyze_results(True)
 p.save_datasets(rdb)
 
 # %% 26/11/2019 - 333-sc-p1-moelle - Shirley :(
@@ -427,17 +472,27 @@ p = reco.pipeline("sc_std_nows")
 p.dataset[0]["legend"] = "sLASER 20:1"
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/333-sc-p1-moelle/20191126/01_0008_slaser-r-n",
                                 "/home/tangir/crmbm/acq/333-sc-p1-moelle/20191126/01_0010_slaser-r-n"]
-p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/333-sc-p1-moelle/meas_MID123_slaser_R_N=20+_1_longTE_SNR++++_FID47359.dat"]
+# p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/333-sc-p1-moelle/meas_MID123_slaser_R_N=20+_1_longTE_SNR++++_FID47359.dat"]
 
 p.dataset[1]["legend"] = "sLASER 20:1 IR"
 p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/333-sc-p1-moelle/20191126/01_0009_slaser-r-n",
                                 "/home/tangir/crmbm/acq/333-sc-p1-moelle/20191126/01_0010_slaser-r-n"]
 p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/333-sc-p1-moelle/meas_MID126_slaser_R_N=20+_1_longTE_SNR++++_FID47362.dat"]
 
+# water peak very small and close to 5ppm artefact
+p.settings["POI_range_ppm"] = [4.5, 4.8]
+p.settings["POI_shift_range_ppm"] = [4.5, 4.8]
+p.settings["POI_LW_range_ppm"] = [4.5, 4.8]
+
+p.job["phasing"]["offset"] = 3.1416
+
+p.settings["datasets_indexes"] = 0
 p.run()
+p.check_analyze_results()
 p.save_datasets(rdb)
 
 # %% 09/12/2019 - 336-nb-p1-moelle - Naouelle :s
+# looks ok
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -456,9 +511,15 @@ p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/336-nb-p1-moelle/me
                                 "/home/tangir/crmbm/acq_twix/336-nb-p1-moelle/meas_MID75_slaser_R_N=20+_1_longTE_SNR++++_FID48206.dat"]
 
 # probably bad ref scan: only NA=1, no phase cycling
-p.job["channel-combining"]["using_ref_data"] = False
+# p.job["channel-combining"]["using_ref_data"] = False
 
+p.job["realigning"]["moving_averages"] = 4
+p.job["realigning"]["inter_corr_mode"] = True
+p.job["data-rejecting"]["moving_averages"] = 2
+
+p.settings["datasets_indexes"] = 0
 p.run()
+p.check_analyze_results(True)
 p.save_datasets(rdb)
 
 # %% 10/12/2019 - 338-ro-p1-moelle - Rischa :)
@@ -481,7 +542,9 @@ p.dataset[2]["legend"] = "sLASER 20:1 IR"
 p.dataset[2]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/338-ro-p1-moelle/meas_MID118_slaser_R_N=20+_1_longTE_SNR++++_FID48500.dat",
                                 "/home/tangir/crmbm/acq_twix/338-ro-p1-moelle/meas_MID116_slaser_R_N=20+_1_longTE_SNR++++_FID48498.dat"]
 
+p.settings["datasets_indexes"] = 0
 p.run()
+p.check_analyze_results(True)
 p.save_datasets(rdb)
 
 # %% 28/01/2019 - 300-pm-p2-moelle - Pelayo P2 :)
@@ -491,54 +554,53 @@ plt.close("all")
 p = reco.pipeline("sc_std_nows")
 
 p.dataset[0]["legend"] = "sLASER 20:1 (REF with OVS)"
-p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/300-pm-p2-moelle/20200128/01_0011_slaser-r-n/original-primary_e09_0001.dcm",
-                                "/home/tangir/crmbm/acq/300-pm-p2-moelle/20200128/01_0012_slaser-r-n/original-primary_e09_0001.dcm"]
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/300-pm-p2-moelle/meas_MID68_slaser_R_N=20+_1_longTE_SNR++++_FID50926.dat",
                                 "/home/tangir/crmbm/acq_twix/300-pm-p2-moelle/meas_MID69_slaser_R_N=20+_1_longTE_SNR++++_FID50927.dat"]
+p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/300-pm-p2-moelle/20200128/01_0011_slaser-r-n/original-primary_e09_0001.dcm",
+                                "/home/tangir/crmbm/acq/300-pm-p2-moelle/20200128/01_0012_slaser-r-n/original-primary_e09_0001.dcm"]
 
 p.dataset[1]["legend"] = "STEAM IR (REF with OVS)"
 p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/300-pm-p2-moelle/meas_MID62_steam_shortTE_SNR+_FID50920.dat",
                                 "/home/tangir/crmbm/acq_twix/300-pm-p2-moelle/meas_MID64_steam_shortTE_SNR+_FID50922.dat"]
 
-p.dataset[2]["legend"] = "STEAM IR (REF without OVS)"
-p.dataset[2]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/300-pm-p2-moelle/meas_MID62_steam_shortTE_SNR+_FID50920.dat",
-                                "/home/tangir/crmbm/acq_twix/300-pm-p2-moelle/meas_MID65_steam_shortTE_SNR+_FID50923.dat"]
-
-p.dataset[3]["legend"] = "sLASER 20:1 (REF without OVS)"
-p.dataset[3]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/300-pm-p2-moelle/meas_MID68_slaser_R_N=20+_1_longTE_SNR++++_FID50926.dat",
-                                "/home/tangir/crmbm/acq_twix/300-pm-p2-moelle/meas_MID70_slaser_R_N=20+_1_longTE_SNR++++_FID50928.dat"]
-
-p.dataset[4]["legend"] = "sLASER IR 5:5 (REF with OVS)"
-p.dataset[4]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/300-pm-p2-moelle/meas_MID73_slaser_R_N=5_5+_shortTE_SNR++_FID50931.dat",
+p.dataset[2]["legend"] = "sLASER IR 5:5 (REF with OVS)"
+p.dataset[2]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/300-pm-p2-moelle/meas_MID73_slaser_R_N=5_5+_shortTE_SNR++_FID50931.dat",
                                 "/home/tangir/crmbm/acq_twix/300-pm-p2-moelle/meas_MID74_slaser_R_N=5_5+_shortTE_SNR++_FID50932.dat"]
 
-p.dataset[5]["legend"] = "sLASER IR 5:5 (REF without OVS)"
-p.dataset[5]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/300-pm-p2-moelle/meas_MID73_slaser_R_N=5_5+_shortTE_SNR++_FID50931.dat",
-                                "/home/tangir/crmbm/acq_twix/300-pm-p2-moelle/meas_MID75_slaser_R_N=5_5+_shortTE_SNR++_FID50933.dat"]
-
+p.settings["datasets_indexes"] = 0
 p.run()
+p.check_analyze_results()
 p.save_datasets(rdb)
 
 # %% 06/02/2019 - 349-ap-p1-moelle - Ahmad Fajar :|
+# 3-5ppm region fucked  up
 get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline("sc_std_nows")
 
 p.dataset[0]["legend"] = "sLASER 10:2 (REF with OVS)"
-p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/349-ap-p1-moelle/20200206/01_0006_slaser-r-n/original-primary_e09_0001.dcm",
-                                "/home/tangir/crmbm/acq/349-ap-p1-moelle/20200206/01_0007_slaser-r-n/original-primary_e09_0001.dcm"]
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/349-ap-p1-moelle/meas_MID313_slaser_R_N=10_2_longTE_SNR+++_FID51947.dat",
                                 "/home/tangir/crmbm/acq_twix/349-ap-p1-moelle/meas_MID314_slaser_R_N=10_2_longTE_SNR+++_FID51948.dat"]
+p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/349-ap-p1-moelle/20200206/01_0006_slaser-r-n/original-primary_e09_0001.dcm",
+                                "/home/tangir/crmbm/acq/349-ap-p1-moelle/20200206/01_0007_slaser-r-n/original-primary_e09_0001.dcm"]
 
 p.dataset[1]["legend"] = "sLASER 10:2 (REF without OVS)"
 p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/349-ap-p1-moelle/meas_MID313_slaser_R_N=10_2_longTE_SNR+++_FID51947.dat",
                                 "/home/tangir/crmbm/acq_twix/349-ap-p1-moelle/meas_MID315_slaser_R_N=10_2_longTE_SNR+++_FID51949.dat"]
+p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/349-ap-p1-moelle/20200206/01_0006_slaser-r-n/original-primary_e09_0001.dcm",
+                                "/home/tangir/crmbm/acq/349-ap-p1-moelle/20200206/01_0008_slaser-r-n/original-primary_e09_0001.dcm"]
 
+p.job["realigning"]["moving_averages"] = 4
+p.job["data-rejecting"]["moving_averages"] = 2
+
+p.settings["datasets_indexes"] = 0
 p.run()
+p.check_analyze_results(True)
 p.save_datasets(rdb)
 
 # %% 24/02/2019 - 355-st-p1-moelle - Steven :)
+# raw looks actually better than dcm, but not the estimated snr
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -550,10 +612,17 @@ p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/355-st-p1-moelle/me
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/355-st-p1-moelle/20200224/01_0008_slaser-r-n/original-primary_e09_0001.dcm",
                                 "/home/tangir/crmbm/acq/355-st-p1-moelle/20200224/01_0009_slaser-r-n/original-primary_e09_0001.dcm"]
 
+p.job["realigning"]["moving_averages"] = 7
+p.job["data-rejecting"]["moving_averages"] = 2
+
 p.run()
+p.check_analyze_results()
 p.save_datasets(rdb)
 
-# %% 04/03/2020 - 304-ka-p2-moelle - Karen P2 :|
+# %% 04/03/2020 - 304-ka-p2-moelle - Karen P2 :(
+# dataset #0 contains big water artefact, data quality is horrible, could not make it happen
+# dataset #1, a bit better but still not good enough
+
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -571,12 +640,19 @@ p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/304-ka-p2-moelle/me
 p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/304-ka-p2-moelle/20200304/01_0019_slaser-r-n/original-primary_e09_0001.dcm",
                                 "/home/tangir/crmbm/acq/304-ka-p2-moelle/20200304/01_0020_slaser-r-n/original-primary_e09_0001.dcm"]
 
+
 # water peak very small and close to 5ppm artefact
-p.job["analyzing-lw"]["POI_range_ppm"] = [4.5, 4.8]
-p.job["phasing"]["POI_range_ppm"] = [4.5, 4.8]
-p.job["data-rejecting"]["POI_range_ppm"] = [4.5, 4.8]
+p.job["phasing"]["using_ref_data"] = False
+p.settings["POI_range_ppm"] = [4.5, 4.8]
+p.settings["POI_shift_range_ppm"] = [4.5, 4.8]
+p.settings["POI_LW_range_ppm"] = [4.5, 4.8]
+
+p.job["realigning"]["moving_averages"] = 2
+p.job["data-rejecting"]["moving_averages"] = 4
+p.job["realigning"]["inter_corr_mode"] = True
 
 p.run()
+p.check_analyze_results(True)
 p.save_datasets(rdb)
 
 # %% 30/05/2020 - 311-sl-p2-moelle - Simon P2 :)
@@ -597,10 +673,14 @@ p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/311-sl-p2-moelle/me
 p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/311-sl-p2-moelle/20200529/01_0011_slaser-r-n/original-primary_e09_0001.dcm",
                                 "/home/tangir/crmbm/acq/311-sl-p2-moelle/20200529/01_0012_slaser-r-n/original-primary_e09_0001.dcm"]
 
+p.job["realigning"]["moving_averages"] = 2
+p.job["data-rejecting"]["moving_averages"] = 2
 p.run()
+p.check_analyze_results(True)
 p.save_datasets(rdb)
 
 # %% 09/06/2020 - 336-nb-p2-moelle - Naouelle P2 :)
+# data #2 did not pass quality check, did my best
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -609,20 +689,32 @@ p = reco.pipeline("sc_std_nows")
 p.dataset[0]["legend"] = "sLASER 20/1 NA=128 trig"
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID98_slaser_R_N=20+_1_longTE_SNR++++_FID57305.dat",
                                 "/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID100_slaser_R_N=20+_1_longTE_SNR++++_FID57307.dat"]
+p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/336-nb-p2-moelle/20200609/01_0008_slaser-r-n",
+                                "/home/tangir/crmbm/acq/336-nb-p2-moelle/20200609/01_0009_slaser-r-n"]
+
 
 p.dataset[1]["legend"] = "sLASER 20/1 NA=64 notrig"
 p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID103_slaser_R_N=20+_1_longTE_SNR++++_FID57310.dat",
                                 "/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID105_slaser_R_N=20+_1_longTE_SNR++++_FID57312.dat"]
+p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/336-nb-p2-moelle/20200609/01_0010_slaser-r-n",
+                                "/home/tangir/crmbm/acq/336-nb-p2-moelle/20200609/01_0011_slaser-r-n"]
 
 p.dataset[2]["legend"] = "sLASER 10/2 NA=64 notrig"
 p.dataset[2]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID122_slaser_R_N=10_2_longTE_SNR+++_FID57329.dat",
                                 "/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID124_slaser_R_N=10_2_longTE_SNR+++_FID57331.dat"]
+p.dataset[2]["dcm"]["files"] = ["/home/tangir/crmbm/acq/336-nb-p2-moelle/20200609/01_0013_slaser-r-n",
+                                "/home/tangir/crmbm/acq/336-nb-p2-moelle/20200609/01_0014_slaser-r-n"]
 
-p.dataset[3]["legend"] = "sLASER 5/1 NA=64 notrig"
+p.dataset[3]["legend"] = "sLASER 5/5 NA=64 notrig"
 p.dataset[3]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID127_slaser_R_N=5_5+_shortTE_SNR++_FID57334.dat",
                                 "/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID129_slaser_R_N=5_5+_shortTE_SNR++_FID57336.dat"]
+p.dataset[3]["dcm"]["files"] = ["/home/tangir/crmbm/acq/336-nb-p2-moelle/20200609/01_0015_slaser-r-n",
+                                "/home/tangir/crmbm/acq/336-nb-p2-moelle/20200609/01_0016_slaser-r-n"]
 
+p.job["realigning"]["moving_averages"] = 2
+p.job["data-rejecting"]["moving_averages"] = 2
 p.run()
+p.check_analyze_results(True)
 p.save_datasets(rdb)
 
 # %% 11/06/2020 - 319-fc-p2-moelle - Fernando P2 :)
@@ -638,9 +730,11 @@ p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/319-fc-p2-moelle/2020061
                                 "/home/tangir/crmbm/acq/319-fc-p2-moelle/20200611/01_0013_slaser-r-n/original-primary_e09_0001.dcm"]
 
 p.run()
+p.check_analyze_results()
 p.save_datasets(rdb)
 
 # %% 15/06/2020 - 313-ft-p2-moelle - Fransiska P2 :|
+# did not pass quality check, raw data looks contaminated with some shit
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -652,7 +746,10 @@ p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/313-ft-p2-moelle/me
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/313-ft-p2-moelle/20200615/01_0011_slaser-r-n/original-primary_e09_0001.dcm",
                                 "/home/tangir/crmbm/acq/313-ft-p2-moelle/20200615/01_0012_slaser-r-n/original-primary_e09_0001.dcm"]
 
+p.job["realigning"]["moving_averages"] = 2
+p.job["data-rejecting"]["moving_averages"] = 4
 p.run()
+p.check_analyze_results(True)
 p.save_datasets(rdb)
 
 # %% 19/06/2020 - 333-sc-p2-moelle - Shirley P2 :|
@@ -673,6 +770,7 @@ p.job["phasing"]["POI_range_ppm"] = [4.5, 4.8]
 p.job["data-rejecting"]["POI_range_ppm"] = [4.5, 4.8]
 
 p.run()
+p.check_analyze_results(True)
 p.save_datasets(rdb)
 
 # %% 25/06/2020 - 314-yt-p2-moelle - Yolanda P2 :)))
@@ -684,6 +782,38 @@ p = reco.pipeline("sc_std_nows")
 p.dataset[0]["legend"] = "sLASER 20/1 NA=128"
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/314-yt-p2-moelle/meas_MID98_slaser_R_N=20+_1_longTE_SNR++++_FID59064.dat",
                                 "/home/tangir/crmbm/acq_twix/314-yt-p2-moelle/meas_MID99_slaser_R_N=20+_1_longTE_SNR++++_FID59065.dat"]
+p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/314-yt-p2-moelle/20200625/01_0008_slaser-r-n",
+"/home/tangir/crmbm/acq/314-yt-p2-moelle/20200625/01_0009_slaser-r-n"]
 
 p.run()
+p.check_analyze_results()
+p.save_datasets(rdb)
+
+# %% 25/09/2020 - 349-ap-p2-moelle - Admah Fajar P2 :)))
+get_ipython().magic("clear")
+plt.close("all")
+
+p = reco.pipeline("sc_std_nows")
+
+p.dataset[0]["legend"] = "sLASER 10/2 NA=128"
+p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/349-ap-p2-moelle/meas_MID97_slaser_R_N=10_2_longTE_SNR+++_FID63227.dat",
+                                "/home/tangir/crmbm/acq_twix/349-ap-p2-moelle/meas_MID98_slaser_R_N=10_2_longTE_SNR+++_FID63228.dat"]
+p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/349-ap-p2-moelle/20200925/01_0007_slaser-r-n",
+                                "/home/tangir/crmbm/acq/349-ap-p2-moelle/20200925/01_0008_slaser-r-n"]
+
+# this dataset was interrupted, cannot read it... ;(
+p.dataset[1]["legend"] = "sLASER 10/2 NA=96 (repro)"
+p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/349-ap-p2-moelle/meas_MID102_slaser_R_N=10_2_longTE_SNR+++_FID63232.dat",
+                                "/home/tangir/crmbm/acq_twix/349-ap-p2-moelle/meas_MID101_slaser_R_N=10_2_longTE_SNR+++_FID63231.dat"]
+p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/349-ap-p2-moelle/20200925/01_0009_slaser-r-n",
+                                "/home/tangir/crmbm/acq/349-ap-p2-moelle/20200925/01_0010_slaser-r-n"]
+
+p.settings["datasets_indexes"] = 0
+p.job["realigning"]["moving_averages"] = 4
+p.job["data-rejecting"]["moving_averages"] = 4
+
+#p.job_list.remove(p.job["data-rejecting"])
+
+p.run()
+p.check_analyze_results()
 p.save_datasets(rdb)
