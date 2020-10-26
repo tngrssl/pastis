@@ -3112,7 +3112,10 @@ class pipeline:
                                "raw": {"files": [None, None], "data": None, "analysis-results": None, "ref-data-analysis-results": None},
                                "dcm": {"files": [None, None], "data": None, "analysis-results": None, "ref-data-analysis-results": None},
                                "physio-file": None,
-                               "imaging-file": None}
+                               "imaging-file": None,
+                               "resp_bpm": None,
+                               "heart_bpm": None,
+                               "comment": None}
 
         # --- global settings ---
         self.settings = {   # option to process only a set of datasets: list of indexes
@@ -3129,6 +3132,8 @@ class pipeline:
                             "POI_SNR_range_ppm": [1.8, 2.1],
                             # ppm range to search for peak for FWHM estimation
                             "POI_LW_range_ppm": [4.5, 5.2],
+                            # ppm range to for SNR/LW estimation in ref. data
+                            "POI_ref_range_ppm" : [4.5, 5.2],
                             # ppm range used for display
                             "display_range_ppm": [1, 6],
                             # y offset used for display
@@ -3367,6 +3372,32 @@ class pipeline:
                                     "display_range_ppm": self.job["displaying"]["range_ppm"]
                                     }
 
+        # --- job: ref data SNR analysis ---
+        self.job["ref-data-analyzing-snr"] = {0:
+                                     {"func": MRSData2.analyze_snr_1d, "name": "analyzing ref. data SNR"},
+                                     # ppm range to look for a peak to analyze
+                                     "POI_ref_range_ppm": self.settings["POI_ref_range_ppm"],
+                                     # ppm range to look for pure noise
+                                     "n_range_ppm": [-2, -1],
+                                     # should we look at the magnitude or real spectrum?
+                                     "magnitude_mode": False,
+                                     # display all this process to check what the hell is going on
+                                     "display": False,
+                                     "display_range_ppm": self.job["displaying"]["range_ppm"]
+                                     }
+
+        # --- job: ref data LW analysis ---
+        self.job["ref-data-analyzing-lw"] = {0:
+                                    {"func": MRSData2.analyze_linewidth_1d, "name": "analyzing ref. data peak-linewidth"},
+                                    # ppm range to look for a peak to analyze
+                                    "POI_ref_range_ppm": self.settings["POI_ref_range_ppm"],
+                                    # should we look at the magnitude or real spectrum?
+                                    "magnitude_mode": False,
+                                    # display all this process to check what the hell is going on
+                                    "display": False,
+                                    "display_range_ppm": self.job["displaying"]["range_ppm"]
+                                    }
+
         # --- job list ---
         # list of data processing to apply to the data
         # beware, you need to know what you are doing here
@@ -3448,7 +3479,7 @@ class pipeline:
         # return
         return(job_result)
 
-    def _analyze(self, data, current_job, already_done_jobs, nodisplay=False):
+    def _analyze(self, data, current_job, already_done_jobs):
         """
         Estimate SNR and/or peak linewidth for this dataset. Values are stored. A mini default pipeline is applied before SNR/LW measurements and can be set with self.analyze_job_list.
 
@@ -3467,6 +3498,10 @@ class pipeline:
             SNR estimated on data
         data_lw : float
             Peak linewidth estimated on data
+        ref_data_snr : float
+            SNR estimated on ref. data if any
+        ref_data_lw : float
+            Peak linewidth estimated on ref. data if any
         """
         log.debug("estimating SNR and peak-linewidth for [%s]..." % data.display_label)
 
@@ -3483,14 +3518,21 @@ class pipeline:
 
         # measure snr
         this_job = self.job["analyzing-snr"]
-        if(nodisplay):
-            this_job["display"] = False
         data_snr, _, _ = self._run_job(this_job, data)
         # measure lw
         this_job = self.job["analyzing-lw"]
-        if(nodisplay):
-            this_job["display"] = False
         data_lw = self._run_job(this_job, data)
+
+        if(data.data_ref is not None):
+            # measure ref data snr
+            this_job = self.job["ref-data-analyzing-snr"]
+            ref_data_snr, _, _ = self._run_job(this_job, data.data_ref)
+            # measure ref data lw
+            this_job = self.job["ref-data-analyzing-lw"]
+            ref_data_lw = self._run_job(this_job, data.data_ref)
+        else:
+            ref_data_snr = np.nan
+            ref_data_lw = np.nan
 
         # allow outputs
         log.setLevel(old_level)
@@ -3500,7 +3542,7 @@ class pipeline:
         log.info(job_label + " SNR of [%s] = %.2f" % (data.display_label, data_snr))
         log.info(job_label + " LW of [%s] = %.2f" % (data.display_label, data_lw))
 
-        return(data_snr, data_lw)
+        return(data_snr, data_lw, ref_data_snr, ref_data_lw)
 
     def get_te_list(self):
         """
@@ -3762,7 +3804,7 @@ class pipeline:
                                     this_job_name = this_job_name + " (#2)"
 
                                 # get SNR and LW estimations
-                                this_data_snr, this_data_lw = self._analyze(this_data, job, jobs_done_stack)
+                                this_data_snr, this_data_lw, _, _ = self._analyze(this_data, job, jobs_done_stack)
 
                                 # store analysis results
                                 self.dataset[i][dtype]["analysis-results"][this_job_name] = {"snr": this_data_snr, "lw": this_data_lw}
@@ -3797,9 +3839,8 @@ class pipeline:
                 if(this_data is None):
                     continue
 
-                if(this_data.data_ref is not None):
-                    this_data_ref_snr, this_data_ref_lw = self._analyze(this_data.data_ref, job, jobs_done_stack, True)
-                    self.dataset[i][dtype]["ref-data-analysis-results"] = {"snr": this_data_ref_snr, "lw": this_data_ref_lw}
+                _, _, this_data_ref_snr, this_data_ref_lw = self._analyze(this_data, job, jobs_done_stack)
+                self.dataset[i][dtype]["ref-data-analysis-results"] = {"snr": this_data_ref_snr, "lw": this_data_ref_lw}
 
         # --- summary final linewidths ---
         if(self.analyze_enable):

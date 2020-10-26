@@ -76,27 +76,6 @@ p.job["data-rejecting"]["auto_method_list"] = [   reco.data_rejection_method.AUT
 
 p.save_template("sc_std_nows_concatenate")
 
-p = reco.pipeline("sc_std_nows")
-p.job_list = [  p.job["phasing"],
-                p.job["scaling"],
-                # p.job["FID modulus"],
-                p.job["channel-combining"],
-                p.job["concatenate"],
-                p.job["noise-estimation"],
-                p.job["zero-filling"],
-                p.job["physio-analysis"],
-                p.job["apodizing"],
-                p.job["realigning"],
-                p.job["data-rejecting"],
-                p.job["averaging"],
-                p.job["calibrating"],
-                # p.job["water-removal"],
-                p.job["cropping"],
-                p.job["displaying"]
-                ]
-
-p.save_template("sc_std_nows_noadj")
-
 # %% 15/03/2019 - 291-vs-moelle-spectro-p1 - concatenated STEAM #1 :(
 # not included in group, the protocol was not ead, RFC pulses were too short...
 get_ipython().magic("clear")
@@ -230,24 +209,32 @@ plt.close("all")
 p = reco.pipeline("sc_std_nows")
 
 p.dataset[0]["legend"] = "sLASER 20:1 cardiac trig"
+p.dataset[0]["resp_bpm"] = 20
+p.dataset[0]["heart_bpm"] = 55
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/307-ap-p1-moelle/20190821/01_0011_slaser-r-n",
                                 "/home/tangir/crmbm/acq/307-ap-p1-moelle/20190821/01_0012_slaser-r-n"]
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/307-AP-P1-MOELLE/meas_MID101_slaser_R_N=20+_1_longTE_SNR++++_FID38622.dat",
                                 "/home/tangir/crmbm/acq_twix/307-AP-P1-MOELLE/meas_MID102_slaser_R_N=20+_1_longTE_SNR++++_FID38623.dat"]
 
 p.dataset[1]["legend"] = "sLASER 20:1 resp trig"
+p.dataset[1]["resp_bpm"] = 20
+p.dataset[1]["heart_bpm"] = 55
 p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/307-ap-p1-moelle/20190821/01_0013_slaser-r-n",
                                 "/home/tangir/crmbm/acq/307-ap-p1-moelle/20190821/01_0014_slaser-r-n"]
 p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/307-AP-P1-MOELLE/meas_MID104_slaser_R_N=20+_1_longTE_SNR++++_FID38625.dat",
                                 "/home/tangir/crmbm/acq_twix/307-AP-P1-MOELLE/meas_MID105_slaser_R_N=20+_1_longTE_SNR++++_FID38626.dat"]
 
 p.dataset[2]["legend"] = "sLASER 20:1 no trig"
+p.dataset[2]["resp_bpm"] = 20
+p.dataset[2]["heart_bpm"] = 55
 p.dataset[2]["dcm"]["files"] = ["/home/tangir/crmbm/acq/307-ap-p1-moelle/20190821/01_0015_slaser-r-n",
                                 "/home/tangir/crmbm/acq/307-ap-p1-moelle/20190821/01_0016_slaser-r-n"]
 p.dataset[2]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/307-AP-P1-MOELLE/meas_MID106_slaser_R_N=20+_1_longTE_SNR++++_FID38627.dat",
                                 "/home/tangir/crmbm/acq_twix/307-AP-P1-MOELLE/meas_MID107_slaser_R_N=20+_1_longTE_SNR++++_FID38628.dat"]
 
 p.dataset[3]["legend"] = "sLASER 10:2 repos. + resp trig"
+p.dataset[3]["resp_bpm"] = 20
+p.dataset[3]["heart_bpm"] = 55
 p.dataset[3]["dcm"]["files"] = ["/home/tangir/crmbm/acq/307-ap-p1-moelle/20190821/01_0018_slaser-r-n",
                                 "/home/tangir/crmbm/acq/307-ap-p1-moelle/20190821/01_0019_slaser-r-n"]
 p.dataset[3]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/307-AP-P1-MOELLE/meas_MID123_slaser_R_N=10_2_longTE_SNR+++_FID38644.dat",
@@ -267,6 +254,8 @@ plt.close("all")
 p = reco.pipeline("sc_std_nows")
 
 p.dataset[0]["legend"] = "sLASER 20:1 resp trig"
+p.dataset[0]["resp_bpm"] = 15
+p.dataset[0]["heart_bpm"] = 65
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/308-rs-p1-moelle/20190827/01_0008_slaser-r-n/original-primary_e09_0001.dcm",
                                 "/home/tangir/crmbm/acq/308-rs-p1-moelle/20190827/01_0009_slaser-r-n/original-primary_e09_0001.dcm"]
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/308-rs-p1-moelle/meas_MID165_slaser_R_N=20+_1_longTE_SNR++++_FID38910.dat",
@@ -289,6 +278,8 @@ plt.close("all")
 p = reco.pipeline("sc_std_nows")
 
 p.dataset[0]["legend"] = "sLASER 20:1"
+p.dataset[0]["resp_bpm"] = 13
+p.dataset[0]["heart_bpm"] = 70
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/310-mg-p1-moelle/20190829/01_0006_slaser-r-n",
                                 "/home/tangir/crmbm/acq/310-mg-p1-moelle/20190829/01_0007_slaser-r-n"]
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/310-mg-p1-moelle/meas_MID140_slaser_R_N=20+_1_longTE_SNR++++_FID39212.dat",
@@ -309,6 +300,8 @@ plt.close("all")
 p = reco.pipeline("sc_std_nows")
 
 p.dataset[0]["legend"] = "sLASER 20:1"
+p.dataset[0]["resp_bpm"] = 16
+p.dataset[0]["heart_bpm"] = 55
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/311-sl-p1-moelle/20190905/01_0020_slaser-r-n",
                                 "/home/tangir/crmbm/acq/311-sl-p1-moelle/20190905/01_0018_slaser-r-n"]
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/311-sl-p1-moelle/meas_MID128_slaser_R_N=20+_1_longTE_SNR++++_FID39740.dat",
@@ -325,6 +318,7 @@ plt.close("all")
 p = reco.pipeline("sc_std_nows")
 
 p.dataset[0]["legend"] = "sLASER 20:1"
+p.dataset[0]["resp_bpm"] = 12
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/313-ft-p1-moelle/20190923/01_0011_slaser-r-n/original-primary_e09_0001.dcm",
                                 "/home/tangir/crmbm/acq/313-ft-p1-moelle/20190923/01_0010_slaser-r-n/original-primary_e09_0001.dcm"]
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/313-ft-p1-moelle/meas_MID68_slaser_R_N=20+_1_longTE_SNR++++_FID41500.dat",
@@ -345,6 +339,8 @@ plt.close("all")
 p = reco.pipeline("sc_std_nows")
 
 p.dataset[0]["legend"] = "sLASER 20:1"
+p.dataset[0]["resp_bpm"] = 17
+p.dataset[0]["heart_bpm"] = 75
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/314-yt-p1-moelle/20190925/01_0010_slaser-r-n",
                                 "/home/tangir/crmbm/acq/314-yt-p1-moelle/20190925/01_0009_slaser-r-n"]
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/314-yt-p1-moelle/meas_MID83_slaser_R_N=20+_1_longTE_SNR++++_FID41681.dat",
@@ -352,6 +348,8 @@ p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/314-yt-p1-moelle/me
 p.dataset[0]["physio-file"] = "/home/tangir/crmbm/acq_physio/314_YT_P1_MOELLE_2.resp"
 
 p.dataset[1]["legend"] = "sLASER 5:5"
+p.dataset[1]["resp_bpm"] = 17
+p.dataset[1]["heart_bpm"] = 65
 p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/314-yt-p1-moelle/20190925/01_0012_slaser-r-n",
                                 "/home/tangir/crmbm/acq/314-yt-p1-moelle/20190925/01_0011_slaser-r-n"]
 p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/314-yt-p1-moelle/meas_MID88_slaser_R_N=5_5+_shortTE_SNR++_FID41686.dat",
@@ -372,6 +370,8 @@ plt.close("all")
 p = reco.pipeline("sc_std_nows")
 
 p.dataset[0]["legend"] = "sLASER 20:1"
+p.dataset[0]["resp_bpm"] = 11
+p.dataset[0]["heart_bpm"] = 65
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/316-ap-p1-moelle/20191003/01_0009_slaser-r-n",
                                 "/home/tangir/crmbm/acq/316-ap-p1-moelle/20191003/01_0008_slaser-r-n"]
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/316-ap-p1-moelle/meas_MID42_slaser_R_N=20+_1_longTE_SNR++++_FID42201.dat",
@@ -379,6 +379,8 @@ p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/316-ap-p1-moelle/me
 p.dataset[0]["physio-file"] = "/home/tangir/crmbm/acq_physio/316_AP_P1_MOELLE.resp"
 
 p.dataset[1]["legend"] = "sLASER 5:5"
+p.dataset[1]["resp_bpm"] = 11
+p.dataset[1]["heart_bpm"] = 65
 p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/316-ap-p1-moelle/20191003/01_0012_slaser-r-n",
                                 "/home/tangir/crmbm/acq/316-ap-p1-moelle/20191003/01_0011_slaser-r-n"]
 p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/316-ap-p1-moelle/meas_MID49_slaser_R_N=5_5+_shortTE_SNR++_FID42208.dat",
@@ -401,12 +403,16 @@ plt.close("all")
 p = reco.pipeline("sc_std_nows")
 
 p.dataset[0]["legend"] = "sLASER 20:1"
+p.dataset[0]["resp_bpm"] = 18
+p.dataset[0]["heart_bpm"] = 58
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/319-fc-p1-moelle/20191017/01_0015_slaser-r-n",
                                 "/home/tangir/crmbm/acq/319-fc-p1-moelle/20191017/01_0013_slaser-r-n"]
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/319-fc-p1-moelle/meas_MID142_slaser_R_N=20+_1_longTE_SNR++++_FID43720.dat",
                                 "/home/tangir/crmbm/acq_twix/319-fc-p1-moelle/meas_MID138_slaser_R_N=20+_1_longTE_SNR++++_FID43716.dat"]
 
 p.dataset[1]["legend"] = "sLASER 10:2"
+p.dataset[0]["resp_bpm"] = 16
+p.dataset[0]["heart_bpm"] = 59
 p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/319-fc-p1-moelle/20191017/01_0017_slaser-r-n",
                                 "/home/tangir/crmbm/acq/319-fc-p1-moelle/20191017/01_0016_slaser-r-n"]
 p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/319-fc-p1-moelle/meas_MID147_slaser_R_N=10_2_longTE_SNR+++_FID43725.dat",
@@ -424,6 +430,8 @@ plt.close("all")
 p = reco.pipeline("sc_std_nows")
 
 p.dataset[0]["legend"] = "sLASER 20:1"
+p.dataset[0]["resp_bpm"] = 18
+p.dataset[0]["heart_bpm"] = 60
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/328-af-p1-moelle/20191105/01_0011_slaser-r-n",
                                 "/home/tangir/crmbm/acq/328-af-p1-moelle/20191105/01_0012_slaser-r-n"]
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/328-af-p1-moelle/meas_MID64_slaser_R_N=20+_1_longTE_SNR++++_FID45771.dat",
@@ -444,12 +452,14 @@ plt.close("all")
 p = reco.pipeline("sc_std_nows")
 
 p.dataset[0]["legend"] = "sLASER 20:1"
+p.dataset[0]["resp_bpm"] = 20
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/329-pi-p1-moelle/meas_MID169_slaser_R_N=20+_1_longTE_SNR++++_FID46233.dat",
                                 "/home/tangir/crmbm/acq_twix/329-pi-p1-moelle/meas_MID170_slaser_R_N=20+_1_longTE_SNR++++_FID46234.dat"]
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/329-pi-p1-moelle/20191108/01_0008_slaser-r-n/original-primary_e09_0001.dcm",
                                 "/home/tangir/crmbm/acq/329-pi-p1-moelle/20191108/01_0009_slaser-r-n/original-primary_e09_0001.dcm"]
 
 p.dataset[1]["legend"] = "sLASER 10:2"
+p.dataset[1]["resp_bpm"] = 23
 p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/329-pi-p1-moelle/meas_MID180_slaser_R_N=10_2_longTE_SNR+++_FID46244.dat",
                                 "/home/tangir/crmbm/acq_twix/329-pi-p1-moelle/meas_MID181_slaser_R_N=10_2_longTE_SNR+++_FID46245.dat"]
 p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/329-pi-p1-moelle/20191108/01_0012_slaser-r-n/original-primary_e09_0001.dcm",
@@ -470,11 +480,15 @@ plt.close("all")
 p = reco.pipeline("sc_std_nows")
 
 p.dataset[0]["legend"] = "sLASER 20:1"
+p.dataset[0]["resp_bpm"] = 15
+p.dataset[0]["heart_bpm"] = 62
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/333-sc-p1-moelle/20191126/01_0008_slaser-r-n",
                                 "/home/tangir/crmbm/acq/333-sc-p1-moelle/20191126/01_0010_slaser-r-n"]
 # p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/333-sc-p1-moelle/meas_MID123_slaser_R_N=20+_1_longTE_SNR++++_FID47359.dat"]
 
 p.dataset[1]["legend"] = "sLASER 20:1 IR"
+p.dataset[1]["resp_bpm"] = 15
+p.dataset[1]["heart_bpm"] = 62
 p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/333-sc-p1-moelle/20191126/01_0009_slaser-r-n",
                                 "/home/tangir/crmbm/acq/333-sc-p1-moelle/20191126/01_0010_slaser-r-n"]
 p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/333-sc-p1-moelle/meas_MID126_slaser_R_N=20+_1_longTE_SNR++++_FID47362.dat"]
@@ -498,13 +512,17 @@ plt.close("all")
 
 p = reco.pipeline("sc_std_nows")
 
-p.dataset[0]["legend"] = "sLASER 20:1 (DCM)"
+p.dataset[0]["legend"] = "sLASER 20:1"
+p.dataset[0]["resp_bpm"] = 14
+p.dataset[0]["heart_bpm"] = 50
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/336-nb-p1-moelle/20191209/01_0010_slaser-r-n/original-primary_e09_0001.dcm",
                                 "/home/tangir/crmbm/acq/336-nb-p1-moelle/20191209/01_0011_slaser-r-n/original-primary_e09_0001.dcm"]
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/336-nb-p1-moelle/meas_MID72_slaser_R_N=20+_1_longTE_SNR++++_FID48203.dat",
                                 "/home/tangir/crmbm/acq_twix/336-nb-p1-moelle/meas_MID75_slaser_R_N=20+_1_longTE_SNR++++_FID48206.dat"]
 
-p.dataset[1]["legend"] = "sLASER 20:1 IR (DCM)"
+p.dataset[1]["legend"] = "sLASER 20:1 IR"
+p.dataset[1]["resp_bpm"] = 14
+p.dataset[1]["heart_bpm"] = 50
 p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/336-nb-p1-moelle/20191209/01_0012_slaser-r-n/original-primary_e09_0001.dcm",
                                 "/home/tangir/crmbm/acq/336-nb-p1-moelle/20191209/01_0011_slaser-r-n/original-primary_e09_0001.dcm"]
 p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/336-nb-p1-moelle/meas_MID78_slaser_R_N=20+_1_longTE_SNR++++_FID48209.dat",
@@ -529,16 +547,22 @@ plt.close("all")
 p = reco.pipeline("sc_std_nows")
 
 p.dataset[0]["legend"] = "sLASER 20:1 WS"
+p.dataset[0]["resp_bpm"] = 20
+p.dataset[0]["heart_bpm"] = 85
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/338-ro-p1-moelle/20191210/01_0007_slaser-r-n/original-primary_e09_0001.dcm",
                                 "/home/tangir/crmbm/acq/338-ro-p1-moelle/20191210/01_0008_slaser-r-n/original-primary_e09_0001.dcm"]
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/338-ro-p1-moelle/meas_MID112_slaser_R_N=20+_1_longTE_SNR++++_FID48494.dat",
                                 "/home/tangir/crmbm/acq_twix/338-ro-p1-moelle/meas_MID114_slaser_R_N=20+_1_longTE_SNR++++_FID48496.dat"]
 
 p.dataset[1]["legend"] = "sLASER 20:1 noWS"
+p.dataset[1]["resp_bpm"] = 20
+p.dataset[1]["heart_bpm"] = 85
 p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/338-ro-p1-moelle/meas_MID114_slaser_R_N=20+_1_longTE_SNR++++_FID48496.dat",
                                 "/home/tangir/crmbm/acq_twix/338-ro-p1-moelle/meas_MID114_slaser_R_N=20+_1_longTE_SNR++++_FID48496.dat"]
 
 p.dataset[2]["legend"] = "sLASER 20:1 IR"
+p.dataset[2]["resp_bpm"] = 20
+p.dataset[2]["heart_bpm"] = 85
 p.dataset[2]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/338-ro-p1-moelle/meas_MID118_slaser_R_N=20+_1_longTE_SNR++++_FID48500.dat",
                                 "/home/tangir/crmbm/acq_twix/338-ro-p1-moelle/meas_MID116_slaser_R_N=20+_1_longTE_SNR++++_FID48498.dat"]
 
@@ -554,16 +578,22 @@ plt.close("all")
 p = reco.pipeline("sc_std_nows")
 
 p.dataset[0]["legend"] = "sLASER 20:1 (REF with OVS)"
+p.dataset[0]["resp_bpm"] = 13
+p.dataset[0]["heart_bpm"] = 55
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/300-pm-p2-moelle/meas_MID68_slaser_R_N=20+_1_longTE_SNR++++_FID50926.dat",
                                 "/home/tangir/crmbm/acq_twix/300-pm-p2-moelle/meas_MID69_slaser_R_N=20+_1_longTE_SNR++++_FID50927.dat"]
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/300-pm-p2-moelle/20200128/01_0011_slaser-r-n/original-primary_e09_0001.dcm",
                                 "/home/tangir/crmbm/acq/300-pm-p2-moelle/20200128/01_0012_slaser-r-n/original-primary_e09_0001.dcm"]
 
 p.dataset[1]["legend"] = "STEAM IR (REF with OVS)"
+p.dataset[1]["resp_bpm"] = 13
+p.dataset[1]["heart_bpm"] = 55
 p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/300-pm-p2-moelle/meas_MID62_steam_shortTE_SNR+_FID50920.dat",
                                 "/home/tangir/crmbm/acq_twix/300-pm-p2-moelle/meas_MID64_steam_shortTE_SNR+_FID50922.dat"]
 
 p.dataset[2]["legend"] = "sLASER IR 5:5 (REF with OVS)"
+p.dataset[2]["resp_bpm"] = 13
+p.dataset[2]["heart_bpm"] = 55
 p.dataset[2]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/300-pm-p2-moelle/meas_MID73_slaser_R_N=5_5+_shortTE_SNR++_FID50931.dat",
                                 "/home/tangir/crmbm/acq_twix/300-pm-p2-moelle/meas_MID74_slaser_R_N=5_5+_shortTE_SNR++_FID50932.dat"]
 
@@ -580,12 +610,16 @@ plt.close("all")
 p = reco.pipeline("sc_std_nows")
 
 p.dataset[0]["legend"] = "sLASER 10:2 (REF with OVS)"
+p.dataset[0]["resp_bpm"] = 18
+p.dataset[0]["heart_bpm"] = 51
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/349-ap-p1-moelle/meas_MID313_slaser_R_N=10_2_longTE_SNR+++_FID51947.dat",
                                 "/home/tangir/crmbm/acq_twix/349-ap-p1-moelle/meas_MID314_slaser_R_N=10_2_longTE_SNR+++_FID51948.dat"]
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/349-ap-p1-moelle/20200206/01_0006_slaser-r-n/original-primary_e09_0001.dcm",
                                 "/home/tangir/crmbm/acq/349-ap-p1-moelle/20200206/01_0007_slaser-r-n/original-primary_e09_0001.dcm"]
 
 p.dataset[1]["legend"] = "sLASER 10:2 (REF without OVS)"
+p.dataset[1]["resp_bpm"] = 18
+p.dataset[1]["heart_bpm"] = 51
 p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/349-ap-p1-moelle/meas_MID313_slaser_R_N=10_2_longTE_SNR+++_FID51947.dat",
                                 "/home/tangir/crmbm/acq_twix/349-ap-p1-moelle/meas_MID315_slaser_R_N=10_2_longTE_SNR+++_FID51949.dat"]
 p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/349-ap-p1-moelle/20200206/01_0006_slaser-r-n/original-primary_e09_0001.dcm",
@@ -607,6 +641,8 @@ plt.close("all")
 p = reco.pipeline("sc_std_nows")
 
 p.dataset[0]["legend"] = "sLASER TE=52ms"
+p.dataset[0]["resp_bpm"] = 11
+p.dataset[0]["heart_bpm"] = 85
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/355-st-p1-moelle/meas_MID164_slaser_R_N=20+_1_longTE_SNR++++_FID53261.dat",
                                 "/home/tangir/crmbm/acq_twix/355-st-p1-moelle/meas_MID166_slaser_R_N=20+_1_longTE_SNR++++_FID53263.dat"]
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/355-st-p1-moelle/20200224/01_0008_slaser-r-n/original-primary_e09_0001.dcm",
@@ -629,12 +665,16 @@ plt.close("all")
 p = reco.pipeline("sc_std_nows")
 
 p.dataset[0]["legend"] = "1st try (30-40Hz water LW)"
+p.dataset[0]["resp_bpm"] = 15
+p.dataset[0]["heart_bpm"] = 75
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/304-ka-p2-moelle/meas_MID177_slaser_R_N=20+_1_longTE_SNR++++_FID53952.dat",
                                 "/home/tangir/crmbm/acq_twix/304-ka-p2-moelle/meas_MID178_slaser_R_N=20+_1_longTE_SNR++++_FID53953.dat"]
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/304-ka-p2-moelle/20200304/01_0016_slaser-r-n/original-primary_e09_0001.dcm",
                                 "/home/tangir/crmbm/acq/304-ka-p2-moelle/20200304/01_0017_slaser-r-n/original-primary_e09_0001.dcm"]
 
 p.dataset[1]["legend"] = "2nd try (25Hz water LW)"
+p.dataset[1]["resp_bpm"] = 15
+p.dataset[1]["heart_bpm"] = 75
 p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/304-ka-p2-moelle/meas_MID185_slaser_R_N=20+_1_longTE_SNR++++_FID53960.dat",
                                 "/home/tangir/crmbm/acq_twix/304-ka-p2-moelle/meas_MID187_slaser_R_N=20+_1_longTE_SNR++++_FID53962.dat"]
 p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/304-ka-p2-moelle/20200304/01_0019_slaser-r-n/original-primary_e09_0001.dcm",
@@ -662,12 +702,16 @@ plt.close("all")
 p = reco.pipeline("sc_std_nows")
 
 p.dataset[0]["legend"] = "sLASER 20/1 NA=128 trig"
+p.dataset[0]["resp_bpm"] = 22
+p.dataset[0]["heart_bpm"] = 55
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/311-sl-p2-moelle/meas_MID152_slaser_R_N=20+_1_longTE_SNR++++_FID56036.dat",
                                 "/home/tangir/crmbm/acq_twix/311-sl-p2-moelle/meas_MID153_slaser_R_N=20+_1_longTE_SNR++++_FID56037.dat"]
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/311-sl-p2-moelle/20200529/01_0009_slaser-r-n/original-primary_e09_0001.dcm",
                                 "/home/tangir/crmbm/acq/311-sl-p2-moelle/20200529/01_0010_slaser-r-n/original-primary_e09_0001.dcm"]
 
 p.dataset[1]["legend"] = "sLASER 20/1 NA=128 notrig"
+p.dataset[1]["resp_bpm"] = 21
+p.dataset[1]["heart_bpm"] = 55
 p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/311-sl-p2-moelle/meas_MID156_slaser_R_N=20+_1_longTE_SNR++++_FID56040.dat",
                                 "/home/tangir/crmbm/acq_twix/311-sl-p2-moelle/meas_MID157_slaser_R_N=20+_1_longTE_SNR++++_FID56041.dat"]
 p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/311-sl-p2-moelle/20200529/01_0011_slaser-r-n/original-primary_e09_0001.dcm",
@@ -687,25 +731,32 @@ plt.close("all")
 p = reco.pipeline("sc_std_nows")
 
 p.dataset[0]["legend"] = "sLASER 20/1 NA=128 trig"
+p.dataset[0]["resp_bpm"] = 17
+p.dataset[0]["heart_bpm"] = 58
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID98_slaser_R_N=20+_1_longTE_SNR++++_FID57305.dat",
                                 "/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID100_slaser_R_N=20+_1_longTE_SNR++++_FID57307.dat"]
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/336-nb-p2-moelle/20200609/01_0008_slaser-r-n",
                                 "/home/tangir/crmbm/acq/336-nb-p2-moelle/20200609/01_0009_slaser-r-n"]
 
-
 p.dataset[1]["legend"] = "sLASER 20/1 NA=64 notrig"
+p.dataset[1]["resp_bpm"] = 17
+p.dataset[1]["heart_bpm"] = 58
 p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID103_slaser_R_N=20+_1_longTE_SNR++++_FID57310.dat",
                                 "/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID105_slaser_R_N=20+_1_longTE_SNR++++_FID57312.dat"]
 p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/336-nb-p2-moelle/20200609/01_0010_slaser-r-n",
                                 "/home/tangir/crmbm/acq/336-nb-p2-moelle/20200609/01_0011_slaser-r-n"]
 
 p.dataset[2]["legend"] = "sLASER 10/2 NA=64 notrig"
+p.dataset[2]["resp_bpm"] = 18
+p.dataset[2]["heart_bpm"] = 60
 p.dataset[2]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID122_slaser_R_N=10_2_longTE_SNR+++_FID57329.dat",
                                 "/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID124_slaser_R_N=10_2_longTE_SNR+++_FID57331.dat"]
 p.dataset[2]["dcm"]["files"] = ["/home/tangir/crmbm/acq/336-nb-p2-moelle/20200609/01_0013_slaser-r-n",
                                 "/home/tangir/crmbm/acq/336-nb-p2-moelle/20200609/01_0014_slaser-r-n"]
 
 p.dataset[3]["legend"] = "sLASER 5/5 NA=64 notrig"
+p.dataset[3]["resp_bpm"] = 18
+p.dataset[3]["heart_bpm"] = 60
 p.dataset[3]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID127_slaser_R_N=5_5+_shortTE_SNR++_FID57334.dat",
                                 "/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID129_slaser_R_N=5_5+_shortTE_SNR++_FID57336.dat"]
 p.dataset[3]["dcm"]["files"] = ["/home/tangir/crmbm/acq/336-nb-p2-moelle/20200609/01_0015_slaser-r-n",
@@ -724,6 +775,8 @@ plt.close("all")
 p = reco.pipeline("sc_std_nows")
 
 p.dataset[0]["legend"] = "sLASER 10/2 NA=64 trig"
+p.dataset[0]["resp_bpm"] = 16
+p.dataset[0]["heart_bpm"] = 65
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/319-fc-p2-moelle/meas_MID72_slaser_R_N=10_2_longTE_SNR+++_FID57445.dat",
                                 "/home/tangir/crmbm/acq_twix/319-fc-p2-moelle/meas_MID74_slaser_R_N=10_2_longTE_SNR+++_FID57447.dat"]
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/319-fc-p2-moelle/20200611/01_0012_slaser-r-n/original-primary_e09_0001.dcm",
@@ -741,6 +794,8 @@ plt.close("all")
 p = reco.pipeline("sc_std_nows")
 
 p.dataset[0]["legend"] = "sLASER 20/1"
+p.dataset[0]["resp_bpm"] = 17
+p.dataset[0]["heart_bpm"] = 73
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/313-ft-p2-moelle/meas_MID239_slaser_R_N=20+_1_longTE_SNR++++_FID57752.dat",
                                 "/home/tangir/crmbm/acq_twix/313-ft-p2-moelle/meas_MID240_slaser_R_N=20+_1_longTE_SNR++++_FID57753.dat"]
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/313-ft-p2-moelle/20200615/01_0011_slaser-r-n/original-primary_e09_0001.dcm",
@@ -759,6 +814,8 @@ plt.close("all")
 p = reco.pipeline("sc_std_nows")
 
 p.dataset[0]["legend"] = "sLASER 20/1"
+p.dataset[0]["resp_bpm"] = 16
+p.dataset[0]["heart_bpm"] = 65
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/333-sc-p2-moelle/meas_MID180_slaser_R_N=20+_1_longTE_SNR++++_FID58587.dat",
                                 "/home/tangir/crmbm/acq_twix/333-sc-p2-moelle/meas_MID181_slaser_R_N=20+_1_longTE_SNR++++_FID58588.dat"]
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/333-sc-p2-moelle/20200619/01_0008_slaser-r-n/original-primary_e09_0001.dcm",
@@ -780,6 +837,8 @@ plt.close("all")
 p = reco.pipeline("sc_std_nows")
 
 p.dataset[0]["legend"] = "sLASER 20/1 NA=128"
+p.dataset[0]["resp_bpm"] = 17
+p.dataset[0]["heart_bpm"] = 80
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/314-yt-p2-moelle/meas_MID98_slaser_R_N=20+_1_longTE_SNR++++_FID59064.dat",
                                 "/home/tangir/crmbm/acq_twix/314-yt-p2-moelle/meas_MID99_slaser_R_N=20+_1_longTE_SNR++++_FID59065.dat"]
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/314-yt-p2-moelle/20200625/01_0008_slaser-r-n",
@@ -796,6 +855,8 @@ plt.close("all")
 p = reco.pipeline("sc_std_nows")
 
 p.dataset[0]["legend"] = "sLASER 10/2 NA=128"
+p.dataset[0]["resp_bpm"] = 17
+p.dataset[0]["heart_bpm"] = 70
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/349-ap-p2-moelle/meas_MID97_slaser_R_N=10_2_longTE_SNR+++_FID63227.dat",
                                 "/home/tangir/crmbm/acq_twix/349-ap-p2-moelle/meas_MID98_slaser_R_N=10_2_longTE_SNR+++_FID63228.dat"]
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/349-ap-p2-moelle/20200925/01_0007_slaser-r-n",
@@ -803,6 +864,8 @@ p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/349-ap-p2-moelle/2020092
 
 # this dataset was interrupted, cannot read it... ;(
 p.dataset[1]["legend"] = "sLASER 10/2 NA=96 (repro)"
+p.dataset[0]["resp_bpm"] = 17
+p.dataset[0]["heart_bpm"] = 70
 p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/349-ap-p2-moelle/meas_MID102_slaser_R_N=10_2_longTE_SNR+++_FID63232.dat",
                                 "/home/tangir/crmbm/acq_twix/349-ap-p2-moelle/meas_MID101_slaser_R_N=10_2_longTE_SNR+++_FID63231.dat"]
 p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/349-ap-p2-moelle/20200925/01_0009_slaser-r-n",

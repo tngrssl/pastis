@@ -7,12 +7,15 @@ Stuff related to database handling. These classes help to store reconstructed da
 """
 
 from mrs import paths as default_paths
+from mrs import reco
+from mrs import sim
 from mrs import log
 import os
 import pickle
 from datetime import datetime, timedelta
 from shutil import copyfile
 import numpy as np
+import pandas as pd
 
 import pdb
 
@@ -66,17 +69,8 @@ class data_db(dict):
         if(reco_data_db_file is None):
             self.db_file = None
         else:
-            self.db_file = reco_data_db_file
-
-            # if file does not exist, create it
-            if(not os.path.isfile(self.db_file)):
-                log.info("creating storage file [%s]..." % self.db_file)
-                # write pkl file
-                with open(self.db_file, 'wb') as f:
-                    pickle.dump([{}], f)
-
-            # first read
-            self._read_db_file()
+            # create file on disk etc
+            self.link_to_file(reco_data_db_file)
 
     def _is_linked_to_file(self):
         """
@@ -108,6 +102,27 @@ class data_db(dict):
         # write back pkl file
         with open(self.db_file, 'wb') as f:
             pickle.dump([self], f)
+
+    def link_to_file(self, data_db_file):
+        """
+        Initialize link to file on disk.
+
+        Parameters
+        ----------
+        data_db_file: string
+            PKL file where all the data is stored
+        """
+        self.db_file = data_db_file
+
+        # if file does not exist, create it
+        if(not os.path.isfile(self.db_file)):
+            log.info("creating storage file [%s]..." % self.db_file)
+            # write pkl file
+            with open(self.db_file, 'wb') as f:
+                pickle.dump([{}], f)
+
+        # first read
+        self._read_db_file()
 
     def select_datasets(self, check_func=_check_func_test):
         """
@@ -195,6 +210,105 @@ class data_db(dict):
 
         return(selected_data_db)
 
+    def _scrap_data(self, var, prefix_str=None):
+        """
+        Scrap data in db reading dicts, lists and some objects' attributes and converting it to lists.
+
+        Parameters
+        ----------
+        var : ?
+            Could be anything but likely a dict, list, a mrs.* object or int/float/etc.
+
+        Returns
+        -------
+        par_name_list : list
+            Name of parameters scraped.
+        par_val_list : list
+            Values of parameters scraped.
+        """
+        # init lists
+        par_name_list = []
+        par_val_list = []
+
+        # if scraping a dict
+        if(type(var) is dict):
+            # browse
+            for this_dict_key in var:
+                # recursive call
+                name_list, val_list = self._scrap_data(var[this_dict_key], str(this_dict_key))
+
+                # add the resulting parameter names
+                par_name_list = par_name_list + name_list
+                par_val_list = par_val_list + val_list
+
+        # if scraping a list
+        elif(type(var) is list):
+            # browse
+            for ind, this_item in enumerate(var):
+                name_list, val_list = self._scrap_data(this_item, "[" + str(ind) + "]")
+
+                # add the resulting parameter names
+                par_name_list = par_name_list + name_list
+                par_val_list = par_val_list + val_list
+
+        # if scraping an object instance of a class we wrote in the package
+        elif(isinstance(var, (reco.MRSData2, reco.pipeline, sim.mrs_sequence))):
+            # scrap the dict attribute
+            name_list, val_list = self._scrap_data(var.__dict__)
+
+            # add the resulting parameter names
+            par_name_list = par_name_list + name_list
+            par_val_list = par_val_list + val_list
+
+        # if scraping something else, probably some int or stuff
+        else:
+            # make it simple
+            par_name_list = par_name_list + [""]
+            par_val_list = par_val_list + [var]
+
+        # format the field name, usefull later in pandas df
+        if(prefix_str is not None):
+            if(len(par_name_list) > 1 and type(var) is not list):
+                prefix_str += "_"
+
+            par_name_list = [prefix_str + s for s in par_name_list]
+
+        return(par_name_list, par_val_list)
+
+    def to_dataframe(self):
+        """
+        Convert this huge db structure into a pandas dataframe object.
+
+        Returns
+        -------
+        par_name_list : dataframe
+            Resulted df object.
+        """
+        log.info("converting db into pandas dataframe...")
+
+        # init a list of df
+        df_list = []
+
+        # browse db
+        for patient_key in self:
+            for study_key in self[patient_key]:
+                for hash_key in self[patient_key][study_key]:
+                    # scrap this scan entry
+                    this_entry = self[patient_key][study_key][hash_key]
+                    this_column_list, this_values_list = self._scrap_data(this_entry)
+                    # convert to df (that makes one line)
+                    df = pd.DataFrame([this_values_list], columns=this_column_list)
+                    # store
+                    df_list.append(df)
+
+        # creating final df by merging all lines
+        df = pd.DataFrame()
+        df = df.append(df_list)
+        # hash of scan will be our index (should be unique)
+        df.set_index('hash')
+
+        return(df)
+
     def print(self):
         """
         Print a summary of the database content.
@@ -215,7 +329,7 @@ class data_db(dict):
             patient_key_max_len = 10
 
         # now browse and print
-        print("[Patient]".ljust(patient_key_max_len) + "[Study]".ljust(10) + "[hash]".ljust(34) + "[RAW]".ljust(6) + "[DCM]".ljust(6) + "[RECO]".ljust(7) + "[FIT]".ljust(6))
+        print("[Patient]".ljust(patient_key_max_len) + "[Study]".ljust(10) + "[Scan (hash)]".ljust(34) + "[RAW]".ljust(6) + "[DCM]".ljust(6) + "[RECO]".ljust(7) + "[FIT]".ljust(6))
         for patient_key in self:
             for study_key in self[patient_key]:
                 for hash_key in self[patient_key][study_key]:
@@ -332,12 +446,49 @@ class data_db(dict):
         ts = datetime.now()
 
         self[patient_id][study_id][h] = {"patient": patient_id,
-                                      "study": study_id,
-                                      "hash": h,
-                                      "dataset": d,
-                                      "reco_pipeline": rp,
-                                      "fit_pipeline": None,
-                                      "timestamp": ts}
+                                          "study": study_id,
+                                          "hash": h,
+                                          "dataset": d,
+                                          "reco_pipeline": rp,
+                                          "fit_pipeline": None,
+                                          "timestamp": ts}
+
+        # save db file if needed
+        if(self._is_linked_to_file()):
+            self._save_db_file()
+
+    def save_fit(self, data_hash, fit_key, fit_results):
+        """
+        Save mrs.reco.pipeline dataset and its reco pipeline and deal with conflicts.
+
+        Parameters
+        ----------
+        data_hash: mrs.reco.pipeline dataset entry (dict)
+            Dict containing data and stuff
+        fit_key: string
+            String used to store the fit results
+        fit_results: dict
+            Fit results stored as a dict
+        """
+        log.debug("saving fit to file [%s]..." % self.db_file)
+
+        # reload db file if needed
+        if(self._is_linked_to_file()):
+            self._read_db_file()
+
+        # if we reached here, that means the PKL file is not corrupted
+        # let's make a backup of it
+        copyfile(self.db_file, self.db_file + ".bak")
+
+        # find data hash in dict
+        for patient_key in self:
+            for study_key in self[patient_key]:
+                for hash_key in self[patient_key][study_key]:
+                    if(hash_key == data_hash):
+                        if(self[patient_key][study_key][hash_key]["fit_pipeline"] is None):
+                            self[patient_key][study_key][hash_key]["fit_pipeline"] = {}
+                        # store fit results
+                        self[patient_key][study_key][hash_key]["fit_pipeline"][fit_key] = fit_results
 
         # save db file if needed
         if(self._is_linked_to_file()):
