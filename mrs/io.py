@@ -8,7 +8,6 @@ Stuff related to MRS data file reading.
 
 import suspect
 import suspect.io.twix as sit
-import mapvbvd
 import numpy as np
 from mrs import sim
 from mrs import log
@@ -19,7 +18,14 @@ import os
 import pydicom
 import hashlib
 
+try:
+    import mapvbvd
+    MAPVBVD_LIB_LOADED = True
+except ImportError:
+    MAPVBVD_LIB_LOADED = False
+
 import pdb
+
 
 class data_file_reader(metaclass=ABCMeta):
     """A virtual class used to read data and acquisition parameters from files. Subclasses depending on MRI constructors."""
@@ -177,10 +183,14 @@ class SIEMENS_data_file_reader(data_file_reader):
                 log.debug("reading TWIX file...")
                 MRSData_obj = suspect.io.load_twix(self.fullfilepath)
             except:
-                # well maybe it is broken, maybe the acquisition was interrupted
-                # let's try to read it using this modified verion of suspect.io.load_twix
-                log.debug("reading broken TWIX file...")
-                MRSData_obj = self._load_broken_twix()
+                if(MAPVBVD_LIB_LOADED):
+                    # well maybe it is broken, maybe the acquisition was interrupted
+                    # let's try to read it using this modified verion of suspect.io.load_twix
+                    log.debug("reading broken TWIX file...")
+                    MRSData_obj = self._load_broken_twix()
+                else:
+                    log.error("the TWIX file looks broken and the pymapvdvb library could not be loaded (probably due to your old python version?).")
+
         elif(self.file_ext == '.dcm'):
             log.debug("reading DICOM file...")
             MRSData_obj = suspect.io.load_siemens_dicom(self.fullfilepath)

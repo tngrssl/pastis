@@ -22,6 +22,36 @@ log.setLevel(log.DEBUG)
 
 rdb = db.data_db("/home/tangir/crmbm/acq_db/brain.pkl")
 
+# standard brain template
+p = reco.pipeline()
+
+p.settings["POI_range_ppm"] = [1.8, 2.2]
+p.settings["POI_SNR_range_ppm"] = [1.8, 2.1]
+p.settings["POI_LW_range_ppm"] = [1.8, 2.2]
+
+p.job_list = [  p.job["phasing"],
+                p.job["scaling"],
+                # p.job["FID modulus"],
+                p.job["channel-combining"],
+                # p.job["concatenate"],
+                p.job["noise-estimation"],
+                p.job["zero-filling"],
+                # p.job["physio-analysis"],
+                p.job["apodizing"],
+                p.job["realigning"],
+                p.job["data-rejecting"],
+                p.job["averaging"],
+                p.job["calibrating"],
+                # p.job["water-removal"],
+                p.job["cropping"],
+                p.job["displaying"]
+                ]
+
+p.job["realigning"]["moving_averages"] = 2
+p.job["data-rejecting"]["moving_averages"] = 2
+
+p.save_template("brain_std_nows")
+
 # %% 20/06/2019 - 296_ym_p1_brainmoelle - Yasmin :)
 get_ipython().magic("clear")
 plt.close("all")

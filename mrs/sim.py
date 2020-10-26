@@ -363,7 +363,7 @@ class params(np.ndarray):
 
         return(p2)
 
-    def get_ratios(self, mIndex=xxx.m_Cr_CH3):
+    def get_ratios(self, mIndex):
         """
         Calculate the metabolite ratios.
 
