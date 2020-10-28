@@ -172,19 +172,28 @@ p.check_analyze_results(True)
 p.save_datasets(rdb)
 
 # %% 16/07/2019 - 300-pm-p1-moelle - Pelayo :)
+# forgot to acquire the ref scans... replace them with non-ws data
 get_ipython().magic("clear")
 plt.close("all")
 
 p = reco.pipeline("sc_std_nows")
 
 p.dataset[0]["legend"] = "sLASER R:N=25:1"
-p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/300-pm-p1-moelle/20190716/01_0010_slaser-r-n/original-primary_e09_0001.dcm"]
-p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/300-pm-p1-moelle/meas_MID62_slaser_R_N=20+_1_longTE_SNR++++_FID35515.dat"]
+p.dataset[0]["comment"] = "No REF scan !"
+p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/300-pm-p1-moelle/20190716/01_0010_slaser-r-n/original-primary_e09_0001.dcm",
+                                "/home/tangir/crmbm/acq/300-pm-p1-moelle/20190716/01_0010_slaser-r-n/original-primary_e09_0001.dcm"]
+p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/300-pm-p1-moelle/meas_MID62_slaser_R_N=20+_1_longTE_SNR++++_FID35515.dat",
+                                "/home/tangir/crmbm/acq_twix/300-pm-p1-moelle/meas_MID62_slaser_R_N=20+_1_longTE_SNR++++_FID35515.dat"]
 
 p.dataset[1]["legend"] = "sLASER R:N=25:1 trig"
-p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/300-pm-p1-moelle/20190716/01_0011_slaser-r-n/original-primary_e09_0001.dcm"]
-p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/300-pm-p1-moelle/meas_MID63_slaser_R_N=20+_1_longTE_SNR++++_FID35516.dat"]
+p.dataset[0]["comment"] = "No REF scan !"
+p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/300-pm-p1-moelle/20190716/01_0011_slaser-r-n/original-primary_e09_0001.dcm",
+                                "/home/tangir/crmbm/acq/300-pm-p1-moelle/20190716/01_0011_slaser-r-n/original-primary_e09_0001.dcm"]
+p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/300-pm-p1-moelle/meas_MID63_slaser_R_N=20+_1_longTE_SNR++++_FID35516.dat",
+                                "/home/tangir/crmbm/acq_twix/300-pm-p1-moelle/meas_MID63_slaser_R_N=20+_1_longTE_SNR++++_FID35516.dat"]
 
+p.job["phasing"]["using_ref_data"] = False
+p.job["channel-combining"]["using_ref_data"] = False
 p.run()
 p.check_analyze_results()
 p.save_datasets(rdb)
@@ -196,8 +205,11 @@ plt.close("all")
 p = reco.pipeline("sc_std_nows")
 
 p.dataset[0]["legend"] = "crappy"
-p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/304-ka-p1-moelle/20190814/01_0013_slaser-r-n/original-primary_e09_0001.dcm"]
+p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/304-ka-p1-moelle/20190814/01_0013_slaser-r-n/original-primary_e09_0001.dcm",
+                                "/home/tangir/crmbm/acq/304-ka-p1-moelle/20190814/01_0013_slaser-r-n/original-primary_e09_0001.dcm"]
 
+p.job["phasing"]["using_ref_data"] = False
+p.job["channel-combining"]["using_ref_data"] = False
 p.run()
 p.check_analyze_results()
 p.save_datasets(rdb)
