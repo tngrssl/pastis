@@ -1741,7 +1741,7 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
             fig = plt.figure(11)
             fig.clf()
             axs = fig.subplots(3, 1)
-            fig.canvas.set_window_title("mrs.sim.mrs_seq_eja_svs_slaser._rf_pulse_hsn")
+            fig.canvas.set_window_title("_rf_pulse_hsn (mrs.sim.mrs_seq_eja_svs_slaser)")
             fig.suptitle("HSn pulse generation | %.2f ms, BW = %.2f Hz, TBW/R = %.2f, n-order = %d, %d pts" % (Tp, bw, tbw, n, N))
 
             axs[0].plot(t * 1000.0, pulse_amp, 'k-', linewidth=1)
@@ -1913,7 +1913,7 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
         fig = plt.figure(10)
         fig.clf()
         axs = fig.subplots(1, 2)
-        fig.canvas.set_window_title("mrs.sim.mrs_seq_eja_svs_slaser._get_rfc_pulse_w1max_by_optim")
+        fig.canvas.set_window_title("_get_rfc_pulse_w1max_by_optim (mrs.sim.mrs_seq_eja_svs_slaser)")
         fig.suptitle("RF power optimization results for sLASER")
 
         afactor = (w1_range_Hz[2] - w1_range_Hz[1]) / np.max(peak_intensity_abs)

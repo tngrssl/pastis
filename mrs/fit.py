@@ -228,7 +228,7 @@ class prefit_tool:
             fig = plt.figure(self.display_fig_index)
             fig.clf()
             axs = fig.subplots()
-            fig.canvas.set_window_title("mrs.fit.prefit_tool.run")
+            fig.canvas.set_window_title("run (mrs.fit.prefit_tool)")
             axs.plot(self.data.frequency_axis_ppm(), self.data.spectrum().real, "k-", label="data")
 
         # now for each peak, integrate the area
@@ -510,7 +510,7 @@ class fit_tool:
             fig = plt.figure(self.display_fig_index)
             fig.clf()
             axs = fig.subplots(2, 4)
-            fig.canvas.set_window_title("mrs.fit.lsqfit._minimizeThis")
+            fig.canvas.set_window_title("_minimizeThis (mrs.fit.lsqfit)")
 
             # display real-time bargraphs
             # real-time CRBs

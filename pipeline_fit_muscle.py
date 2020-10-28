@@ -30,7 +30,9 @@ log.setLevel(log.DEBUG)
 rdb = reco.data_db()
 
 # %% retrieve data to process
-data, data_pipeline = rdb.get_latest_dataset()
+df_sel = rdb.df.loc[rdb.df["timestamp"] == rdb.df["timestamp"].max()]
+data = df_sel["dataset"]["raw"]["data"]
+data_pipeline = df_sel["reco_pipeline"]
 
 # %% set metabolites to fit, water concentration, csv file
 

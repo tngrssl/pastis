@@ -28,7 +28,6 @@ from mrs import paths as default_paths
 import pdb
 
 MAX_NUM_DATASETS = 1000
-FIG_TITLE_WIDTH = 36
 
 
 class suspect_phasing_method(Enum):
@@ -687,7 +686,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig = plt.figure(100)
             fig.clf()
             axs = fig.subplots(2, 2, sharex='row', sharey='row')
-            fig.canvas.set_window_title("mrs.reco.MRSData2.correct_zerofill_nd"[-FIG_TITLE_WIDTH:])
+            fig.canvas.set_window_title("correct_zerofill_nd (mrs.reco.MRSData2)")
             fig.suptitle("zero-filling [%s]" % self.display_label)
 
             # no time axis, we want to see the number of points
@@ -855,7 +854,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig = plt.figure(110)
             fig.clf()
             axs = fig.subplots(2, 3, sharex='col')
-            fig.canvas.set_window_title("mrs.reco.MRSData2.correct_phase_3d"[-FIG_TITLE_WIDTH:])
+            fig.canvas.set_window_title("correct_phase_3d (mrs.reco.MRSData2)")
             fig.suptitle("phasing [%s]" % self.display_label)
 
         # display chosen method
@@ -1315,7 +1314,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig = plt.figure(120)
             fig.clf()
             axs = fig.subplots(2, 2, sharex='all')
-            fig.canvas.set_window_title("mrs.reco.MRSData2.analyze_physio_2d_1"[-FIG_TITLE_WIDTH:])
+            fig.canvas.set_window_title("analyze_physio_2d_1 (mrs.reco.MRSData2)")
             fig.suptitle("analyzing physiological signals for [%s]" % self.display_label)
 
             p = 0
@@ -1340,7 +1339,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig = plt.figure(121)
             fig.clf()
             axs = fig.subplots(2, 2, sharex='all')
-            fig.canvas.set_window_title("mrs.reco.MRSData2.analyze_physio_2d_2"[-FIG_TITLE_WIDTH:])
+            fig.canvas.set_window_title("analyze_physio_2d_2 (mrs.reco.MRSData2)")
             fig.suptitle("analyzing physiological signals for [%s]" % self.display_label)
 
             p = 0
@@ -1373,7 +1372,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig = plt.figure(122)
             fig.clf()
             axs = fig.subplots(2, 2, sharex='all')
-            fig.canvas.set_window_title("mrs.reco.MRSData2.analyze_physio_2d_3"[-FIG_TITLE_WIDTH:])
+            fig.canvas.set_window_title("analyze_physio_2d_3 (mrs.reco.MRSData2)")
             fig.suptitle("analyzing physiological signals for [%s]" % self.display_label)
 
             p = 0
@@ -1397,7 +1396,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig = plt.figure(123)
             fig.clf()
             axs = fig.subplots(2, 2, sharex='all')
-            fig.canvas.set_window_title("mrs.reco.MRSData2.analyze_physio_2d_4"[-FIG_TITLE_WIDTH:])
+            fig.canvas.set_window_title("analyze_physio_2d_4 (mrs.reco.MRSData2)")
             fig.suptitle("analyzing physiological signals for [%s]" % self.display_label)
 
             p = 0
@@ -1687,7 +1686,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                     if(not display_axes_ready[0]):
                         # we just created the figure, let's create the axes
                         fig.clf()
-                        fig.canvas.set_window_title("mrs.reco.MRSData2.correct_analyze_and_reject_2d (auto 1/2)"[-FIG_TITLE_WIDTH:])
+                        fig.canvas.set_window_title("correct_analyze_and_reject_2d (auto 1/2) (mrs.reco.MRSData2)")
                         fig.suptitle("adjusting data rejection criteria for [%s] (round #%d)" % (self.display_label, iround_data_rej))
                         fig.subplots(2, 2)
                         for a in fig.axes:
@@ -1714,7 +1713,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                     if(not display_axes_ready[1]):
                         # we just created the figure, let's create the axes
                         fig.clf()
-                        fig.canvas.set_window_title("mrs.reco.MRSData2.correct_analyze_and_reject_2d (auto 2/2)"[-FIG_TITLE_WIDTH:])
+                        fig.canvas.set_window_title("correct_analyze_and_reject_2d (auto 2/2) (mrs.reco.MRSData2)")
                         fig.suptitle("estimating data rejection rates for [%s] (round #%d)" % (self.display_label, iround_data_rej))
                         fig.subplots(2, 2)
                         for a in fig.axes:
@@ -1841,7 +1840,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig = plt.figure(129 + (iround_data_rej - 1) * 4 + 3)
             fig.clf()
             axs = fig.subplots(2, 3, sharex='all')
-            fig.canvas.set_window_title("mrs.reco.MRSData2.correct_analyze_and_reject_2d (summary)"[-FIG_TITLE_WIDTH:])
+            fig.canvas.set_window_title("correct_analyze_and_reject_2d (summary) (mrs.reco.MRSData2)")
             fig.suptitle("analyzing data and rejecting some for [%s] (round #%d)" % (self.display_label, iround_data_rej))
 
             k = 0
@@ -1917,7 +1916,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig = plt.figure(129 + (iround_data_rej - 1) * 4 + 4)
             fig.clf()
             ax = fig.subplots()
-            fig.canvas.set_window_title("mrs.reco.MRSData2.correct_analyze_and_reject_2d (rej. data)"[-FIG_TITLE_WIDTH:])
+            fig.canvas.set_window_title("correct_analyze_and_reject_2d (rej. data) (mrs.reco.MRSData2)")
             fig.suptitle("original, corrected and rejected spectra for [%s] (round #%d)" % (self.display_label, iround_data_rej))
 
             ax.plot(s_rej_avg.frequency_axis_ppm(), s_rej_avg.spectrum().real, 'r-', linewidth=1, label=s_rej_avg.display_label)
@@ -2081,7 +2080,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 fig = plt.figure(140)
                 fig.clf()
                 axs = fig.subplots(2, 3, sharex='all', sharey='all')
-                fig.canvas.set_window_title("mrs.reco.MRSData2.correct_realign_2d"[-FIG_TITLE_WIDTH:])
+                fig.canvas.set_window_title("correct_realign_2d (mrs.reco.MRSData2)")
                 fig.suptitle("frequency realigning [%s]" % self.display_label)
 
                 # display original averaged spectrum
@@ -2179,7 +2178,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 fig = plt.figure(150)
                 fig.clf()
                 axs = fig.subplots(2, 1, sharex='all', sharey='all')
-                fig.canvas.set_window_title("mrs.reco.MRSData2.correct_average_2d"[-FIG_TITLE_WIDTH:])
+                fig.canvas.set_window_title("correct_average_2d (mrs.reco.MRSData2)")
                 fig.suptitle("averaging [%s]" % self.display_label)
 
                 axs[0].plot(ppm, s.spectrum().real.transpose(), 'k-', linewidth=1)
@@ -2257,7 +2256,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig = plt.figure(160)
             fig.clf()
             axs = fig.subplots(2, 1, sharex='all', sharey='all')
-            fig.canvas.set_window_title("mrs.reco.MRSData2.correct_phase_1d"[-FIG_TITLE_WIDTH:])
+            fig.canvas.set_window_title("correct_phase_1d (mrs.reco.MRSData2)")
             fig.suptitle("phasing (suspect) [%s]" % self.display_label)
 
             axs[0].plot(s.frequency_axis_ppm(), s.spectrum().real, 'k-', linewidth=1)
@@ -2335,7 +2334,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig = plt.figure(170)
             fig.clf()
             axs = fig.subplots(2, 2, sharex='row', sharey='row')
-            fig.canvas.set_window_title("mrs.reco.MRSData2.correct_apodization"[-FIG_TITLE_WIDTH:])
+            fig.canvas.set_window_title("correct_apodization (mrs.reco.MRSData2)")
             fig.suptitle("apodizing [%s]" % self.display_label)
 
             axs[0, 0].plot(t, np.abs(s_disp).transpose(), 'k-', linewidth=1, label='fid')
@@ -2423,7 +2422,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig = plt.figure(180)
             fig.clf()
             axs = fig.subplots(2, 2, sharex='row', sharey='row')
-            fig.canvas.set_window_title("mrs.reco.MRSData2.correct_crop_1d"[-FIG_TITLE_WIDTH:])
+            fig.canvas.set_window_title("correct_crop_1d (mrs.reco.MRSData2)")
             fig.suptitle("cropping [%s]" % self.display_label)
 
             axs[0, 0].plot(t, np.abs(s), 'k-', linewidth=1, label='fid')
@@ -2518,7 +2517,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig = plt.figure(190)
             fig.clf()
             axs = fig.subplots(2, 1, sharex='all', sharey='all')
-            fig.canvas.set_window_title("mrs.reco.MRSData2.correct_water_removal_1d"[-FIG_TITLE_WIDTH:])
+            fig.canvas.set_window_title("correct_water_removal_1d (mrs.reco.MRSData2)")
             fig.suptitle("removing water peak for [%s]" % self.display_label)
 
             # original spectrum
@@ -2594,7 +2593,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig = plt.figure(200)
             fig.clf()
             axs = fig.subplots(2, 1, sharex='all', sharey='all')
-            fig.canvas.set_window_title("mrs.reco.MRSData2.correct_freqshift_1d"[-FIG_TITLE_WIDTH:])
+            fig.canvas.set_window_title("correct_freqshift_1d (mrs.reco.MRSData2)")
             fig.suptitle("calibrating [%s]" % self.display_label)
 
             axs[0].plot(ppm, s.spectrum().real, 'k-', linewidth=1)
@@ -2675,7 +2674,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig = plt.figure(210)
             fig.clf()
             axs = fig.subplots(2, 2)
-            fig.canvas.set_window_title("mrs.reco.MRSData2.correct_bandpass_filtering_1d"[-FIG_TITLE_WIDTH:])
+            fig.canvas.set_window_title("correct_bandpass_filtering_1d (mrs.reco.MRSData2)")
             fig.suptitle("filtering [%s]" % self.display_label)
 
             axs[0, 0].plot(s.time_axis(), np.real(s), 'k-', linewidth=1)
@@ -2752,7 +2751,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig = plt.figure(220)
             fig.clf()
             axs = fig.subplots(2, 1, sharex='all', sharey='all')
-            fig.canvas.set_window_title("mrs.reco.MRSData2.analyze_snr_1d"[-FIG_TITLE_WIDTH:])
+            fig.canvas.set_window_title("analyze_snr_1d (mrs.reco.MRSData2)")
             fig.suptitle("analyzing SNR for [%s]" % self.display_label)
 
         # find maximum peak in range
@@ -2856,7 +2855,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig = plt.figure(230)
             fig.clf()
             axs = fig.subplots(2, 1, sharex='all', sharey='all')
-            fig.canvas.set_window_title("mrs.reco.MRSData2.analyze_linewidth_1d"[-FIG_TITLE_WIDTH:])
+            fig.canvas.set_window_title("analyze_linewidth_1d (mrs.reco.MRSData2)")
             fig.suptitle("analyzing peak linewidth for [%s]" % self.display_label)
 
             axs[0].plot(ppm, np.real(sf), 'k-', linewidth=1)
@@ -2912,7 +2911,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         s = self.copy()
         log.debug("displaying stuff!")
 
-        plt.figure(ifig).canvas.set_window_title("mrs.reco.MRSData2.display_spectrum_1d"[-FIG_TITLE_WIDTH:])
+        plt.figure(ifig).canvas.set_window_title("display_spectrum_1d (mrs.reco.MRSData2)")
         if(magnitude_mode):
             plt.plot(s.frequency_axis_ppm(), np.abs(s.spectrum()) + self.display_offset, linewidth=1, label=self.display_label)
         else:
@@ -4046,7 +4045,7 @@ class pipeline:
             fig = plt.figure(300)
             fig.clf()
             axs = fig.subplots(2, 1, sharex='row')
-            fig.canvas.set_window_title("mrs.reco.pipeline.display_analyze_results"[-FIG_TITLE_WIDTH:])
+            fig.canvas.set_window_title("display_analyze_results (mrs.reco.MRSData2)")
             fig.suptitle("SNR/peak-linewidth results")
 
             # prepare bars
@@ -4131,7 +4130,7 @@ class pipeline:
         # for each dataset
         log.info("saving all datasets to file [%s]..." % rdb.db_file)
         for d in self.dataset:
-            rdb.save_dataset(d, self)
+            rdb.save_reco_dataset(d, self)
 
     def load_template(self, template_name):
         """
@@ -4288,7 +4287,7 @@ def reco_spatial_select_profile(dcm_folders_list, legends_list, analyze_selectiv
     fig = plt.figure()
     fig.clf()
     axs = fig.subplots(2, 3)
-    fig.canvas.set_window_title("mrs.reco.voi_pipeline.run"[-FIG_TITLE_WIDTH:])
+    fig.canvas.set_window_title("run (mrs.reco.voi_pipeline)")
     fig.suptitle("spatial selection profiles")
     for (sx, sy, sz, sx_ax, sy_ax, sz_ax, leg) in zip(xdata_list, ydata_list, zdata_list, xdata_axis_list, ydata_axis_list, zdata_axis_list, legends_list):
 
