@@ -326,8 +326,8 @@ for this_hash, this_dataset in zip(df_sel.index, df_sel["dataset"]):
         fittool.params_init[metabolites_fit, xxx.p_cm] = 0.1
 
         # frequency shifts for metabolites
-        fittool.params_min[xxx.m_All_MBs, xxx.p_df] = -15.0
-        fittool.params_max[xxx.m_All_MBs, xxx.p_df] = 15.0
+        fittool.params_min[xxx.m_All_MBs, xxx.p_df] = -20.0
+        fittool.params_max[xxx.m_All_MBs, xxx.p_df] = 20.0
 
         # phase bounds for metabolites and lipids
         fittool.params_min[:, xxx.p_dp] = -0.1
