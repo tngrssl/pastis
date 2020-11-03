@@ -348,7 +348,7 @@ class fit_tool:
         self.params_init = (self.params_min + self.params_max) / 2.0
         # with early minimal concentrations
         self.params_init[xxx.m_All_MBs, xxx.p_cm] = self.params_min[xxx.m_All_MBs, xxx.p_cm] * 1.1
-        # with early minimal dmaping
+        # with early minimal damping
         self.params_init[xxx.m_All_MBs, xxx.p_dd] = self.params_min[xxx.m_All_MBs, xxx.p_dd] * 1.1
 
         # link-lock vectors should be the same for initial, minimum and maximum parameter sets: link them here

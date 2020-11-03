@@ -26,10 +26,11 @@ plt.rcParams['figure.max_open_warning'] = 1000
 plt.rcParams['font.size'] = 9
 log.setLevel(log.DEBUG)
 
-rdb = db.data_db("/home/tangir/crmbm/acq_db/brain.pkl")
+rdb = db.data_db("/home/tangir/crmbm/acq_db/sc.pkl")
 
 # %% select datasets via dataframe
 
+# df_sel = rdb.df.loc[(rdb.df["patient"] == 304) & (rdb.df["study"] == 2)]
 df_sel = rdb.df
 
 # %% fit strategies
@@ -48,7 +49,9 @@ metabolites_fit = np.sort([
     xxx.m_NAA_CH3,
     xxx.m_Cr_CH3,
     xxx.m_Cho_CH3,
-    xxx.m_Water])
+    xxx.m_Water,
+    xxx.m_Lip1,
+    xxx.m_Lip2])
 
 # linklock: relations between fit parameters
 linklock_arr = linklock_arr_unset.copy()
@@ -57,6 +60,8 @@ linklock_arr[metabolites_fit, :] = [0, 200, 0, 100]
 linklock_arr[xxx.m_Cr_CH3, :] = [0, -200, 0, -100]
 # leave water free
 linklock_arr[xxx.m_Water, :] = [0, 0, 0, 0]
+# leave Lipids linewidth free
+linklock_arr[[xxx.m_Lip1, xxx.m_Lip2], :] = [0, 0, 0, 100]
 
 # store this strategy
 fit_stategies["singlets"] = {}
@@ -68,7 +73,9 @@ metabolites_fit = np.sort([
     xxx.m_NAA_CH3,
     xxx.m_Cr_CH3,
     xxx.m_Cho_CH3,
-    xxx.m_Water])
+    xxx.m_Water,
+    xxx.m_Lip1,
+    xxx.m_Lip2])
 
 # linklock: relations between fit parameters
 linklock_arr = linklock_arr_unset.copy()
@@ -77,6 +84,8 @@ linklock_arr[metabolites_fit, :] = [0, 0, 0, 100]
 linklock_arr[xxx.m_Cr_CH3, :] = [0, 0, 0, -100]
 # leave water free
 linklock_arr[xxx.m_Water, :] = [0, 0, 0, 0]
+# leave Lipids linewidth free
+linklock_arr[[xxx.m_Lip1, xxx.m_Lip2], :] = [0, 0, 0, 100]
 
 # store this strategy
 fit_stategies["singlets_free"] = {}
@@ -92,7 +101,9 @@ metabolites_fit = np.sort([
     xxx.m_Cho_CH3,
     xxx.m_Cho_CH2,
     xxx.m_mI,
-    xxx.m_Water])
+    xxx.m_Water,
+    xxx.m_Lip1,
+    xxx.m_Lip2])
 
 # linklock: relations between fit parameters
 linklock_arr = linklock_arr_unset.copy()
@@ -101,6 +112,8 @@ linklock_arr[metabolites_fit, :] = [0, 200, 0, 100]
 linklock_arr[xxx.m_Cr_CH3, :] = [0, -200, 0, -100]
 # leave water free
 linklock_arr[xxx.m_Water, :] = [0, 0, 0, 0]
+# leave Lipids linewidth free
+linklock_arr[[xxx.m_Lip1, xxx.m_Lip2], :] = [0, 0, 0, 100]
 
 # store this strategy
 fit_stategies["singlets_CH2s_mI"] = {}
@@ -116,7 +129,9 @@ metabolites_fit = np.sort([
     xxx.m_Cho_CH3,
     xxx.m_Cho_CH2,
     xxx.m_mI,
-    xxx.m_Water])
+    xxx.m_Water,
+    xxx.m_Lip1,
+    xxx.m_Lip2])
 
 # linklock: relations between fit parameters
 linklock_arr = linklock_arr_unset.copy()
@@ -129,6 +144,8 @@ linklock_arr[xxx.m_Water, :] = [0, 0, 0, 0]
 linklock_arr[xxx.m_NAA_CH3, :] = [0, 0, 0, 100]
 linklock_arr[xxx.m_Cr_CH3, :] = [0, 0, 0, 100]
 linklock_arr[xxx.m_Cho_CH3, :] = [0, 0, 0, 100]
+# leave Lipids linewidth free
+linklock_arr[[xxx.m_Lip1, xxx.m_Lip2], :] = [0, 0, 0, 100]
 
 # store this strategy
 fit_stategies["free_singlets_CH2s_mI"] = {}
@@ -147,7 +164,9 @@ metabolites_fit = np.sort([
     xxx.m_Glu,
     xxx.m_mI,
     xxx.m_Tau,
-    xxx.m_Water])
+    xxx.m_Water,
+    xxx.m_Lip1,
+    xxx.m_Lip2])
 
 # linklock: relations between fit parameters
 linklock_arr = linklock_arr_unset.copy()
@@ -156,6 +175,8 @@ linklock_arr[metabolites_fit, :] = [0, 200, 0, 100]
 linklock_arr[xxx.m_Cr_CH3, :] = [0, -200, 0, -100]
 # leave water free
 linklock_arr[xxx.m_Water, :] = [0, 0, 0, 0]
+# leave Lipids linewidth free
+linklock_arr[[xxx.m_Lip1, xxx.m_Lip2], :] = [0, 0, 0, 100]
 
 # store this strategy
 fit_stategies["singlets_CH2s_mI_Glx_Tau"] = {}
@@ -174,7 +195,9 @@ metabolites_fit = np.sort([
     xxx.m_Glu,
     xxx.m_mI,
     xxx.m_Tau,
-    xxx.m_Water])
+    xxx.m_Water,
+    xxx.m_Lip1,
+    xxx.m_Lip2])
 
 # linklock: relations between fit parameters
 linklock_arr = linklock_arr_unset.copy()
@@ -187,6 +210,8 @@ linklock_arr[xxx.m_Water, :] = [0, 0, 0, 0]
 linklock_arr[xxx.m_NAA_CH3, :] = [0, 0, 0, 100]
 linklock_arr[xxx.m_Cr_CH3, :] = [0, 0, 0, 100]
 linklock_arr[xxx.m_Cho_CH3, :] = [0, 0, 0, 100]
+# leave Lipids linewidth free
+linklock_arr[[xxx.m_Lip1, xxx.m_Lip2], :] = [0, 0, 0, 100]
 
 # store this strategy
 fit_stategies["free_singlets_CH2s_mI_Glx_Tau"] = {}
@@ -207,6 +232,9 @@ for this_hash, this_dataset in zip(df_sel.index, df_sel["dataset"]):
 
     # display the data
     this_data.display_spectrum_1d()
+
+    # removing any artefact > 5ppm (corrupts fit quality criteria)
+    this_data = this_data.correct_water_removal_1d(5, [5, 6], True)
 
     # perform area integration and ref fit
 
@@ -308,33 +336,43 @@ for this_hash, this_dataset in zip(df_sel.index, df_sel["dataset"]):
         fittool = fit.fit_tool(this_data, seq)
 
         # default fitting bounds from muscle template
-        fittool.params_min = fittool.params_min.set_default_min()
-        fittool.params_max = fittool.params_max.set_default_max()
+        fittool.params_min = fittool.params_min.set_default_min().add_macromolecules_min()
+        fittool.params_max = fittool.params_max.set_default_max().add_macromolecules_max()
+
+        # re-init params_init
+        fittool.params_init = (fittool.params_min + fittool.params_max) / 2.0
 
         # ranges for concentration
         fittool.params_min[:, xxx.p_cm] = 0.09
         fittool.params_max[:, xxx.p_cm] = 300.0
+        fittool.params_max[xxx.m_All_MMs, xxx.p_cm] = 600.0
         fittool.params_max[xxx.m_Water, xxx.p_cm] = 100000.0
 
         # linewidth bounds for metabolites
-        # use water linewidth
-        fittool.params_min[xxx.m_All_MBs, xxx.p_dd] = 5
-        fittool.params_max[xxx.m_All_MBs, xxx.p_dd] = params_ref_fit[xxx.m_Water, xxx.p_dd] + 5
+        # use water linewidth for max
+        fittool.params_min[:, xxx.p_dd] = 5
+        fittool.params_max[:, xxx.p_dd] = params_ref_fit[xxx.m_Water, xxx.p_dd] + 5
+        # let the MMs go above
+        fittool.params_max[xxx.m_All_MMs, xxx.p_dd] = 400
+        # with early minimal damping
+        fittool.params_init[:, xxx.p_dd] = fittool.params_min[:, xxx.p_dd] * 1.1
 
         # initial concentrations
         fittool.params_init[:, xxx.p_cm] = 0.0
         fittool.params_init[metabolites_fit, xxx.p_cm] = 0.1
 
         # frequency shifts for metabolites
-        fittool.params_min[xxx.m_All_MBs, xxx.p_df] = -20.0
-        fittool.params_max[xxx.m_All_MBs, xxx.p_df] = 20.0
+        # TODO: understand why I have a 0.05ppm systematic shift
+        fittool.params_init[:, xxx.p_df] = -15.0
+        fittool.params_min[:, xxx.p_df] = -35.0
+        fittool.params_max[:, xxx.p_df] = 5.0
 
         # phase bounds for metabolites and lipids
         fittool.params_min[:, xxx.p_dp] = -0.1
         fittool.params_max[:, xxx.p_dp] = +0.1
 
         # linklock
-        linklock_arr = metabolites_fit = fit_stategies[this_fit_strategy]["linklock"]
+        linklock_arr = fit_stategies[this_fit_strategy]["linklock"]
         fittool.params_init.linklock[:] = linklock_arr.copy()
 
         # numerical optimization parameters
