@@ -28,10 +28,14 @@ log.setLevel(log.DEBUG)
 
 rdb = db.data_db("/home/tangir/crmbm/acq_db/sc.pkl")
 
+# display real-time fit and other stuff?
+display_stuff = False
+
 # %% select datasets via dataframe
 
-# df_sel = rdb.df.loc[(rdb.df["patient"] == 304) & (rdb.df["study"] == 2)]
 df_sel = rdb.df
+# df_sel = rdb.df.loc[(rdb.df["patient"] == 304) & (rdb.df["study"] == 2)]
+# df_sel = rdb.df.loc[(rdb.df.index == "3695a02a4fbf0153215cf09eaa21658e")]
 
 # %% fit strategies
 
@@ -231,10 +235,11 @@ for this_hash, this_dataset in zip(df_sel.index, df_sel["dataset"]):
         this_data = this_dataset["dcm"]["data"]
 
     # display the data
-    this_data.display_spectrum_1d()
+    if(display_stuff):
+        this_data.display_spectrum_1d()
 
-    # removing any artefact > 5ppm (corrupts fit quality criteria)
-    this_data = this_data.correct_water_removal_1d(5, [5, 6], True)
+    # removing water and any artefact > 5ppm (corrupts fit quality criteria)
+    this_data = this_data.correct_water_removal_1d(8, [4.5, 6], display_stuff)
 
     # perform area integration and ref fit
 
@@ -261,6 +266,7 @@ for this_hash, this_dataset in zip(df_sel.index, df_sel["dataset"]):
     prefittool = fit.prefit_tool(this_data.data_ref, seq)
     prefittool.area_integration_peak_ranges = [0.5]
     prefittool.area_integration_peaks = [xxx.m_Water]
+    prefittool.display_enable = display_stuff
     prefittool.initialize()
     params_ref_area, params_ref_area_pnorm = prefittool.run()
 
@@ -268,6 +274,7 @@ for this_hash, this_dataset in zip(df_sel.index, df_sel["dataset"]):
     prefittool = fit.prefit_tool(this_data, seq)
     prefittool.area_integration_peak_ranges = [0.1, 0.1, 0.1]
     prefittool.area_integration_peaks = [xxx.m_NAA_CH3, xxx.m_Cr_CH3, xxx.m_Cho_CH3]
+    prefittool.display_enable = display_stuff
     prefittool.initialize()
     params_area, params_area_pnorm = prefittool.run()
 
@@ -302,6 +309,8 @@ for this_hash, this_dataset in zip(df_sel.index, df_sel["dataset"]):
     fittool.optim_ftol = 1e-9
     fittool.optim_gtol = 1e-9
     fittool.display_range_ppm = [3, 7]
+
+    fittool.display_enable = display_stuff
 
     # run the fit
     fittool.initialize()
@@ -378,6 +387,8 @@ for this_hash, this_dataset in zip(df_sel.index, df_sel["dataset"]):
         # numerical optimization parameters
         fittool.display_range_ppm = [0, 6]
         fittool.display_frequency = 2
+
+        fittool.display_enable = display_stuff
 
         # run the fit
         fittool.initialize()
