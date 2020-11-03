@@ -10,6 +10,7 @@ from mrs import paths as default_paths
 from mrs import reco
 from mrs import sim
 from mrs import log
+import scipy.optimize as optimize
 import pandas as pd
 import os
 import pickle
@@ -88,6 +89,7 @@ class data_db():
 
         self.db_file = pkl_db_file
         self._df = pkl_df
+        log.debug("finished reading!")
 
     def _save_db_file(self):
         """Save the content of the dict to the PKL file."""
@@ -96,6 +98,8 @@ class data_db():
         # write back pkl file
         with open(self.db_file, 'wb') as f:
             pickle.dump([self.db_file, self._df], f)
+
+        log.debug("finished saving!")
 
     def save_reco_dataset(self, d, rp=None):
         """
@@ -271,6 +275,16 @@ class data_db():
         elif(isinstance(var, (reco.MRSData2, reco.pipeline, sim.mrs_sequence))):
             # scrap the dict attribute
             name_list, val_list = self._scrap_data(var.__dict__)
+
+            # add the resulting parameter names and the original object
+            par_name_list = par_name_list + ["obj"] + name_list
+            par_val_list = par_val_list + [var] + val_list
+
+        # if scraping an optim result
+        elif(isinstance(var, optimize.OptimizeResult)):
+            # this is actually a dict but the __dict__ is empty for some reason (!?)
+            name_list = list(var.keys())
+            val_list = list(var.values())
 
             # add the resulting parameter names and the original object
             par_name_list = par_name_list + ["obj"] + name_list

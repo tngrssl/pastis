@@ -254,7 +254,6 @@ p.dataset[3]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/307-AP-P1-MOELLE/me
 
 p.job["realigning"]["moving_averages"] = 2
 p.job["data-rejecting"]["moving_averages"] = 2
-
 p.run()
 p.check_analyze_results(True)
 p.save_datasets(rdb)
@@ -670,6 +669,7 @@ p.save_datasets(rdb)
 # %% 04/03/2020 - 304-ka-p2-moelle - Karen P2 :(
 # dataset #0 contains big water artefact, data quality is horrible, could not make it happen
 # dataset #1, a bit better but still not good enough
+# very particular processing: I do not use the ref scan for phasing but the 5ppm artefact which has the best SNR
 
 get_ipython().magic("clear")
 plt.close("all")
@@ -695,13 +695,18 @@ p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/304-ka-p2-moelle/2020030
 
 # water peak very small and close to 5ppm artefact
 p.job["phasing"]["using_ref_data"] = False
-p.settings["POI_range_ppm"] = [4.5, 4.8]
+
+p.settings["POI_range_ppm"] = [5, 5.5]
 p.settings["POI_shift_range_ppm"] = [4.5, 4.8]
 p.settings["POI_LW_range_ppm"] = [4.5, 4.8]
 
 p.job["realigning"]["moving_averages"] = 2
-p.job["data-rejecting"]["moving_averages"] = 4
 p.job["realigning"]["inter_corr_mode"] = True
+
+# data rejection is confused with artefact!
+p.job["data-rejecting"]["moving_averages"] = 4
+p.job["data-rejecting"]["auto_method_list"] = [reco.data_rejection_method.AUTO_AMPLITUDE,
+                                               reco.data_rejection_method.AUTO_LINEWIDTH]
 
 p.run()
 p.check_analyze_results(True)
@@ -736,9 +741,27 @@ p.check_analyze_results(True)
 p.save_datasets(rdb)
 
 # %% 09/06/2020 - 336-nb-p2-moelle - Naouelle P2 :)
-# data #2 did not pass quality check, did my best
+# dataset #2 is bad, processed it differently for the 3 others
 get_ipython().magic("clear")
 plt.close("all")
+
+p = reco.pipeline("sc_std_nows")
+
+p.dataset[0]["legend"] = "sLASER 10/2 NA=64 notrig"
+p.dataset[0]["resp_bpm"] = 18
+p.dataset[0]["heart_bpm"] = 60
+p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID122_slaser_R_N=10_2_longTE_SNR+++_FID57329.dat",
+                                "/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID124_slaser_R_N=10_2_longTE_SNR+++_FID57331.dat"]
+p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/336-nb-p2-moelle/20200609/01_0013_slaser-r-n",
+                                "/home/tangir/crmbm/acq/336-nb-p2-moelle/20200609/01_0014_slaser-r-n"]
+
+p.job["realigning"]["moving_averages"] = 2
+p.job["realigning"]["inter_corr_mode"] = True
+p.job["data-rejecting"]["moving_averages"] = 2
+
+p.run()
+p.check_analyze_results(True)
+p.save_datasets(rdb)
 
 p = reco.pipeline("sc_std_nows")
 
@@ -758,24 +781,18 @@ p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/me
 p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/336-nb-p2-moelle/20200609/01_0010_slaser-r-n",
                                 "/home/tangir/crmbm/acq/336-nb-p2-moelle/20200609/01_0011_slaser-r-n"]
 
-p.dataset[2]["legend"] = "sLASER 10/2 NA=64 notrig"
+p.dataset[2]["legend"] = "sLASER 5/5 NA=64 notrig"
 p.dataset[2]["resp_bpm"] = 18
 p.dataset[2]["heart_bpm"] = 60
-p.dataset[2]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID122_slaser_R_N=10_2_longTE_SNR+++_FID57329.dat",
-                                "/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID124_slaser_R_N=10_2_longTE_SNR+++_FID57331.dat"]
-p.dataset[2]["dcm"]["files"] = ["/home/tangir/crmbm/acq/336-nb-p2-moelle/20200609/01_0013_slaser-r-n",
-                                "/home/tangir/crmbm/acq/336-nb-p2-moelle/20200609/01_0014_slaser-r-n"]
-
-p.dataset[3]["legend"] = "sLASER 5/5 NA=64 notrig"
-p.dataset[3]["resp_bpm"] = 18
-p.dataset[3]["heart_bpm"] = 60
-p.dataset[3]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID127_slaser_R_N=5_5+_shortTE_SNR++_FID57334.dat",
+p.dataset[2]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID127_slaser_R_N=5_5+_shortTE_SNR++_FID57334.dat",
                                 "/home/tangir/crmbm/acq_twix/336-nb-p2-moelle/meas_MID129_slaser_R_N=5_5+_shortTE_SNR++_FID57336.dat"]
-p.dataset[3]["dcm"]["files"] = ["/home/tangir/crmbm/acq/336-nb-p2-moelle/20200609/01_0015_slaser-r-n",
+p.dataset[2]["dcm"]["files"] = ["/home/tangir/crmbm/acq/336-nb-p2-moelle/20200609/01_0015_slaser-r-n",
                                 "/home/tangir/crmbm/acq/336-nb-p2-moelle/20200609/01_0016_slaser-r-n"]
 
 p.job["realigning"]["moving_averages"] = 2
+p.job["realigning"]["inter_corr_mode"] = False
 p.job["data-rejecting"]["moving_averages"] = 2
+
 p.run()
 p.check_analyze_results(True)
 p.save_datasets(rdb)
