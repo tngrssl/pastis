@@ -305,9 +305,14 @@ class data_db():
 
         return(par_name_list, par_val_list)
 
-    def create_big_df(self):
+    def create_big_df(self, replace_none_raw_with_dcm=False):
         """
         Extract info from stored objects and dicts and create an extended dataframe.
+
+        Parameters
+        ----------
+        replace_none_raw_with_dcm : boolean
+            Deal with the tricky exception of datasets that only have dcm data and no raw.
 
         Returns
         -------
@@ -319,11 +324,20 @@ class data_db():
         # reload db file
         self._read_db_file()
 
+        # fix non raw data?
+        if(replace_none_raw_with_dcm):
+            df2scrap = self.df.copy()
+            for i, row in self.df.iterrows():
+                if(row["dataset"]["raw"]["data"] is None):
+                    df2scrap.loc[i, "dataset"]["raw"] = row["dataset"]["dcm"]
+        else:
+            df2scrap = self.df
+
         # init a list of df
         df_list = []
 
         # browse db
-        for i, row in self.df.iterrows():
+        for i, row in df2scrap.iterrows():
             this_column_list, this_values_list = self._scrap_data(row.to_dict())
             # add hash
             this_column_list = ["hash"] + this_column_list
