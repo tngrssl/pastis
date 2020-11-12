@@ -26,22 +26,21 @@ plt.rcParams['figure.max_open_warning'] = 1000
 plt.rcParams['font.size'] = 9
 log.setLevel(log.DEBUG)
 
-rdb = db.data_db("/home/tangir/crmbm/acq_db/sc.pkl")
+rdb = db.data_db("/home/tangir/crmbm/acq_db/brain.pkl")
 
 # display real-time fit and other stuff?
 display_stuff = False
 
 # %% select datasets via dataframe
 
-df_sel = rdb.df
-# df_sel = rdb.df.loc[(rdb.df["patient"] == 304) & (rdb.df["study"] == 2)]
-# df_sel = rdb.df.loc[(rdb.df.index == "3695a02a4fbf0153215cf09eaa21658e")]
+df_sel = rdb.df_reco
+# df_sel = rdb.df_reco.loc[(rdb.df_reco["patient"] == 308) & (rdb.df_reco["study"] == 1)]
+# df_sel = rdb.df_reco.loc[(rdb.df_reco.index == "3695a02a4fbf0153215cf09eaa21658e")]
 
 # %% fit strategies
 
-# object to save different strategies
-# TODO: maybe a class would be nice...
-fit_stategies = {}
+# list to save different strategies
+fit_stategies_list = []
 
 # init metabolite basis set and linklock
 meta_bs = sim.metabolite_basis_set()
@@ -68,9 +67,8 @@ linklock_arr[xxx.m_Water, :] = [0, 0, 0, 0]
 linklock_arr[[xxx.m_Lip1, xxx.m_Lip2], :] = [0, 0, 0, 100]
 
 # store this strategy
-fit_stategies["singlets"] = {}
-fit_stategies["singlets"]["metabolites"] = metabolites_fit
-fit_stategies["singlets"]["linklock"] = linklock_arr
+this_strategy = fit.fit_stategy("singlets", metabolites_fit, linklock_arr)
+fit_stategies_list.append(this_strategy)
 
 # --- easy strategy: free singlets (amares) ---
 metabolites_fit = np.sort([
@@ -92,9 +90,8 @@ linklock_arr[xxx.m_Water, :] = [0, 0, 0, 0]
 linklock_arr[[xxx.m_Lip1, xxx.m_Lip2], :] = [0, 0, 0, 100]
 
 # store this strategy
-fit_stategies["singlets_free"] = {}
-fit_stategies["singlets_free"]["metabolites"] = metabolites_fit
-fit_stategies["singlets_free"]["linklock"] = linklock_arr
+this_strategy = fit.fit_stategy("singlets_free", metabolites_fit, linklock_arr)
+fit_stategies_list.append(this_strategy)
 
 # --- medium strategy: singlets, CH2s, mI ---
 metabolites_fit = np.sort([
@@ -120,9 +117,8 @@ linklock_arr[xxx.m_Water, :] = [0, 0, 0, 0]
 linklock_arr[[xxx.m_Lip1, xxx.m_Lip2], :] = [0, 0, 0, 100]
 
 # store this strategy
-fit_stategies["singlets_CH2s_mI"] = {}
-fit_stategies["singlets_CH2s_mI"]["metabolites"] = metabolites_fit
-fit_stategies["singlets_CH2s_mI"]["linklock"] = linklock_arr
+this_strategy = fit.fit_stategy("singlets_CH2s_mI", metabolites_fit, linklock_arr)
+fit_stategies_list.append(this_strategy)
 
 # --- medium strategy: free singlets, CH2s, mI ---
 metabolites_fit = np.sort([
@@ -152,9 +148,8 @@ linklock_arr[xxx.m_Cho_CH3, :] = [0, 0, 0, 100]
 linklock_arr[[xxx.m_Lip1, xxx.m_Lip2], :] = [0, 0, 0, 100]
 
 # store this strategy
-fit_stategies["free_singlets_CH2s_mI"] = {}
-fit_stategies["free_singlets_CH2s_mI"]["metabolites"] = metabolites_fit
-fit_stategies["free_singlets_CH2s_mI"]["linklock"] = linklock_arr
+this_strategy = fit.fit_stategy("free_singlets_CH2s_mI", metabolites_fit, linklock_arr)
+fit_stategies_list.append(this_strategy)
 
 # --- difficult strategy: singlets, CH2s, mI, Glx, Tau ---
 metabolites_fit = np.sort([
@@ -183,9 +178,8 @@ linklock_arr[xxx.m_Water, :] = [0, 0, 0, 0]
 linklock_arr[[xxx.m_Lip1, xxx.m_Lip2], :] = [0, 0, 0, 100]
 
 # store this strategy
-fit_stategies["singlets_CH2s_mI_Glx_Tau"] = {}
-fit_stategies["singlets_CH2s_mI_Glx_Tau"]["metabolites"] = metabolites_fit
-fit_stategies["singlets_CH2s_mI_Glx_Tau"]["linklock"] = linklock_arr
+this_strategy = fit.fit_stategy("singlets_CH2s_mI_Glx_Tau", metabolites_fit, linklock_arr)
+fit_stategies_list.append(this_strategy)
 
 # --- difficult strategy: free singlets, CH2s, mI, Glx, Tau ---
 metabolites_fit = np.sort([
@@ -218,9 +212,8 @@ linklock_arr[xxx.m_Cho_CH3, :] = [0, 0, 0, 100]
 linklock_arr[[xxx.m_Lip1, xxx.m_Lip2], :] = [0, 0, 0, 100]
 
 # store this strategy
-fit_stategies["free_singlets_CH2s_mI_Glx_Tau"] = {}
-fit_stategies["free_singlets_CH2s_mI_Glx_Tau"]["metabolites"] = metabolites_fit
-fit_stategies["free_singlets_CH2s_mI_Glx_Tau"]["linklock"] = linklock_arr
+this_strategy = fit.fit_stategy("free_singlets_CH2s_mI_Glx_Tau", metabolites_fit, linklock_arr)
+fit_stategies_list.append(this_strategy)
 
 water_concentration = 55000.0  # mmol/kg
 
@@ -244,7 +237,6 @@ for this_hash, this_dataset in zip(df_sel.index, df_sel["dataset"]):
     # perform area integration and ref fit
 
     # metabolite db
-    metabolites_fit = list(fit_stategies.values())[0]
     meta_bs = sim.metabolite_basis_set()
     meta_bs.initialize()
 
@@ -317,12 +309,12 @@ for this_hash, this_dataset in zip(df_sel.index, df_sel["dataset"]):
     [params_ref_fit, optim_result_ref] = fittool.run()
 
     # use various fit strategies
-    for this_fit_strategy in fit_stategies:
+    for this_fit_strategy in fit_stategies_list:
 
         # %% prepare simulation machine
 
         # metabolite db
-        metabolites_fit = fit_stategies[this_fit_strategy]["metabolites"]
+        metabolites_fit = this_fit_strategy.metabolites
         meta_bs = sim.metabolite_basis_set()
         meta_bs.initialize()
 
@@ -381,7 +373,7 @@ for this_hash, this_dataset in zip(df_sel.index, df_sel["dataset"]):
         fittool.params_max[:, xxx.p_dp] = +0.1
 
         # linklock
-        linklock_arr = fit_stategies[this_fit_strategy]["linklock"]
+        linklock_arr = this_fit_strategy.linklock
         fittool.params_init.linklock[:] = linklock_arr.copy()
 
         # numerical optimization parameters
@@ -401,7 +393,6 @@ for this_hash, this_dataset in zip(df_sel.index, df_sel["dataset"]):
                         "params_area_pnorm": params_area_pnorm,
                         "params_ref_fit": params_ref_fit,
                         "params_fit_final": params_fit_final,
-                        "optim_result": optim_result,
-                        "fittool": fittool}
+                        "optim_result": optim_result}
 
-        rdb.save_fit(this_hash, this_fit_strategy, fit_results)
+        rdb.save_fit_results(this_hash, fit_results, fittool, this_fit_strategy)

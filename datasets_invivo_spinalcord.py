@@ -22,6 +22,9 @@ log.setLevel(log.DEBUG)
 
 rdb = db.data_db("/home/tangir/crmbm/acq_db/sc.pkl")
 
+# display stuff?
+display_stuff = False
+
 # standard spinal cord template
 p = reco.pipeline()
 p.job_list = [  p.job["phasing"],
@@ -47,6 +50,7 @@ p.job["data-rejecting"]["auto_method_list"] = [reco.data_rejection_method.AUTO_A
                                                 reco.data_rejection_method.AUTO_FREQUENCY,
                                                 reco.data_rejection_method.AUTO_PHASE]
 
+p.settings["display"] = display_stuff
 p.save_template("sc_std_nows")
 
 # standard spinal cord template with concatenate feature (for the first 2 crappy datasets)
@@ -74,6 +78,7 @@ p.job["data-rejecting"]["auto_method_list"] = [   reco.data_rejection_method.AUT
                                                         reco.data_rejection_method.AUTO_FREQUENCY,
                                                         reco.data_rejection_method.AUTO_PHASE]
 
+p.settings["display"] = display_stuff
 p.save_template("sc_std_nows_concatenate")
 
 # %% 15/03/2019 - 291-vs-moelle-spectro-p1 - concatenated STEAM #1 :(

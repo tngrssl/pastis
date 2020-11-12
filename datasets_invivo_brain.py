@@ -22,12 +22,16 @@ log.setLevel(log.DEBUG)
 
 rdb = db.data_db("/home/tangir/crmbm/acq_db/brain.pkl")
 
+# display stuff?
+display_stuff = False
+
 # standard brain template
 p = reco.pipeline()
 
 p.settings["POI_range_ppm"] = [1.8, 2.2]
 p.settings["POI_SNR_range_ppm"] = [1.8, 2.1]
 p.settings["POI_LW_range_ppm"] = [1.8, 2.2]
+p.settings["display"] = display_stuff
 
 p.job_list = [  p.job["phasing"],
                 p.job["scaling"],
@@ -75,6 +79,7 @@ p.dataset[2]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/296_ym_p1_brainmoel
                                 "/home/tangir/crmbm/acq_twix/296_ym_p1_brainmoelle/meas_MID69_steam_shortTE_SNR+_FID33868.dat"]
 p.dataset[2]["dcm"]["files"] = ["/home/tangir/crmbm/acq/296_ym_p1_brainmoelle/296-ym-p1-brainmoelle/20190619/01_0008_steam-shortte-snr/original-primary_e09_0001.dcm",
                                 "/home/tangir/crmbm/acq/296_ym_p1_brainmoelle/296-ym-p1-brainmoelle/20190619/01_0006_steam-shortte-snr/original-primary_e09_0001.dcm"]
+
 
 p.settings["datasets_indexes"] = [0, 1]
 p.run()

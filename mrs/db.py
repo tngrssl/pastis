@@ -9,22 +9,19 @@ Stuff related to database handling. These classes help to store reconstructed da
 from mrs import paths as default_paths
 from mrs import reco
 from mrs import sim
+from mrs import fit
 from mrs import log
 import scipy.optimize as optimize
 import pandas as pd
 import os
-import pickle
-from datetime import datetime, timedelta
 from shutil import copyfile
-import pandas as pd
-import copy
 
 import pdb
 
 
 class data_db():
-    """A class used to deal with storage of reconstructed signals in pkl files.
-    The database consists of a dataframe."""
+    """A class used to deal with storage of reconstructed signals in pkl files. The database consists of dataframes.
+    One stores the reconstructed signals, the other the fits."""
 
     # frozen stuff: a technique to prevent creating new attributes
     # (https://stackoverflow.com/questions/3603502/prevent-creating-new-attributes-outside-init)
@@ -36,70 +33,83 @@ class data_db():
             log.error_new_attribute(key)
         object.__setattr__(self, key, value)
 
-    def __init__(self, data_db_file=default_paths.DEFAULT_RECO_DATA_DB_FILE):
+    def __init__(self, data_db_reco_file=default_paths.DEFAULT_RECO_DATA_DB_FILE):
         """
-        Initialize the reconstructed data storage, basically creates an empty PKL file if nothing already exists.
+        Initialize the reconstructed data storage, basically creates empty PKL files if nothing already exists.
 
         Parameters
         ----------
-        data_db_file: string
-            PKL file where all the data is stored
+        data_db_reco_file: string
+            PKL file where all the reconstructed data is stored
         """
-        # init df
-        self._df = pd.DataFrame(columns = ['hash' ,
-                                         'patient',
-                                         'study' ,
-                                         'dataset',
-                                         'reco_pipeline',
-                                         'fit_results',
-                                         'timestamp'])
+        data_db_fit_file = data_db_reco_file[:-4] + "_fit.pkl"
+        log.info("initializing db files [in progress]")
+        log.info(data_db_reco_file)
+        log.info(data_db_fit_file)
+
+        # init df reco
+        self._df_reco = pd.DataFrame(columns = ['scan_hash',
+                                                 'patient',
+                                                 'study',
+                                                 'dataset',
+                                                 'reco_pipeline'])
 
         # hash of scan will be our index (should be unique)
-        self._df = self._df.set_index('hash')
-
-        self.db_file = data_db_file
+        self._df_reco = self._df_reco.set_index('scan_hash')
 
         # if file does not exist, create it
-        if(not os.path.isfile(self.db_file)):
-            log.info("creating storage file [%s]..." % self.db_file)
-            self._save_db_file()
+        self.data_db_reco_file = data_db_reco_file
+        if(not os.path.isfile(self.data_db_reco_file)):
+            log.debug("creating storage file [%s]..." % self.data_db_reco_file)
+            self._df_reco.to_pickle(self.data_db_reco_file)
+        else:
+            log.debug("reading storage file [%s]..." % self.data_db_reco_file)
+            self._df_reco = pd.read_pickle(self.data_db_reco_file)
+        log.debug("done.")
 
-        # first read
-        self._read_db_file()
+        # init df fit
+        self._df_fit = pd.DataFrame(columns = ['fit_hash',
+                                                'scan_hash',
+                                                'fit_strategy',
+                                                'fit_pipeline',
+                                                'fit_results'])
+
+        # hash of scan will be our index (should be unique)
+        self._df_fit = self._df_fit.set_index('fit_hash')
+
+        # if file does not exist, create it
+        self.data_db_fit_file = data_db_fit_file
+        if(not os.path.isfile(self.data_db_fit_file)):
+            log.debug("creating storage file [%s]..." % self.data_db_fit_file)
+            self._df_fit.to_pickle(self.data_db_fit_file)
+        else:
+            log.debug("reading storage file [%s]..." % self.data_db_fit_file)
+            self._df_fit = pd.read_pickle(self.data_db_fit_file)
+        log.info("initializing db files [done]")
 
     @property
-    def df(self):
+    def df_reco(self):
         """
-        Property get function for df.
+        Property get function for df_reco.
 
         Returns
         -------
-        self._df : dataframe
+        self._df_reco : dataframe
             Database
         """
-        return(self._df)
+        return(self._df_reco)
 
-    def _read_db_file(self):
-        """Read the content of PKL file and store it."""
-        log.debug("reading db file [%s]..." % self.db_file)
+    @property
+    def df_fit(self):
+        """
+        Property get function for df_fit.
 
-        # now open pkl file
-        with open(self.db_file, 'rb') as f:
-            [pkl_db_file, pkl_df] = pickle.load(f)
-
-        self.db_file = pkl_db_file
-        self._df = pkl_df
-        log.debug("finished reading!")
-
-    def _save_db_file(self):
-        """Save the content of the dict to the PKL file."""
-        log.debug("saving to db file [%s]..." % self.db_file)
-
-        # write back pkl file
-        with open(self.db_file, 'wb') as f:
-            pickle.dump([self.db_file, self._df], f)
-
-        log.debug("finished saving!")
+        Returns
+        -------
+        self._df_fit : dataframe
+            Database
+        """
+        return(self._df_fit)
 
     def save_reco_dataset(self, d, rp=None):
         """
@@ -112,17 +122,15 @@ class data_db():
         rp: pipeline
             Reco pipeline used to get this data
         """
-        log.debug("saving dataset to file [%s]..." % self.db_file)
+        log.info("saving dataset to file [%s]..." % self.data_db_reco_file)
 
-        # reload db file
-        self._read_db_file()
+        log.debug("reading storage file [%s]..." % self.data_db_reco_file)
+        self._df_reco = pd.read_pickle(self.data_db_reco_file)
+        log.debug("done.")
 
         # if we reached here, that means the PKL file is not corrupted
         # let's make a backup of it
-        copyfile(self.db_file, self.db_file + ".bak")
-
-        # get timestamp
-        ts = datetime.now()
+        copyfile(self.data_db_reco_file, self.data_db_reco_file + ".bak")
 
         # get hash of data
         if(d["raw"]["data"] is None):
@@ -134,55 +142,64 @@ class data_db():
         patient_id, study_id = self._extract_patient_study_num(d)
 
         # look for hash in df
-        if(h in self._df.index):
+        if(h in self._df_reco.index):
             log.debug("scan [#%s] already exists!" % h)
             log.debug("--> updating entry in db!")
         else:
             log.debug("creating new entry for scan [#%s]!" % h)
 
-        # add entry in db
-        self._df.loc[h] = [patient_id, study_id, d, rp, None, ts]
+        # add/update entry in db
+        self._df_reco.loc[h] = [patient_id, study_id, d, rp]
 
-        # save db file
-        self._save_db_file()
+        log.debug("writing storage file [%s]..." % self.data_db_reco_file)
+        self._df_reco.to_pickle(self.data_db_reco_file)
+        log.info("saving dataset to file [done]")
 
-    def save_fit(self, data_hash, fit_key, fit_results):
+    def save_fit_results(self, scan_hash, fr, ft=None, fs=None):
         """
-        Save mrs.reco.pipeline dataset and its reco pipeline and deal with conflicts.
+        Save fit pipeline, results and deal with conflicts.
 
         Parameters
         ----------
-        data_hash: string
+        scan_hash: string
             Hash of fitted data
-        fit_key: string
-            String used to store the fit results
-        fit_results: dict
+        fr: dict
             Fit results stored as a dict
+        ft: mrs.fit.fit_tool
+            Fit pipeline object used to d othe fit
+        fs: mrs.fit.fit_strategy
+            Fit pipeline object used to d othe fit
         """
-        log.info("saving fit to file [%s]..." % self.db_file)
+        log.info("saving fit to file [%s]..." % self.data_db_fit_file)
 
-        # reload db file
-        self._read_db_file()
+        log.info("reading storage file [%s]..." % self.data_db_fit_file)
+        self._df_fit = pd.read_pickle(self.data_db_fit_file)
+        log.info("done.")
 
         # if we reached here, that means the PKL file is not corrupted
         # let's make a backup of it
-        copyfile(self.db_file, self.db_file + ".bak")
+        copyfile(self.data_db_fit_file, self.data_db_fit_file + ".bak")
 
-        # find data hash in df
-        if(data_hash not in self._df.index):
-            log.error("you are trying to store some fit results for a scan not present in the db! :(")
+        # first, check if the data we fitted in stored in the df_reco
+        if(scan_hash not in self._df_reco.index):
+            log.error("you are trying to store some fit results from a scan which is not present in the reco_db! Weird. :(")
+
+        # get fit hash: mix data hash and fit stategy
+        h = fs.hashit(scan_hash)
+
+        # look for hash in df
+        if(h in self._df_fit.index):
+            log.debug("fit [#%s] already exists!" % h)
+            log.debug("--> updating entry in db!")
         else:
-            if(self.df.loc[data_hash]["fit_results"] is None):
-                # never stored fit results before?
-                log.debug("creating a new [fit_results] entry for scan [%s]!" % data_hash)
-                self.df.at[data_hash, "fit_results"] = {fit_key: fit_results}
-            else:
-                # update
-                log.debug("updating [fit_results] for scan [%s]!" % data_hash)
-                self.df.at[data_hash, "fit_results"][fit_key] = fit_results
+            log.debug("creating new entry for fit [#%s]!" % h)
 
-        # save db file
-        self._save_db_file()
+        # add/update entry in db
+        self._df_fit.loc[h] = [scan_hash, fs, ft, fr]
+
+        log.debug("writing storage file [%s]..." % self.data_db_fit_file)
+        self._df_fit.to_pickle(self.data_db_fit_file)
+        log.info("saving dataset to file [done]")
 
     def _extract_patient_study_num(self, d):
         """
@@ -229,128 +246,177 @@ class data_db():
 
         return(patient_num, study_num)
 
-
-    def _scrap_data(self, var, prefix_str=None):
-        """
-        Scrap data in db reading dicts, lists and some objects' attributes and converting it to lists.
-
-        Parameters
-        ----------
-        var : ?
-            Could be anything but likely a dict, list, a mrs.* object or int/float/etc.
-
-        Returns
-        -------
-        par_name_list : list
-            Name of parameters scraped.
-        par_val_list : list
-            Values of parameters scraped.
-        """
-        # init lists
-        par_name_list = []
-        par_val_list = []
-
-        # if scraping a dict
-        if(type(var) is dict):
-            # browse
-            for this_dict_key in var:
-                # recursive call
-                name_list, val_list = self._scrap_data(var[this_dict_key], str(this_dict_key))
-
-                # add the resulting parameter names
-                par_name_list = par_name_list + name_list
-                par_val_list = par_val_list + val_list
-
-        # if scraping a list
-        elif(type(var) is list):
-            # browse
-            for ind, this_item in enumerate(var):
-                name_list, val_list = self._scrap_data(this_item, "[" + str(ind) + "]")
-
-                # add the resulting parameter names
-                par_name_list = par_name_list + name_list
-                par_val_list = par_val_list + val_list
-
-        # if scraping an object instance of a class we wrote in the package
-        elif(isinstance(var, (reco.MRSData2, reco.pipeline, sim.mrs_sequence))):
-            # scrap the dict attribute
-            name_list, val_list = self._scrap_data(var.__dict__)
-
-            # add the resulting parameter names and the original object
-            par_name_list = par_name_list + ["obj"] + name_list
-            par_val_list = par_val_list + [var] + val_list
-
-        # if scraping an optim result
-        elif(isinstance(var, optimize.OptimizeResult)):
-            # this is actually a dict but the __dict__ is empty for some reason (!?)
-            name_list = list(var.keys())
-            val_list = list(var.values())
-
-            # add the resulting parameter names and the original object
-            par_name_list = par_name_list + ["obj"] + name_list
-            par_val_list = par_val_list + [var] + val_list
-
-        # if scraping something else, probably some int or stuff
-        else:
-            # make it simple
-            par_name_list = par_name_list + [""]
-            par_val_list = par_val_list + [var]
-
-        # format the field name, usefull later in pandas df
-        if(prefix_str is not None):
-            if(len(par_name_list) > 1 and type(var) is not list):
-                prefix_str += "_"
-
-            par_name_list = [prefix_str + s for s in par_name_list]
-
-        return(par_name_list, par_val_list)
-
-    def create_big_df(self, replace_none_raw_with_dcm=False):
+    def extend_df_reco(self, replace_none_raw_with_dcm=False):
         """
         Extract info from stored objects and dicts and create an extended dataframe.
 
         Parameters
         ----------
         replace_none_raw_with_dcm : boolean
-            Deal with the tricky exception of datasets that only have dcm data and no raw.
+            Deal with the tricky exception of datasets that only have dcm data and no raw
 
         Returns
         -------
-        df : dataframe
-            Resulted df object.
+        edf : dataframe
+            Resulted df object
         """
         log.info("extending dataframe by scraping data...")
 
-        # reload db file
-        self._read_db_file()
-
         # fix non raw data?
         if(replace_none_raw_with_dcm):
-            df2scrap = self.df.copy()
-            for i, row in self.df.iterrows():
+            df2scrap = self.df_reco.copy()
+            for i, row in self.df_reco.iterrows():
                 if(row["dataset"]["raw"]["data"] is None):
                     df2scrap.loc[i, "dataset"]["raw"] = row["dataset"]["dcm"]
         else:
-            df2scrap = self.df
+            df2scrap = self.df_reco
 
-        # init a list of df
-        df_list = []
+        edf = _extend_df(df2scrap)
+        return(edf)
 
-        # browse db
-        for i, row in df2scrap.iterrows():
-            this_column_list, this_values_list = self._scrap_data(row.to_dict())
-            # add hash
-            this_column_list = ["hash"] + this_column_list
-            this_values_list = [i] + this_values_list
-            # convert to df (that makes one line)
-            df = pd.DataFrame([this_values_list], columns=this_column_list)
-            # store
-            df_list.append(df)
+    def extend_df_fit(self):
+        """
+        Extract info from stored objects and dicts and create an extended dataframe.
 
-        # creating final df by merging all lines
-        df = pd.DataFrame()
-        df = df.append(df_list)
-        # hash of scan will be our index (should be unique)
-        df = df.set_index('hash')
+        Returns
+        -------
+        edf : dataframe
+            Resulted df object
+        """
+        log.info("extending dataframe by scraping data...")
 
-        return(df)
+        edf = _extend_df(self.df_fit)
+        return(edf)
+
+
+def _extend_df(df):
+    """
+    Scrap data in db reading dicts, lists and some objects' attributes and converting it to lists.
+
+    Parameters
+    ----------
+    df : dataframe
+        Panda dataframe to extend
+
+    Returns
+    -------
+    edf : dataframe
+        Resulting extended dataframe
+    """
+    # init a list of df
+    df_list = []
+
+    # find index col of df
+    df_index_name = df.index.name
+
+    # browse db
+    for i, row in df.iterrows():
+        this_column_list, this_values_list = _scrap_data(row.to_dict())
+        # add hash
+        this_column_list = [df_index_name] + this_column_list
+        this_values_list = [i] + this_values_list
+        # convert to df (that makes one line)
+        this_df = pd.DataFrame([this_values_list], columns=this_column_list)
+        # store
+        df_list.append(this_df)
+
+    # creating final df by merging all lines
+    edf = pd.DataFrame()
+    edf = edf.append(df_list)
+    # hash of scan will be our index (should be unique)
+    edf = edf.set_index(df_index_name)
+
+    return(edf)
+
+
+def _scrap_data(var, prefix_str=None):
+    """
+    Scrap data in db reading dicts, lists and some objects' attributes and converting it to lists.
+
+    Parameters
+    ----------
+    var : ?
+        Could be anything but likely a dict, list, a mrs.* object or int/float/etc.
+
+    Returns
+    -------
+    par_name_list : list
+        Name of parameters scraped.
+    par_val_list : list
+        Values of parameters scraped.
+    """
+    # init lists
+    par_name_list = []
+    par_val_list = []
+
+    # if scraping a dict
+    if(type(var) is dict):
+        # browse
+        for this_dict_key in var:
+            # recursive call
+            name_list, val_list = _scrap_data(var[this_dict_key], str(this_dict_key))
+
+            # add the resulting parameter names
+            par_name_list = par_name_list + name_list
+            par_val_list = par_val_list + val_list
+
+    # if scraping a list
+    elif(type(var) is list):
+        # browse
+        for ind, this_item in enumerate(var):
+            name_list, val_list = _scrap_data(this_item, "[" + str(ind) + "]")
+
+            # add the resulting parameter names
+            par_name_list = par_name_list + name_list
+            par_val_list = par_val_list + val_list
+
+    # if scraping an object instance of a class we wrote in the package
+    elif(isinstance(var, (reco.MRSData2, reco.pipeline, sim.mrs_sequence, fit.fit_stategy))):
+        # scrap the dict attribute
+        name_list, val_list = _scrap_data(var.__dict__)
+
+        # add the resulting parameter names and the original object
+        par_name_list = par_name_list + ["obj"] + name_list
+        par_val_list = par_val_list + [var] + val_list
+
+    # if scraping an object instance of params
+    elif(isinstance(var, (sim.params))):
+        # scrap the dict attribute
+        name_list, val_list = _scrap_data(var.__dict__)
+
+        # add the resulting parameter names and the original object
+        par_name_list = par_name_list + ["obj"] + name_list
+        par_val_list = par_val_list + [var] + val_list
+
+        # and now add an entry per paramter per metabolite (!)
+        meta_names = var.get_meta_names()
+        par_names = ["cm", "dd", "df", "dp"]
+        for m, m_name in enumerate(meta_names):
+            for p, p_name in enumerate(par_names):
+                par_name_list = par_name_list + [p_name + "_" + m_name]
+                par_val_list = par_val_list + [var[m, p]]
+
+    # if scraping an optim result
+    elif(isinstance(var, optimize.OptimizeResult)):
+        # this is actually a dict but the __dict__ is empty for some reason (!?)
+        name_list = list(var.keys())
+        val_list = list(var.values())
+
+        # add the resulting parameter names and the original object
+        par_name_list = par_name_list + ["obj"] + name_list
+        par_val_list = par_val_list + [var] + val_list
+
+    # if scraping something else, probably some int or stuff
+    else:
+        # make it simple
+        par_name_list = par_name_list + [""]
+        par_val_list = par_val_list + [var]
+
+    # format the field name, usefull later in pandas df
+    if(prefix_str is not None):
+        if(len(par_name_list) > 1 and type(var) is not list):
+            prefix_str += "_"
+
+        par_name_list = [prefix_str + s for s in par_name_list]
+
+    return(par_name_list, par_val_list)

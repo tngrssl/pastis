@@ -15,6 +15,7 @@ import scipy.optimize as optimize
 import matplotlib._color_data as mcd
 from enum import Enum
 import time
+import hashlib
 
 import pdb
 
@@ -34,32 +35,59 @@ class fit_plot_type(Enum):
     TIME_DOMAIN = 7
 
 
-import os
-import pickle
-from datetime import datetime, timedelta
-from shutil import copyfile
+class fit_stategy():
+    """The fit_stategy class is to store a fitting stategy."""
 
+    # frozen stuff: a technique to prevent creating new attributes
+    # (https://stackoverflow.com/questions/3603502/prevent-creating-new-attributes-outside-init)
+    __isfrozen = False
 
-def _dummy_check_func(d, rp, fp, dp):
-    """
-    Return true if you want to select this dataset/pipeline when getting data from database using the get_datasets method. This is only a dummy example. Please feel free to recode a function with the same prototype to select for example only 3T scans, or short-TE scans, etc.
+    def __setattr__(self, key, value):
+        """Overload of __setattr__ method to check that we are not creating a new attribute."""
+        if self.__isfrozen and not hasattr(self, key):
+            log.error_new_attribute(key)
+        object.__setattr__(self, key, value)
 
-    Parameters
-    ----------
-    d : MRSData2 object
-        Function with two arguments (MRSData2 object, pipeline object) that you should code and which returns True if you want to get it this dataset/pipeline out of the database.
-    rp : reco pipeline object
-    fp : fit pipeline object
-    dp : dict of parameter results
+    def __init__(self, name, metabolites_list, params_linklock):
+        """Construct a fit_stategy object.
 
-    Returns
-    -------
-    r : boolean
-        True if we keep this dataset/pipeline
-    """
-    r = (d.te > 0.0 and
-         d.na > 0)  # that is stupid, just an example
-    return(r)
+        Parameters
+        ----------
+        name : dict
+            The fit strategy name
+        metabolites_list : dict
+            A list of metabolite indexes to include in this fit
+        params_linklock : sim.params
+            The linklock params vector to use for this fit
+        """
+        # a few attributes
+        self.name = name
+        self.metabolites = metabolites_list
+        self.linklock = params_linklock
+
+        # freeze
+        self.__isfrozen = True
+
+    def hashit(self, scan_hash=None):
+        """
+        Generate a hash of this strategy.
+
+        Parameters
+        ----------
+        data_hash : string
+            A scan md5 hash
+
+        Returns
+        -------
+        h : string
+            Hash code of this strategy. Usefull later when dealing with databases...
+        """
+        if(scan_hash is None):
+            h = hashlib.md5(self.metabolites.tobytes() + self.linklock.tobytes())
+        else:
+            h = hashlib.md5(scan_hash.encode() + self.metabolites.tobytes() + self.linklock.tobytes())
+
+        return(h.hexdigest())
 
 
 class prefit_tool:

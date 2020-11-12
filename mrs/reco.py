@@ -3133,6 +3133,8 @@ class pipeline:
                             "POI_LW_range_ppm": [4.5, 5.2],
                             # ppm range to for SNR/LW estimation in ref. data
                             "POI_ref_range_ppm" : [4.5, 5.2],
+                            # force display off if needed
+                            "display": None,
                             # ppm range used for display
                             "display_range_ppm": [1, 6],
                             # y offset used for display
@@ -3725,16 +3727,20 @@ class pipeline:
 
                 log.info_line________________________()
 
-        # --- reading job list ---
+        # --- applying global settings ---
         log.info_line________________________()
         log.info("reading your job list...")
         log.info_line________________________()
         # applying some global settings to jobs
         # (BTW, PYTHON CANNOT HANDLE POINTERS -_-)
-        for this_setting in list(self.settings.keys()):
+        for this_setting_name, this_setting_value in self.settings.items():
             for this_job in list(self.job.keys()):
-                if(this_setting in self.job[this_job]):
-                    self.job[this_job][this_setting] = self.settings[this_setting]
+                if(this_setting_value is not None and this_setting_name in self.job[this_job]):
+                    self.job[this_job][this_setting_name] = this_setting_value
+
+        # remove display job if we don't want to display
+        if(self.settings["display"] is False):
+            self.job_list.remove(self.job["displaying"])
 
         # for each job
         for k, this_job in enumerate(self.job_list):
@@ -3842,7 +3848,7 @@ class pipeline:
                 self.dataset[i][dtype]["ref-data-analysis-results"] = {"snr": this_data_ref_snr, "lw": this_data_ref_lw}
 
         # --- summary final linewidths ---
-        if(self.analyze_enable):
+        if(self.analyze_enable and self.settings["display"] is not False):
             self.display_analyze_results()
 
         log.info("pipeline terminated!")
@@ -4128,7 +4134,7 @@ class pipeline:
             Data storage object
         """
         # for each dataset
-        log.info("saving all datasets to file [%s]..." % rdb.db_file)
+        log.info("saving all datasets to file [%s]..." % rdb.data_db_reco_file)
         for d in self.dataset:
             rdb.save_reco_dataset(d, self)
 
