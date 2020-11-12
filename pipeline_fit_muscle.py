@@ -30,7 +30,7 @@ log.setLevel(log.DEBUG)
 rdb = reco.data_db()
 
 # %% retrieve data to process
-df_sel = rdb.df.loc[rdb.df["timestamp"] == rdb.df["timestamp"].max()]
+df_sel = rdb.df_reco.loc[rdb.df_reco["timestamp"] == rdb.df_reco["timestamp"].max()]
 data = df_sel["dataset"]["raw"]["data"]
 data_pipeline = df_sel["reco_pipeline"]
 

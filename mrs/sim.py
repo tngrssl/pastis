@@ -655,6 +655,23 @@ class params(np.ndarray):
             print("", flush=True)
         log.info_line________________________()
 
+    def __reduce__(self):
+        """Reduce internal pickling method used when dumping. Copied from MRSData2 class. Modified so that params attributes are not forgotten. See for more info: https://docs.python.org/3/library/pickle.html ."""
+        # get numpy reduce tuple
+        rd = super().__reduce__()
+        # add params attributes
+        rd2 = rd[2] + (self.__dict__,)
+        # return the new reduce tuple version
+        return(rd[0], rd[1], rd2)
+
+    def __setstate__(self, d):
+        """Set new state to object. Internal pickling method used when loading. Copied from MRSData2 class. Modified so that params attributes are not forgotten. See for more info: https://docs.python.org/3/library/pickle.html ."""
+        # load params attributes
+        self.__dict__ = d[-1]
+        # load all the rest relative to numpy
+        super().__setstate__(d[0:-1])
+        return(self)
+
 
 class mrs_sequence:
     """A class that stores a sequence and all its parameters used for simulation. This is a generic sequence class that you need to overload. By default, the simulated sequence is a simple pulse-acquire NMR experiment."""
@@ -2412,7 +2429,7 @@ class metabolite_basis_set(dict):
         object.__setattr__(self, key, value)
 
     def __init__(self):
-        """Construct a metabolite object."""
+        """Construct a metabolite_basis_set object."""
         super(metabolite_basis_set, self).__init__()
         # xls file that contains metabolites properties (you should not change that)
         self._database_xls_file = default_paths.DEFAULT_META_DB_FILE
