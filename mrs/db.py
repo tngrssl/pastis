@@ -14,6 +14,9 @@ from mrs import log
 import scipy.optimize as optimize
 import pandas as pd
 import os
+import numbers
+import numpy as np
+from datetime import datetime
 from shutil import copyfile
 
 import pdb
@@ -166,9 +169,9 @@ class data_db():
         fr: dict
             Fit results stored as a dict
         ft: mrs.fit.fit_tool
-            Fit pipeline object used to d othe fit
+            Fit pipeline object used
         fs: mrs.fit.fit_strategy
-            Fit pipeline object used to d othe fit
+            Fit strategy object used
         """
         log.info("saving fit to file [%s]..." % self.data_db_fit_file)
 
@@ -371,7 +374,7 @@ def _scrap_data(var, prefix_str=None):
             par_val_list = par_val_list + val_list
 
     # if scraping an object instance of a class we wrote in the package
-    elif(isinstance(var, (reco.MRSData2, reco.pipeline, sim.mrs_sequence, fit.fit_stategy))):
+    elif(isinstance(var, (reco.MRSData2, fit.fit_stategy, sim.params))):
         # scrap the dict attribute
         name_list, val_list = _scrap_data(var.__dict__)
 
@@ -379,22 +382,14 @@ def _scrap_data(var, prefix_str=None):
         par_name_list = par_name_list + ["obj"] + name_list
         par_val_list = par_val_list + [var] + val_list
 
-    # if scraping an object instance of params
-    elif(isinstance(var, (sim.params))):
+    # if scraping an object instance of a class we wrote in the package
+    elif(isinstance(var, (reco.pipeline, sim.mrs_sequence, fit.fit_stategy))):
         # scrap the dict attribute
         name_list, val_list = _scrap_data(var.__dict__)
 
-        # add the resulting parameter names and the original object
-        par_name_list = par_name_list + ["obj"] + name_list
-        par_val_list = par_val_list + [var] + val_list
-
-        # and now add an entry per paramter per metabolite (!)
-        meta_names = var.get_meta_names()
-        par_names = ["cm", "dd", "df", "dp"]
-        for m, m_name in enumerate(meta_names):
-            for p, p_name in enumerate(par_names):
-                par_name_list = par_name_list + [p_name + "_" + m_name]
-                par_val_list = par_val_list + [var[m, p]]
+        # add the resulting parameter names
+        par_name_list = par_name_list + name_list
+        par_val_list = par_val_list + val_list
 
     # if scraping an optim result
     elif(isinstance(var, optimize.OptimizeResult)):
@@ -403,14 +398,23 @@ def _scrap_data(var, prefix_str=None):
         val_list = list(var.values())
 
         # add the resulting parameter names and the original object
-        par_name_list = par_name_list + ["obj"] + name_list
-        par_val_list = par_val_list + [var] + val_list
+        par_name_list = par_name_list + name_list
+        par_val_list = par_val_list + val_list
 
-    # if scraping something else, probably some int or stuff
-    else:
+    # if scraping some basis types
+    elif(var is None or isinstance(var, (numbers.Number,
+                                         str, datetime,
+                                         sim.gating_signal_source,
+                                         reco.data_rejection_method,
+                                         tuple,
+                                         np.ndarray))):
         # make it simple
         par_name_list = par_name_list + [""]
         par_val_list = par_val_list + [var]
+
+    # if scraping something else, log it
+    else:
+        log.debug("not scraping variable %s" % str(type(var)))
 
     # format the field name, usefull later in pandas df
     if(prefix_str is not None):

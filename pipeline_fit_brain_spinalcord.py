@@ -42,6 +42,9 @@ df_sel = rdb.df_reco
 # list to save different strategies
 fit_stategies_list = []
 
+# list of sequence to try
+fit_strategies_seq_list = [None, sim.mrs_seq_press]
+
 # init metabolite basis set and linklock
 meta_bs = sim.metabolite_basis_set()
 meta_bs.initialize()
@@ -67,8 +70,10 @@ linklock_arr[xxx.m_Water, :] = [0, 0, 0, 0]
 linklock_arr[[xxx.m_Lip1, xxx.m_Lip2], :] = [0, 0, 0, 100]
 
 # store this strategy
-this_strategy = fit.fit_stategy("singlets", metabolites_fit, linklock_arr)
-fit_stategies_list.append(this_strategy)
+for s in fit_strategies_seq_list:
+    suffix = "_" + str(s)
+    this_strategy = fit.fit_stategy("singlets" + suffix, metabolites_fit, linklock_arr, s)
+    fit_stategies_list.append(this_strategy)
 
 # --- easy strategy: free singlets (amares) ---
 metabolites_fit = np.sort([
@@ -90,8 +95,10 @@ linklock_arr[xxx.m_Water, :] = [0, 0, 0, 0]
 linklock_arr[[xxx.m_Lip1, xxx.m_Lip2], :] = [0, 0, 0, 100]
 
 # store this strategy
-this_strategy = fit.fit_stategy("singlets_free", metabolites_fit, linklock_arr)
-fit_stategies_list.append(this_strategy)
+for s in fit_strategies_seq_list:
+    suffix = "_" + str(s)
+    this_strategy = fit.fit_stategy("singlets_free" + suffix, metabolites_fit, linklock_arr, s)
+    fit_stategies_list.append(this_strategy)
 
 # --- medium strategy: singlets, CH2s, mI ---
 metabolites_fit = np.sort([
@@ -117,8 +124,10 @@ linklock_arr[xxx.m_Water, :] = [0, 0, 0, 0]
 linklock_arr[[xxx.m_Lip1, xxx.m_Lip2], :] = [0, 0, 0, 100]
 
 # store this strategy
-this_strategy = fit.fit_stategy("singlets_CH2s_mI", metabolites_fit, linklock_arr)
-fit_stategies_list.append(this_strategy)
+for s in fit_strategies_seq_list:
+    suffix = "_" + str(s)
+    this_strategy = fit.fit_stategy("singlets_CH2s_mI" + suffix, metabolites_fit, linklock_arr, s)
+    fit_stategies_list.append(this_strategy)
 
 # --- medium strategy: free singlets, CH2s, mI ---
 metabolites_fit = np.sort([
@@ -148,8 +157,10 @@ linklock_arr[xxx.m_Cho_CH3, :] = [0, 0, 0, 100]
 linklock_arr[[xxx.m_Lip1, xxx.m_Lip2], :] = [0, 0, 0, 100]
 
 # store this strategy
-this_strategy = fit.fit_stategy("free_singlets_CH2s_mI", metabolites_fit, linklock_arr)
-fit_stategies_list.append(this_strategy)
+for s in fit_strategies_seq_list:
+    suffix = "_" + str(s)
+    this_strategy = fit.fit_stategy("free_singlets_CH2s_mI" + suffix, metabolites_fit, linklock_arr, s)
+    fit_stategies_list.append(this_strategy)
 
 # --- difficult strategy: singlets, CH2s, mI, Glx, Tau ---
 metabolites_fit = np.sort([
@@ -178,8 +189,10 @@ linklock_arr[xxx.m_Water, :] = [0, 0, 0, 0]
 linklock_arr[[xxx.m_Lip1, xxx.m_Lip2], :] = [0, 0, 0, 100]
 
 # store this strategy
-this_strategy = fit.fit_stategy("singlets_CH2s_mI_Glx_Tau", metabolites_fit, linklock_arr)
-fit_stategies_list.append(this_strategy)
+for s in fit_strategies_seq_list:
+    suffix = "_" + str(s)
+    this_strategy = fit.fit_stategy("singlets_CH2s_mI_Glx_Tau" + suffix, metabolites_fit, linklock_arr, s)
+    fit_stategies_list.append(this_strategy)
 
 # --- difficult strategy: free singlets, CH2s, mI, Glx, Tau ---
 metabolites_fit = np.sort([
@@ -212,8 +225,10 @@ linklock_arr[xxx.m_Cho_CH3, :] = [0, 0, 0, 100]
 linklock_arr[[xxx.m_Lip1, xxx.m_Lip2], :] = [0, 0, 0, 100]
 
 # store this strategy
-this_strategy = fit.fit_stategy("free_singlets_CH2s_mI_Glx_Tau", metabolites_fit, linklock_arr)
-fit_stategies_list.append(this_strategy)
+for s in fit_strategies_seq_list:
+    suffix = "_" + str(s)
+    this_strategy = fit.fit_stategy("free_singlets_CH2s_mI_Glx_Tau" + suffix, metabolites_fit, linklock_arr, s)
+    fit_stategies_list.append(this_strategy)
 
 water_concentration = 55000.0  # mmol/kg
 
@@ -234,23 +249,16 @@ for this_hash, this_dataset in zip(df_sel.index, df_sel["dataset"]):
     # removing water and any artefact > 5ppm (corrupts fit quality criteria)
     this_data = this_data.correct_water_removal_1d(8, [4.5, 6], display_stuff)
 
-    # perform area integration and ref fit
+    # %% prepare simulation machine
 
     # metabolite db
     meta_bs = sim.metabolite_basis_set()
     meta_bs.initialize()
 
     # sequence
+
     # take sequence from dataset, usually sLASER
     seq = this_data.sequence
-    # seq.pulse_rfc_real_shape_enable = False
-    # seq.pulse_exc_duration = 0.001
-    # seq.pulse_rfc_duration = 0.001
-    # seq.spoiler_duration = 0.001
-
-    # make it simple: SE sequence
-    seq = sim.mrs_seq_press(seq.te, seq.tr, seq.na, seq.ds, seq.nuclei, seq.npts, seq.fs, seq.f0)
-    seq.initialize(meta_bs)
 
     # %% area integration
 
@@ -260,7 +268,7 @@ for this_hash, this_dataset in zip(df_sel.index, df_sel["dataset"]):
     prefittool.area_integration_peaks = [xxx.m_Water]
     prefittool.display_enable = display_stuff
     prefittool.initialize()
-    params_ref_area, params_ref_area_pnorm = prefittool.run()
+    _, params_ref_area_pnorm = prefittool.run()
 
     # for water-suppressed data
     prefittool = fit.prefit_tool(this_data, seq)
@@ -268,7 +276,7 @@ for this_hash, this_dataset in zip(df_sel.index, df_sel["dataset"]):
     prefittool.area_integration_peaks = [xxx.m_NAA_CH3, xxx.m_Cr_CH3, xxx.m_Cho_CH3]
     prefittool.display_enable = display_stuff
     prefittool.initialize()
-    params_area, params_area_pnorm = prefittool.run()
+    _, params_area_pnorm = prefittool.run()
 
     # %% fit non water-suppressed data
 
@@ -308,31 +316,22 @@ for this_hash, this_dataset in zip(df_sel.index, df_sel["dataset"]):
     fittool.initialize()
     [params_ref_fit, optim_result_ref] = fittool.run()
 
-    # use various fit strategies
+    # %% use various fit strategies
     for this_fit_strategy in fit_stategies_list:
 
-        # %% prepare simulation machine
+        # --- sequence ---
+        if(this_fit_strategy.sequence is None):
+            # take sequence from dataset, usually sLASER
+            seq = this_data.sequence
+        else:
+            # custom sequence
+            seq = this_fit_strategy.sequence(seq.te, seq.tr, seq.na, seq.ds, seq.nuclei, seq.npts, seq.fs, seq.f0)
 
-        # metabolite db
+        # init
+        seq.initialize(meta_bs)
         metabolites_fit = this_fit_strategy.metabolites
-        meta_bs = sim.metabolite_basis_set()
-        meta_bs.initialize()
 
-        # sequence
-        # take sequence from dataset, usually sLASER
-        seq = this_data.sequence
-        # seq.pulse_rfc_real_shape_enable = False
-        # seq.pulse_exc_duration = 0.001
-        # seq.pulse_rfc_duration = 0.001
-        # seq.spoiler_duration = 0.001
-
-        # make it simple: SE sequence
-        seq = sim.mrs_seq_press(seq.te, seq.tr, seq.na, seq.ds, seq.nuclei, seq.npts, seq.fs, seq.f0)
-        seq.initialize(meta_bs)
-
-        # %% fit water-suppressed data
-
-        seq.initialize(meta_bs)
+        # --- fit water-suppressed data ---
 
         fittool = fit.fit_tool(this_data, seq)
 
@@ -386,10 +385,8 @@ for this_hash, this_dataset in zip(df_sel.index, df_sel["dataset"]):
         fittool.initialize()
         [params_fit_final, optim_result] = fittool.run()
 
-        # %% save the fit pipeline to the db
-        fit_results = {"params_ref_area": params_ref_area,
-                        "params_ref_area_pnorm": params_ref_area_pnorm,
-                        "params_area": params_area,
+        # --- save the fit pipeline to the db ---
+        fit_results = {"params_ref_area_pnorm": params_ref_area_pnorm,
                         "params_area_pnorm": params_area_pnorm,
                         "params_ref_fit": params_ref_fit,
                         "params_fit_final": params_fit_final,

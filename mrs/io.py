@@ -165,7 +165,7 @@ class SIEMENS_data_file_reader(data_file_reader):
         nchan : int
             Number of channels
         """
-        nchan = self.read_param_num("lMaximumNofRxReceiverChannels")
+        nchan = self.read_param_num("iMaxNoOfRxChannels")
         return(int(nchan))
 
     def read_data(self):
@@ -216,13 +216,13 @@ class SIEMENS_data_file_reader(data_file_reader):
             Value of parameter
         """
         # scrap out parameter value
-        a = self.file_content_str.find(param_name, file_index)
+        aa = self.file_content_str.find(param_name, file_index)
         # could not find it?
-        if(a < 0):
+        if(aa < 0):
             log.warning("could not find parameter [%s]! :(" % param_name)
             return(np.nan)
 
-        a = self.file_content_str.find("=", a + 1)
+        a = self.file_content_str.find("=", aa + 1)
         b = self.file_content_str.find("\n", a + 1)
         param_val_str = self.file_content_str[(a + 1):b]
         param_val_str = param_val_str.strip()
@@ -231,8 +231,18 @@ class SIEMENS_data_file_reader(data_file_reader):
         try:
             param_val_float = float(param_val_str)
         except:
-            # that did not work, look for next occurence
-            param_val_float = self.read_param_num(param_name, b)
+            # that did not work, try with brackets
+            a = self.file_content_str.find("{", aa + 1)
+            b = self.file_content_str.find("}", a + 1)
+            param_val_str = self.file_content_str[(a + 1):b]
+            param_val_str = param_val_str.strip()
+
+            # try to convert to float
+            try:
+                param_val_float = float(param_val_str)
+            except:
+                # that did not work, look for next occurence
+                param_val_float = self.read_param_num(param_name, b)
 
         # return it
         return(param_val_float)
