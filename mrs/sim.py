@@ -1889,7 +1889,7 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
                 meta_dict_entry = self.meta_bs[meta_key]["metabolites"][meta_key]
                 # acquire
                 s = self._run_sequence(meta_dict_entry)
-                s = s.correct_apodization_1d(10.0)  # silent apodization
+                s = s.correct_apodization_nd(10.0)  # silent apodization
                 acquired_signals.append(s)
                 # analyze
                 sf = s.spectrum()

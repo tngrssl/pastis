@@ -48,7 +48,7 @@ class fit_stategy():
             log.error_new_attribute(key)
         object.__setattr__(self, key, value)
 
-    def __init__(self, name, metabolites_list, params_linklock):
+    def __init__(self, name, metabolites_list, params_linklock, seq):
         """Construct a fit_stategy object.
 
         Parameters
@@ -59,11 +59,14 @@ class fit_stategy():
             A list of metabolite indexes to include in this fit
         params_linklock : sim.params
             The linklock params vector to use for this fit
+        seq : sim.mrs_sequence class
+            The sequence class name to use for the metabolite basis set signals
         """
         # a few attributes
         self.name = name
         self.metabolites = metabolites_list
         self.linklock = params_linklock
+        self.sequence = seq
 
         # freeze
         self.__isfrozen = True
