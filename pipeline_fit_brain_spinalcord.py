@@ -43,7 +43,8 @@ df_sel = rdb.df_reco
 fit_stategies_list = []
 
 # list of sequence to try
-fit_strategies_seq_list = [None, sim.mrs_seq_press]
+fit_strategies_seq_list = [sim.mrs_sequence, sim.mrs_seq_press]
+# fit_strategies_seq_list = [None]
 
 # init metabolite basis set and linklock
 meta_bs = sim.metabolite_basis_set()
@@ -230,6 +231,48 @@ for s in fit_strategies_seq_list:
     this_strategy = fit.fit_stategy("free_singlets_CH2s_mI_Glx_Tau" + suffix, metabolites_fit, linklock_arr, s)
     fit_stategies_list.append(this_strategy)
 
+# --- extra difficult strategy: free singlets, CH2s, mI, Glx, Tau ---
+metabolites_fit = np.sort([
+    xxx.m_Asp,
+    xxx.m_GABA,
+    xxx.m_Glc,
+    xxx.m_Gsh,
+    xxx.m_GPC,
+    xxx.m_Asc,
+    xxx.m_NAA_CH3,
+    xxx.m_NAA_CH2,
+    xxx.m_Cr_CH3,
+    xxx.m_Cr_CH2,
+    xxx.m_Cho_CH3,
+    xxx.m_Cho_CH2,
+    xxx.m_Gln,
+    xxx.m_Glu,
+    xxx.m_mI,
+    xxx.m_Tau,
+    xxx.m_Water,
+    xxx.m_Lip1,
+    xxx.m_Lip2])
+
+# linklock: relations between fit parameters
+linklock_arr = linklock_arr_unset.copy()
+# link metabolites by linewidth and phase
+linklock_arr[metabolites_fit, :] = [0, 200, 0, 100]
+linklock_arr[xxx.m_mI, :] = [0, -200, 0, -100]
+# leave water free
+linklock_arr[xxx.m_Water, :] = [0, 0, 0, 0]
+# let the singlets free
+linklock_arr[xxx.m_NAA_CH3, :] = [0, 0, 0, 100]
+linklock_arr[xxx.m_Cr_CH3, :] = [0, 0, 0, 100]
+linklock_arr[xxx.m_Cho_CH3, :] = [0, 0, 0, 100]
+# leave Lipids linewidth free
+linklock_arr[[xxx.m_Lip1, xxx.m_Lip2], :] = [0, 0, 0, 100]
+
+# store this strategy
+for s in fit_strategies_seq_list:
+    suffix = "_" + str(s)
+    this_strategy = fit.fit_stategy("free_singlets_hardest" + suffix, metabolites_fit, linklock_arr, s)
+    fit_stategies_list.append(this_strategy)
+
 water_concentration = 55000.0  # mmol/kg
 
 # %% run the fits!
@@ -320,7 +363,7 @@ for this_hash, this_dataset in zip(df_sel.index, df_sel["dataset"]):
     for this_fit_strategy in fit_stategies_list:
 
         # --- sequence ---
-        if(this_fit_strategy.sequence is None):
+        if(this_fit_strategy.sequence == sim.mrs_sequence):
             # take sequence from dataset, usually sLASER
             seq = this_data.sequence
         else:
