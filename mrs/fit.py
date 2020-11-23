@@ -86,9 +86,9 @@ class fit_stategy():
             Hash code of this strategy. Usefull later when dealing with databases...
         """
         if(scan_hash is None):
-            h = hashlib.md5(self.metabolites.tobytes() + self.linklock.tobytes())
+            h = hashlib.md5(self.metabolites.tobytes() + self.linklock.tobytes() + str(self.sequence).encode())
         else:
-            h = hashlib.md5(scan_hash.encode() + self.metabolites.tobytes() + self.linklock.tobytes())
+            h = hashlib.md5(scan_hash.encode() + self.metabolites.tobytes() + self.linklock.tobytes() + str(self.sequence).encode())
 
         return(h.hexdigest())
 

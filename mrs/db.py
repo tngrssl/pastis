@@ -391,6 +391,13 @@ def _scrap_data(var, prefix_str=None):
         par_name_list = par_name_list + name_list
         par_val_list = par_val_list + val_list
 
+    # if scraping an object instance of a class we wrote in the package
+    elif(isinstance(var, (sim.params))):
+
+        # add the resulting parameter names and the original object
+        par_name_list = par_name_list + ["obj"]
+        par_val_list = par_val_list + [var]
+
     # if scraping an optim result
     elif(isinstance(var, optimize.OptimizeResult)):
         # this is actually a dict but the __dict__ is empty for some reason (!?)
@@ -407,7 +414,8 @@ def _scrap_data(var, prefix_str=None):
                                          sim.gating_signal_source,
                                          reco.data_rejection_method,
                                          tuple,
-                                         np.ndarray))):
+                                         np.ndarray,
+                                         type))):
         # make it simple
         par_name_list = par_name_list + [""]
         par_val_list = par_val_list + [var]
