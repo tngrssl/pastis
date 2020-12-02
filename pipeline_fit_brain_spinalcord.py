@@ -43,8 +43,8 @@ df_sel = rdb.df_reco
 fit_stategies_list = []
 
 # list of sequence to try
-fit_strategies_seq_list = [sim.mrs_sequence, sim.mrs_seq_press]
-# fit_strategies_seq_list = [None]
+# fit_strategies_seq_list = [sim.mrs_sequence, sim.mrs_seq_press]
+fit_strategies_seq_list = [sim.mrs_seq_press]
 
 # init metabolite basis set and linklock
 meta_bs = sim.metabolite_basis_set()

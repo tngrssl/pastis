@@ -382,9 +382,7 @@ class fit_tool:
         # with early minimal damping
         self.params_init[xxx.m_All_MBs, xxx.p_dd] = self.params_min[xxx.m_All_MBs, xxx.p_dd] * 1.1
 
-        # link-lock vectors should be the same for initial, minimum and maximum parameter sets: link them here
-        self.params_min._linklock = self.params_init.linklock
-        self.params_max._linklock = self.params_init.linklock
+        self._set_unique_linklock()
 
         # private option to know if we are dealing with a water fit
         self._water_only = False
@@ -429,6 +427,12 @@ class fit_tool:
 
         # freeze
         self.__isfrozen = True
+
+    def _set_unique_linklock(self):
+        """Link the params_min, _max and _init linlock vectors using a reference/pointer."""
+        # link-lock vectors should be the same for initial, minimum and maximum parameter sets: link them here
+        self.params_min._linklock = self.params_init.linklock
+        self.params_max._linklock = self.params_init.linklock
 
     @property
     def ready(self):
@@ -546,8 +550,7 @@ class fit_tool:
             # display real-time bargraphs
             # real-time CRBs
             if(self.display_CRBs):
-                params_CRBs_abs, _ = self.get_CRBs(params)
-                params._errors = params_CRBs_abs
+                params._errors = self.get_CRBs(params)
 
             params_val_list = [self.params_min, self.params_max, params]
             params_leg_list = ['lower bounds', 'upper bounds', 'current']
@@ -612,6 +615,9 @@ class fit_tool:
             self.seq.meta_bs.initialize()
             # and rerun sequence !
             self.seq.initialize()
+
+        # reset linklock
+        self._set_unique_linklock()
 
         # ckeck consistency lower<>init<>upper bounds
         log.info("checking consistency with parameter bounds...")
@@ -691,8 +697,11 @@ class fit_tool:
         params_fit = self.params_init.copy()
         params_fit = params_fit.toFullParams(optim_result.x)
         # final CRBs
-        params_CRBs_abs, _ = self.get_CRBs(params_fit)
+        params_CRBs_abs = self.get_CRBs(params_fit)
         params_fit._errors = params_CRBs_abs
+        # final corr mat
+        corr_mat, _ = self.get_corr_mat(params_fit)
+        params_fit._corr_mat = corr_mat
 
         # add fit criteria to optim_result
         rsq_t, rsq_f = self.get_Rsq(params_fit)
@@ -718,8 +727,6 @@ class fit_tool:
         -------
         params_CRBs_abs : params object
             Array of simulation parameters, absolute CRBs
-        params_CRBs_rel : params object
-            Array of simulation parameters, relative CRBs (%)
         """
         # calling jacobian model
         j_full = self.seq._jac(params)
@@ -753,17 +760,11 @@ class fit_tool:
         # normalize to noise: absolute CRBs
         CRBs_abs = CRBs * noise_std
 
-        # normalize to parameter values: relative CRBs (%)
-        params_free = params.toFreeParams()
-        CRBs_rel = (CRBs_abs / params_free) * 100.0
-
         # put back to full parameter form
         params_CRBs_abs = self.params_init.copy()
         params_CRBs_abs = params_CRBs_abs.toFullParams(CRBs_abs)
-        params_CRBs_rel = self.params_init.copy()
-        params_CRBs_rel = params_CRBs_rel.toFullParams(CRBs_rel)
 
-        return(params_CRBs_abs, params_CRBs_rel)
+        return(params_CRBs_abs)
 
     def get_Rsq(self, params):
         """
@@ -833,27 +834,25 @@ class fit_tool:
         fqn = residue_var / data_noise_var
         return(fqn)
 
-    def disp_corr_mat(self, ax, params, mIndex_list=None, pIndex_list=[xxx.p_cm], color_bar=False):
+    def get_corr_mat(self, params, mIndex_list=None, pIndex_list=[xxx.p_cm]):
         """
         Return and display the parameter correlation matrix.
 
         Parameters
         ----------
-        ax : matplotlib axis
-            Axis to use for plotting
         params : params object
             Array of simulation parameters
         mIndex_list : list of int
             Metabolite indexes to display in bargraph
         pIndex_list : list of int
             Parameter indexes to display in bargraph
-        color_bar : boolean
-            Add a color (True) or not (False)
 
         Returns
         -------
-        params_cor : numpy array
+        corr_mat : numpy array
             Correlation matrix
+        corr_mat_lbls : numpy array
+            Correlation matrix labels for plot output
         """
         # calling jacobian model
         j_full = self.seq._jac(params)
@@ -866,42 +865,58 @@ class fit_tool:
         mat_linklock_mask = np.logical_and(np.logical_and(mat_linklock_mIndex, mat_linklock_pIndex), (params.linklock <= 0))
 
         # build labels vector the same way
-        cor_labels = []
+        corr_mat_lbls = []
         meta_names = params.get_meta_names()
         for i, m in enumerate(meta_names):
             for j, p in enumerate(PARS_SHORT_NAMES):
                 if(mat_linklock_mask[i, j]):
-                    cor_labels.append(m + "|" + p)
+                    corr_mat_lbls.append(m + "|" + p)
 
         if(np.all(mat_linklock_mask == False)):
-            log.error(">> mrs.fit_tool.disp_CorrMat: nothing to display, please adjust the mIndex_list/pIndex_list parameters!")
+            log.error("empty fit correlation matrix, please adjust the mIndex_list/pIndex_list parameters!")
 
-        # reducing it to free params
-        j_free = j_full[mat_linklock_mask, :]
-        j_free = np.real(j_free)
+        # reducing it to metabolites, parameters of interest + free params
+        j_reduced = j_full[mat_linklock_mask, :]
+        j_reduced = np.real(j_reduced)
 
         # Fisher (number of free metabolites*number of params, time points)
-        F = np.dot(j_free, np.transpose(j_free))
+        F = np.dot(j_reduced, np.transpose(j_reduced))
 
         # covariance
         covar = np.linalg.inv(np.real(F))
 
         # parameter correlation
-        params_cor = np.zeros(covar.shape)
-        for i in range(params_cor.shape[0]):
-            for j in range(params_cor.shape[1]):
-                params_cor[i, j] = covar[i, j] / (np.sqrt(covar[i, i]) * np.sqrt(covar[j, j]))
+        corr_mat = np.zeros(covar.shape)
+        for i in range(corr_mat.shape[0]):
+            for j in range(corr_mat.shape[1]):
+                corr_mat[i, j] = covar[i, j] / (np.sqrt(covar[i, i]) * np.sqrt(covar[j, j]))
+
+        return(corr_mat, corr_mat_lbls)
+
+    def disp_corr_mat(self, ax, params, disp_color_bar=False):
+        """
+        Return and display the parameter correlation matrix.
+
+        Parameters
+        ----------
+        ax : matplotlib axis
+            Axis to use for plotting
+        params : params object
+            Array of simulation parameters
+        disp_color_bar : boolean
+            Add a color (True) or not (False)
+        """
+        # calling jacobian model
+        corr_mat, corr_mat_lbls = self.get_corr_mat(params)
 
         ax.cla()
-        im = ax.imshow(params_cor, clim=(-1, +1))
-        ax.set_xticks(np.arange(len(cor_labels)))
-        ax.set_yticks(np.arange(len(cor_labels)))
-        ax.set_xticklabels(cor_labels, rotation=90, fontsize=6)
-        ax.set_yticklabels(cor_labels, fontsize=6)
-        if(color_bar):
+        im = ax.imshow(corr_mat, clim=(-1, +1))
+        ax.set_xticks(np.arange(len(corr_mat_lbls)))
+        ax.set_yticks(np.arange(len(corr_mat_lbls)))
+        ax.set_xticklabels(corr_mat_lbls, rotation=90, fontsize=6)
+        ax.set_yticklabels(corr_mat_lbls, fontsize=6)
+        if(disp_color_bar):
             plt.colorbar(im)
-
-        return(params_cor)
 
 
 def disp_bargraph(ax, params_val_list, params_leg_list, colored_LLs=True, bMM=False, bWater=False, bFitMode=False, pIndex=xxx.p_cm, mIndex_list=None, width=0.3):
