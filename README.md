@@ -11,7 +11,7 @@ SHRIMP can be used to process and quantify single-voxel Magnetic Resonance SPect
 - Python 3.7
 - Python packages:
 -- pyGAMMA (https://scion.duhs.duke.edu/vespa/gamma/wiki/PyGamma)
--- numpy suspect=0.4.2 pandas pymapvbvd xlrd termcolor
+-- numpy suspect pandas pymapvbvd xlrd termcolor
 
 - GAMMA library installed on system (https://scion.duhs.duke.edu/vespa/gamma/)
 

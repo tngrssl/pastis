@@ -217,12 +217,22 @@ class MRSData2(suspect.mrsobjects.MRSData):
         obj : MRSData2 numpy array [1,channels,timepoints]
         """
         super().__array_finalize__(obj)
+
         self.data_ref = getattr(obj, 'data_ref', None)
+        # replace by a copy
+        if(self.data_ref is not None):
+            self._data_ref = obj.data_ref.copy()
+
         self._display_label = getattr(obj, 'display_label', None)
         self._display_offset = getattr(obj, 'display_offset', 0.0)
         self._patient = getattr(obj, 'patient', None)
         self._physio_file = getattr(obj, 'physio_file', None)
+
         self._sequence = getattr(obj, 'sequence', None)
+        # replace by a copy
+        if(self.sequence is not None):
+            self._sequence = obj.sequence.copy()
+
         self._noise_level = getattr(obj, 'noise_level', None)
         self._data_rejection = getattr(obj, 'data_rejection', None)
         self._data_file_hash = getattr(obj, 'data_file_hash', None)
@@ -239,12 +249,22 @@ class MRSData2(suspect.mrsobjects.MRSData):
             Multi-channel reference signal
         """
         obj2 = super().inherit(obj)
+
         obj2.data_ref = getattr(self, 'data_ref', None)
+        # replace by a copy
+        if(obj2.data_ref is not None):
+            obj2._data_ref = self.data_ref.copy()
+
         obj2._display_label = getattr(self, 'display_label', None)
         obj2._display_offset = getattr(self, 'display_offset', 0.0)
         obj2._patient = getattr(self, 'patient', None)
         obj2._physio_file = getattr(self, 'physio_file', None)
+
         obj2._sequence = getattr(self, 'sequence', None)
+        # replace by a copy
+        if(obj2.sequence is not None):
+            obj2._sequence = self.sequence.copy()
+
         obj2._noise_level = getattr(self, 'noise_level', 0.0)
         obj2._data_rejection = getattr(self, 'data_rejection', None)
         obj2._data_file_hash = getattr(self, 'data_file_hash', None)
@@ -2405,10 +2425,6 @@ class MRSData2(suspect.mrsobjects.MRSData):
         if(nPoints_final < s.shape[0]):
             log.debug("cropping data from %d to %d points..." % (s.shape[0], nPoints_final))
             s_crop = s[0:nPoints_final]
-            if(s_crop.sequence is not None):
-                log.debug("updating sequence.npts...")
-                s_crop.sequence.npts = nPoints_final
-                s_crop.sequence._ready = False
         else:
             s_crop = self.copy()
             log.debug("no cropping needed, getting bored...")
@@ -2452,6 +2468,12 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         # convert back to MRSData2
         s_crop = self.inherit(s_crop)
+
+        # now we have a MRSData2 obj, modify sequence attribute
+        if(s_crop.sequence is not None):
+            log.debug("updating sequence.npts...")
+            s_crop.sequence.npts = nPoints_final
+            s_crop.sequence._ready = False
 
         # if any ref data available, we crop it too (silently)
         if(s_crop.data_ref is not None):
@@ -3736,7 +3758,17 @@ class pipeline:
         for this_setting_name, this_setting_value in self.settings.items():
             for this_job in list(self.job.keys()):
                 if(this_setting_value is not None and this_setting_name in self.job[this_job]):
-                    self.job[this_job][this_setting_name] = this_setting_value
+                    if(this_setting_name == "display"):
+                        # exception for display setting
+                        # False False => False
+                        # False True => False
+                        # True True => True
+                        # True False => False
+                        # that's a "and mask"
+                        self.job[this_job][this_setting_name] &= this_setting_value
+                    else:
+                        self.job[this_job][this_setting_name] = this_setting_value
+
 
         # remove display job if we don't want to display
         if(self.settings["display"] is False):

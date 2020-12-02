@@ -34,6 +34,7 @@ from mrs import reco
 from mrs import aliases as xxx
 from mrs import log
 from mrs import paths as default_paths
+import copy as copy
 
 import pdb
 
@@ -82,10 +83,10 @@ class params(np.ndarray):
         self._meta_bs = meta_bs
         # the link-lock vector used to control the model
         self._linklock = np.zeros(self.shape)
-        # the ratio vector
-        self._ratios = np.ones(self.shape)
         # the error vector
         self._errors = np.zeros(self.shape)
+        # the corr vector
+        self._corr_mat = np.zeros([self.size, self.size])
 
         # freeze
         self.__isfrozen = True
@@ -116,10 +117,33 @@ class params(np.ndarray):
         ----------
         obj : params numpy array [n,4]
         """
+        # to begin, I followed online help and wrote:
+        #self._meta_bs = getattr(obj, 'meta_bs', None)
+        #self._linklock = getattr(obj, 'linklock', None)
+        #self._errors = getattr(obj, 'errors', None)
+        #self._corr_mat = getattr(obj, 'corr_mat', None)
+
+        # but that only works for some simple attribute types
+        # if the attributes are nd arrays, only the pointers will be copied...
+        # leading to terrible bugs
+
+        # for now, I could only find this ugly way:
+
         self._meta_bs = getattr(obj, 'meta_bs', None)
+        if(self.meta_bs is not None):
+            self._meta_bs = obj.meta_bs.copy()
+
         self._linklock = getattr(obj, 'linklock', None)
-        self._ratios = getattr(obj, 'ratios', None)
+        if(self.linklock is not None):
+            self._linklock = obj.linklock.copy()
+
         self._errors = getattr(obj, 'errors', None)
+        if(self.errors is not None):
+            self._errors = obj.errors.copy()
+
+        self._corr_mat = getattr(obj, 'corr_mat', None)
+        if(self.corr_mat is not None):
+            self._corr_mat = obj.corr_mat.copy()
 
     @property
     def meta_bs(self):
@@ -132,14 +156,14 @@ class params(np.ndarray):
         return(self._linklock)
 
     @property
-    def ratios(self):
-        """Property method for ratios."""
-        return(self._ratios)
-
-    @property
     def errors(self):
         """Property method for errors."""
         return(self._errors)
+
+    @property
+    def corr_mat(self):
+        """Property method for corr_mat."""
+        return(self._corr_mat)
 
     def get_meta_names(self):
         """
@@ -151,6 +175,20 @@ class params(np.ndarray):
             List of metabolite names
         """
         return(list(self._meta_bs.keys()))
+
+    def get_errors_prct(self):
+        """
+        Return relative errors in percentage.
+
+        Returns
+        -------
+        errors_prct : numpy array
+            Errors in percentage (%)
+        """
+        # calculate percentages
+        errors_prct = self.errors / self[:] * 100.0
+
+        return(errors_prct)
 
     def check(self):
         """
@@ -226,7 +264,7 @@ class params(np.ndarray):
         LL_list = np.unique(p.linklock)
         LL_list = LL_list[LL_list >= +2]
         for this_LL in LL_list:
-            p[p.linklock == +this_LL] = p[p.linklock == -this_LL] * p.ratios[p.linklock == +this_LL]
+            p[p.linklock == +this_LL] = p[p.linklock == -this_LL]
 
         return(p)
 
@@ -259,7 +297,7 @@ class params(np.ndarray):
         multiplication_factor = np.exp(-te / params_T2s)
         p[:, xxx.p_cm] = p[:, xxx.p_cm] * multiplication_factor
         # to errors too
-        p._errors[:, xxx.p_cm] = p.errors[:, xxx.p_cm] * multiplication_factor
+        p.errors[:, xxx.p_cm] = p.errors[:, xxx.p_cm] * multiplication_factor
         return(p)
 
     def correct_T2s(self, te):
@@ -291,7 +329,7 @@ class params(np.ndarray):
         multiplication_factor = 1 / np.exp(-te / params_T2s)
         p[:, xxx.p_cm] = p[:, xxx.p_cm] * multiplication_factor
         # to errors too
-        p._errors[:, xxx.p_cm] = p.errors[:, xxx.p_cm] * multiplication_factor
+        p.errors[:, xxx.p_cm] = p.errors[:, xxx.p_cm] * multiplication_factor
         return(p)
 
     def correct_T1s(self, tr):
@@ -323,7 +361,7 @@ class params(np.ndarray):
         multiplication_factor = 1 / (1 - np.exp(-tr / params_T1s))
         p[:, xxx.p_cm] = p[:, xxx.p_cm] * multiplication_factor
         # to errors too
-        p._errors[:, xxx.p_cm] = p.errors[:, xxx.p_cm] * multiplication_factor
+        p.errors[:, xxx.p_cm] = p.errors[:, xxx.p_cm] * multiplication_factor
         return(p)
 
     def get_relative_to_meta(self, mIndex=xxx.m_Water, m_concentration_mmolkg=55000.0, params_ref=None):
@@ -357,10 +395,19 @@ class params(np.ndarray):
         p2[:, xxx.p_cm] = p1[:, xxx.p_cm] * multiplication_factor
 
         # deal with errors too
-        # we are dividing errors:
-        # dp2 = p2 * (dp1/p1 + dpref/pref)
-        p2._errors[:, xxx.p_cm] = p2[:, xxx.p_cm] * (p1.errors[:, xxx.p_cm] / p1[:, xxx.p_cm] + params_ref.errors[mIndex, xxx.p_cm] / params_ref[mIndex, xxx.p_cm])
+        # see paper http://dx.doi.org/10.1007/s10334-005-0018-7
+        # inspired from ratio, considering zero correlation between metabolite of interest and ref:
+        # relCRB(1/ref) = sqrt(relCRB1^2 + relCRB2^2)
+        # get numerator rel CRBs for cm
+        relCRBs_num = p1.get_errors_prct()[:, xxx.p_cm]
+        # get denominator rel CRBs for cm
+        relCRBs_den = p2.get_errors_prct()[mIndex, xxx.p_cm]
+        # calculate the final relCRB
+        rel_CRBs_ratio = np.sqrt( relCRBs_num**2 + relCRBs_den**2 )
+        # back to absCRB
+        abs_CRBs_ratio = p2[:, xxx.p_cm] * rel_CRBs_ratio / 100.0
 
+        p2._errors[:, xxx.p_cm] = abs_CRBs_ratio
         return(p2)
 
     def get_ratios(self, mIndex):
@@ -385,9 +432,49 @@ class params(np.ndarray):
         p2[:, xxx.p_cm] = p1[:, xxx.p_cm] / p1[mIndex, xxx.p_cm]
 
         # deal with errors too
-        # we are dividing errors:
-        # dp2 = p2 * (dp1/p1 + dpref/pref)
-        p2._errors[:, xxx.p_cm] = p2[:, xxx.p_cm] * (p1.errors[:, xxx.p_cm] / p1[:, xxx.p_cm] + p1.errors[mIndex, xxx.p_cm] / p1[mIndex, xxx.p_cm])
+        # see paper http://dx.doi.org/10.1007/s10334-005-0018-7
+        # relCRB(1/2) = sqrt(relCRB1^2 + relCRB2^2 - 2*corr1_2*relCRB1*relCRB2)
+        # get numerator rel CRBs for cm
+        relCRBs_num = p1.get_errors_prct()[:, xxx.p_cm]
+        # get denominator rel CRBs for cm
+        relCRBs_den = p1.get_errors_prct()[mIndex, xxx.p_cm]
+
+        # get corr coeff between num and den cm
+        # first, get free param corr mat
+        free_param_corr_mat = self.corr_mat
+        # convert mIndex to free params index
+        p3 = self.copy()
+        # replace cm by index
+        p3[:, xxx.p_cm] = np.arange(0, p3.shape[0], 1)
+        # lock all other pars
+        p3.linklock[:, xxx.p_dd] = 1
+        p3.linklock[:, xxx.p_df] = 1
+        p3.linklock[:, xxx.p_dp] = 1
+        # convert ot free params
+        p3_free = p3.toFreeParams()
+        # here we should get a list of indexes
+        # find where is mIndex and we did it
+        ind_free_pars_mIndex = np.where(p3_free == mIndex)[0][0]
+        # extract corr vector
+        free_param_corr_vec = free_param_corr_mat[:, ind_free_pars_mIndex]
+        # convert it to full params
+        p3 = self.copy()
+        # lock all other pars
+        p3.linklock[:, xxx.p_dd] = 1
+        p3.linklock[:, xxx.p_df] = 1
+        p3.linklock[:, xxx.p_dp] = 1
+        # replace cm by cor coeffs
+        p3 = p3.toFullParams(free_param_corr_vec)
+        # get full param corr vector
+        full_param_corr_vec = p3[:, xxx.p_cm]
+        # make it absolute
+        rc_num_den_abs = np.abs(full_param_corr_vec)
+
+        # calculate the final relCRB
+        rel_CRBs_ratio = np.sqrt( relCRBs_num**2 + relCRBs_den**2 - 2 * rc_num_den_abs * relCRBs_num * relCRBs_den )
+        # back to absCRB
+        abs_CRBs_ratio = p2[:, xxx.p_cm] * rel_CRBs_ratio / 100.0
+        p2._errors[:, xxx.p_cm] = abs_CRBs_ratio
 
         return(p2)
 
@@ -781,6 +868,20 @@ class mrs_sequence:
 
         # initialized or not
         self._ready = False
+
+    def copy(self):
+        """Copy method"""
+        obj = copy.copy(self)
+        if(self._meta_signals is not None):
+            obj._meta_signals = self._meta_signals.copy()
+        if(self._t is not None):
+            obj._t = self._t.copy()
+        if(self._last_params is not None):
+            obj._last_params = self._last_params.copy()
+        if(self._last_model is not None):
+            obj._last_model = self._last_model.copy()
+
+        return(obj)
 
     @property
     def ready(self):
