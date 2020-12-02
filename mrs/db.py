@@ -64,11 +64,9 @@ class data_db():
         self.data_db_reco_file = data_db_reco_file
         if(not os.path.isfile(self.data_db_reco_file)):
             log.debug("creating storage file [%s]..." % self.data_db_reco_file)
-            self._df_reco.to_pickle(self.data_db_reco_file)
+            self.write_pickle_files(True, False)
         else:
-            log.debug("reading storage file [%s]..." % self.data_db_reco_file)
-            self._df_reco = pd.read_pickle(self.data_db_reco_file)
-        log.debug("done.")
+            self.read_pickle_files(True, False)
 
         # init df fit
         self._df_fit = pd.DataFrame(columns = ['fit_hash',
@@ -84,10 +82,10 @@ class data_db():
         self.data_db_fit_file = data_db_fit_file
         if(not os.path.isfile(self.data_db_fit_file)):
             log.debug("creating storage file [%s]..." % self.data_db_fit_file)
-            self._df_fit.to_pickle(self.data_db_fit_file)
+            self.write_pickle_files(False, True)
         else:
-            log.debug("reading storage file [%s]..." % self.data_db_fit_file)
-            self._df_fit = pd.read_pickle(self.data_db_fit_file)
+            self.read_pickle_files(False, True)
+
         log.info("initializing db files [done]")
 
     @property
@@ -114,7 +112,53 @@ class data_db():
         """
         return(self._df_fit)
 
-    def save_reco_dataset(self, d, rp=None):
+    def read_pickle_files(self, read_reco=True, read_fit=True):
+        """Read dataframes from pickle files.
+
+        Parameters
+        ----------
+        read_reco: boolean
+            Read df_reco from pickle file
+        read_fit: boolean
+            Read df_fit from pickle file
+        """
+        if(not read_reco and not read_fit):
+            return()
+
+        if(read_reco):
+            log.debug("reading storage file [%s]..." % self.data_db_reco_file)
+            self._df_reco = pd.read_pickle(self.data_db_reco_file)
+
+        if(read_fit):
+            log.info("reading storage file [%s]..." % self.data_db_fit_file)
+            self._df_fit = pd.read_pickle(self.data_db_fit_file)
+
+        log.info("reading storage file [done]...")
+
+    def write_pickle_files(self, write_reco=True, write_fit=True):
+        """Write dataframes to pickle files.
+
+        Parameters
+        ----------
+        write_reco: boolean
+            Read df_reco from pickle file
+        write_fit: boolean
+            Read df_fit from pickle file
+        """
+        if(not write_reco and not write_fit):
+            return()
+
+        if(write_reco):
+            log.debug("writing storage file [%s]..." % self.data_db_reco_file)
+            self._df_reco.to_pickle(self.data_db_reco_file)
+
+        if(write_fit):
+            log.debug("writing storage file [%s]..." % self.data_db_fit_file)
+            self._df_fit.to_pickle(self.data_db_fit_file)
+
+        log.info("writing storage files [done]")
+
+    def save_reco_dataset(self, d, rp=None, write2file_now=True):
         """
         Save mrs.reco.pipeline dataset and its reco pipeline and deal with conflicts.
 
@@ -124,12 +168,13 @@ class data_db():
             Dict containing data and stuff
         rp: pipeline
             Reco pipeline used to get this data
+        write2file_now: boolean
+            Write resulting dataframe to pickle file now (takes time)
         """
         log.info("saving dataset to file [%s]..." % self.data_db_reco_file)
 
-        log.debug("reading storage file [%s]..." % self.data_db_reco_file)
-        self._df_reco = pd.read_pickle(self.data_db_reco_file)
-        log.debug("done.")
+        # read storage file to refresh data in memory
+        self.read_pickle_files(write2file_now, False)
 
         # if we reached here, that means the PKL file is not corrupted
         # let's make a backup of it
@@ -154,11 +199,10 @@ class data_db():
         # add/update entry in db
         self._df_reco.loc[h] = [patient_id, study_id, d, rp]
 
-        log.debug("writing storage file [%s]..." % self.data_db_reco_file)
-        self._df_reco.to_pickle(self.data_db_reco_file)
-        log.info("saving dataset to file [done]")
+        # write data in memory to storage file
+        self.read_pickle_files(write2file_now, False)
 
-    def save_fit_results(self, scan_hash, fr, ft=None, fs=None):
+    def save_fit_results(self, scan_hash, fr, ft=None, fs=None, write2file_now=True):
         """
         Save fit pipeline, results and deal with conflicts.
 
@@ -172,12 +216,13 @@ class data_db():
             Fit pipeline object used
         fs: mrs.fit.fit_strategy
             Fit strategy object used
+        write2file_now: boolean
+            Write resulting dataframe to pickle file now (takes time)
         """
         log.info("saving fit to file [%s]..." % self.data_db_fit_file)
 
-        log.info("reading storage file [%s]..." % self.data_db_fit_file)
-        self._df_fit = pd.read_pickle(self.data_db_fit_file)
-        log.info("done.")
+        # read storage file to refresh data in memory
+        self.read_pickle_files(False, write2file_now)
 
         # if we reached here, that means the PKL file is not corrupted
         # let's make a backup of it
@@ -200,9 +245,8 @@ class data_db():
         # add/update entry in db
         self._df_fit.loc[h] = [scan_hash, fs, ft, fr]
 
-        log.debug("writing storage file [%s]..." % self.data_db_fit_file)
-        self._df_fit.to_pickle(self.data_db_fit_file)
-        log.info("saving dataset to file [done]")
+        # write data in memory to storage file
+        self.read_pickle_files(False, write2file_now)
 
     def _extract_patient_study_num(self, d):
         """
