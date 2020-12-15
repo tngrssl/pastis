@@ -128,10 +128,16 @@ class data_db():
         if(read_reco):
             log.debug("reading storage file [%s]..." % self.data_db_reco_file)
             self._df_reco = pd.read_pickle(self.data_db_reco_file)
+            # if we reached here, that means the PKL file is not corrupted
+            # let's make a backup of it
+            copyfile(self.data_db_reco_file, self.data_db_reco_file + ".bak")
 
         if(read_fit):
             log.info("reading storage file [%s]..." % self.data_db_fit_file)
             self._df_fit = pd.read_pickle(self.data_db_fit_file)
+            # if we reached here, that means the PKL file is not corrupted
+            # let's make a backup of it
+            copyfile(self.data_db_fit_file, self.data_db_fit_file + ".bak")
 
         log.info("reading storage file [done]...")
 
@@ -171,14 +177,10 @@ class data_db():
         write2file_now: boolean
             Write resulting dataframe to pickle file now (takes time)
         """
-        log.info("saving dataset to file [%s]..." % self.data_db_reco_file)
+        log.info("saving dataset")
 
         # read storage file to refresh data in memory
         self.read_pickle_files(write2file_now, False)
-
-        # if we reached here, that means the PKL file is not corrupted
-        # let's make a backup of it
-        copyfile(self.data_db_reco_file, self.data_db_reco_file + ".bak")
 
         # get hash of data
         if(d["raw"]["data"] is None):
@@ -200,7 +202,7 @@ class data_db():
         self._df_reco.loc[h] = [patient_id, study_id, d, rp]
 
         # write data in memory to storage file
-        self.read_pickle_files(write2file_now, False)
+        self.write_pickle_files(write2file_now, False)
 
     def save_fit_results(self, scan_hash, fr, ft=None, fs=None, write2file_now=True):
         """
@@ -219,14 +221,10 @@ class data_db():
         write2file_now: boolean
             Write resulting dataframe to pickle file now (takes time)
         """
-        log.info("saving fit to file [%s]..." % self.data_db_fit_file)
+        log.info("saving fit results")
 
         # read storage file to refresh data in memory
         self.read_pickle_files(False, write2file_now)
-
-        # if we reached here, that means the PKL file is not corrupted
-        # let's make a backup of it
-        copyfile(self.data_db_fit_file, self.data_db_fit_file + ".bak")
 
         # first, check if the data we fitted in stored in the df_reco
         if(scan_hash not in self._df_reco.index):
@@ -246,7 +244,7 @@ class data_db():
         self._df_fit.loc[h] = [scan_hash, fs, ft, fr]
 
         # write data in memory to storage file
-        self.read_pickle_files(False, write2file_now)
+        self.write_pickle_files(False, write2file_now)
 
     def _extract_patient_study_num(self, d):
         """

@@ -28,13 +28,16 @@ log.setLevel(log.DEBUG)
 
 rdb = db.data_db("/home/tangir/crmbm/acq_db/brain.pkl")
 
+# fast test: only last fit strategy only
+only_one_fit_strategy = False
+
 # display real-time fit and other stuff?
 display_stuff = False
 
 # %% select datasets via dataframe
 
 df_sel = rdb.df_reco
-# df_sel = rdb.df_reco.loc[(rdb.df_reco["patient"] == 308) & (rdb.df_reco["study"] == 1)]
+# df_sel = rdb.df_reco.loc[(rdb.df_reco["patient"] == 319) & (rdb.df_reco["study"] == 1)]
 # df_sel = rdb.df_reco.loc[(rdb.df_reco.index == "3695a02a4fbf0153215cf09eaa21658e")]
 
 # %% fit strategies
@@ -43,8 +46,8 @@ df_sel = rdb.df_reco
 fit_stategies_list = []
 
 # list of sequence to try
-# fit_strategies_seq_list = [sim.mrs_sequence, sim.mrs_seq_press]
-fit_strategies_seq_list = [sim.mrs_seq_press]
+fit_strategies_seq_list = [sim.mrs_sequence, sim.mrs_seq_press]
+#fit_strategies_seq_list = [sim.mrs_seq_press]
 
 # init metabolite basis set and linklock
 meta_bs = sim.metabolite_basis_set()
@@ -275,7 +278,10 @@ for s in fit_strategies_seq_list:
 
 water_concentration = 55000.0  # mmol/kg
 
-# %% run the fits!
+if(only_one_fit_strategy):
+    fit_stategies_list = [fit_stategies_list[-1]]
+
+# %% prepare data to fit
 
 # browse though datasets
 for this_hash, this_dataset in zip(df_sel.index, df_sel["dataset"]):
@@ -291,6 +297,12 @@ for this_hash, this_dataset in zip(df_sel.index, df_sel["dataset"]):
 
     # removing water and any artefact > 5ppm (corrupts fit quality criteria)
     this_data = this_data.correct_water_removal_1d(8, [4.5, 6], display_stuff)
+
+    # filtering
+    #this_data = this_data.correct_bandpass_filtering_1d([0, 6], np.ones, display_stuff)
+
+    # reapodize to remove filtering artefact (will not affect linewidth because already apodized)
+    #this_data = this_data.correct_apodization_nd(5.0, display_stuff)
 
     # %% prepare simulation machine
 
@@ -388,7 +400,7 @@ for this_hash, this_dataset in zip(df_sel.index, df_sel["dataset"]):
         # ranges for concentration
         fittool.params_min[:, xxx.p_cm] = 0.09
         fittool.params_max[:, xxx.p_cm] = 300.0
-        fittool.params_max[xxx.m_All_MMs, xxx.p_cm] = 600.0
+        fittool.params_max[xxx.m_All_MMs, xxx.p_cm] = 5000.0
         fittool.params_max[xxx.m_Water, xxx.p_cm] = 100000.0
 
         # linewidth bounds for metabolites
@@ -409,6 +421,9 @@ for this_hash, this_dataset in zip(df_sel.index, df_sel["dataset"]):
         fittool.params_init[:, xxx.p_df] = -15.0
         fittool.params_min[:, xxx.p_df] = -35.0
         fittool.params_max[:, xxx.p_df] = 5.0
+        # a bit more for the lipids
+        fittool.params_min[:, xxx.p_df] = -55.0
+        fittool.params_max[:, xxx.p_df] = 25.0
 
         # phase bounds for metabolites and lipids
         fittool.params_min[:, xxx.p_dp] = -0.1
@@ -435,4 +450,8 @@ for this_hash, this_dataset in zip(df_sel.index, df_sel["dataset"]):
                         "params_fit_final": params_fit_final,
                         "optim_result": optim_result}
 
-        rdb.save_fit_results(this_hash, fit_results, fittool, this_fit_strategy)
+        # save in memory only
+        rdb.save_fit_results(this_hash, fit_results, fittool, this_fit_strategy, False)
+
+# now write to pkl file
+rdb.write_pickle_files()

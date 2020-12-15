@@ -267,8 +267,10 @@ class prefit_tool:
         self._peak_areas_norm = []
         pars = sim.params(self.meta_bs)
         pars[:] = 0.0
+        pars._linklock[:] = 1
         pars_pnorm = sim.params(self.meta_bs)
         pars_pnorm[:] = 0.0
+        pars_pnorm._linklock[:] = 1
 
         log.info("integrating peak for...")
         log.info_line________________________()
@@ -301,8 +303,11 @@ class prefit_tool:
             # store
             self._peak_areas.append(this_peak_area)
             self._peak_areas_norm.append(this_peak_area / this_peak_np)
-            pars[this_peak_index, 0] = this_peak_area
-            pars_pnorm[this_peak_index, 0] = this_peak_area / this_peak_np
+            pars[this_peak_index, xxx.p_cm] = this_peak_area
+            pars_pnorm[this_peak_index, xxx.p_cm] = this_peak_area / this_peak_np
+            # fix linklock vectors
+            pars._linklock[this_peak_index, xxx.p_cm] = 0
+            pars_pnorm._linklock[this_peak_index, xxx.p_cm] = 0
 
             # display the area
             if(self.display_enable):
@@ -1168,7 +1173,7 @@ def disp_fit(ax, data, params, seq, LL_exluding=True, LL_merging=False, mIndex_l
         # plot the a single MM keeping the same offset
         ax.plot(s_single_MM.frequency_axis_ppm(), s_single_MM.spectrum().real - ygap * (koffset + 2), 'r--')
 
-    ax.text(display_range[1] - 0.5, -ygap * (koffset + 2) + ygap / 5, 'MM baseline')
+    ax.text(display_range[1] - 0.5, -ygap * (koffset + 2) + ygap / 5, 'Lip baseline')
 
     # finalize the plot
     ax.set_xticks(np.arange(-1, 10, 0.5))
