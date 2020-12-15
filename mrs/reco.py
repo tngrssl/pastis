@@ -1895,7 +1895,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             axs[1, 1].set_title("Abs. phase = %.2f ± %.2f rad" % (peak_prop_disp[:, 3].mean(), peak_prop_disp[:, 3].std()))
 
             # nice plot showing all raw data
-            plt.subplot(1, 3, 3)
+            ax = plt.subplot(1, 3, 3)
             ppm = s_ma.frequency_axis_ppm()
             ystep = np.max(np.mean(s_ma.spectrum().real, axis=0))
             ystep = np.power(10, 1 + (np.floor(np.log10(ystep))))
@@ -1914,7 +1914,23 @@ class MRSData2(suspect.mrsobjects.MRSData):
             plt.xlim(peak_range[1], peak_range[0])
             plt.xlabel('chemical shift (ppm)')
             plt.ylabel('individual spectra')
-            plt.yticks([])
+
+            # y ticks: spectrum index
+            # TODO: maybe need to calculate this automatically
+            n_yticks = 16
+            step_yticks = 2 ** np.ceil(np.sqrt(s.shape[0] / n_yticks))
+            yt_lbl_list = np.arange(0, s.shape[0], step_yticks).tolist()
+            if(yt_lbl_list[-1] != s.shape[0]):
+                yt_lbl_list = yt_lbl_list + [s.shape[0]]
+            yt_lbl_list = [("%d" % yt) for yt in yt_lbl_list]
+
+            yt_loc_list = np.arange(0, s.shape[0] * ystep, step_yticks * ystep).tolist()
+            if(yt_loc_list[-1] != (s.shape[0] * ystep)):
+                yt_loc_list = yt_loc_list + [s.shape[0] * ystep]
+
+            ax.set_yticks(yt_loc_list)
+            ax.set_yticklabels(labels=yt_lbl_list)
+
             plt.grid('on')
             fig.subplots_adjust()
             fig.show()
@@ -2957,7 +2973,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         plt.subplots_adjust()
         plt.show()
 
-        return(plt)
+        return(plt.figure(ifig))
 
     def save_ismrmd(self, h5_filepath):
         """

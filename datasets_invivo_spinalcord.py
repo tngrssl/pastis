@@ -302,7 +302,9 @@ p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/310-mg-p1-moelle/me
                                 "/home/tangir/crmbm/acq_twix/310-mg-p1-moelle/meas_MID142_slaser_R_N=20+_1_longTE_SNR++++_FID39214.dat"]
 
 # do not realign
-p.job_list.remove(p.job["realigning"])
+if(p.job["realigning"] in p.job_list):
+    p.job_list.remove(p.job["realigning"])
+
 p.job["data-rejecting"]["moving_averages"] = 8
 
 p.run()
@@ -908,8 +910,6 @@ p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/349-ap-p2-moelle/2020092
 p.settings["datasets_indexes"] = 0
 p.job["realigning"]["moving_averages"] = 4
 p.job["data-rejecting"]["moving_averages"] = 4
-
-#p.job_list.remove(p.job["data-rejecting"])
 
 p.run()
 p.check_analyze_results()

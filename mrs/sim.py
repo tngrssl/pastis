@@ -86,7 +86,7 @@ class params(np.ndarray):
         # the error vector
         self._errors = np.zeros(self.shape)
         # the corr vector
-        self._corr_mat = np.zeros([self.size, self.size])
+        self._corr_mat = None
 
         # freeze
         self.__isfrozen = True
@@ -432,49 +432,51 @@ class params(np.ndarray):
         p2[:, xxx.p_cm] = p1[:, xxx.p_cm] / p1[mIndex, xxx.p_cm]
 
         # deal with errors too
-        # see paper http://dx.doi.org/10.1007/s10334-005-0018-7
-        # relCRB(1/2) = sqrt(relCRB1^2 + relCRB2^2 - 2*corr1_2*relCRB1*relCRB2)
-        # get numerator rel CRBs for cm
-        relCRBs_num = p1.get_errors_prct()[:, xxx.p_cm]
-        # get denominator rel CRBs for cm
-        relCRBs_den = p1.get_errors_prct()[mIndex, xxx.p_cm]
+        # if correlation matrix available
+        if(self.corr_mat is not None):
+            # see paper http://dx.doi.org/10.1007/s10334-005-0018-7
+            # relCRB(1/2) = sqrt(relCRB1^2 + relCRB2^2 - 2*corr1_2*relCRB1*relCRB2)
+            # get numerator rel CRBs for cm
+            relCRBs_num = p1.get_errors_prct()[:, xxx.p_cm]
+            # get denominator rel CRBs for cm
+            relCRBs_den = p1.get_errors_prct()[mIndex, xxx.p_cm]
 
-        # get corr coeff between num and den cm
-        # first, get free param corr mat
-        free_param_corr_mat = self.corr_mat
-        # convert mIndex to free params index
-        p3 = self.copy()
-        # replace cm by index
-        p3[:, xxx.p_cm] = np.arange(0, p3.shape[0], 1)
-        # lock all other pars
-        p3.linklock[:, xxx.p_dd] = 1
-        p3.linklock[:, xxx.p_df] = 1
-        p3.linklock[:, xxx.p_dp] = 1
-        # convert ot free params
-        p3_free = p3.toFreeParams()
-        # here we should get a list of indexes
-        # find where is mIndex and we did it
-        ind_free_pars_mIndex = np.where(p3_free == mIndex)[0][0]
-        # extract corr vector
-        free_param_corr_vec = free_param_corr_mat[:, ind_free_pars_mIndex]
-        # convert it to full params
-        p3 = self.copy()
-        # lock all other pars
-        p3.linklock[:, xxx.p_dd] = 1
-        p3.linklock[:, xxx.p_df] = 1
-        p3.linklock[:, xxx.p_dp] = 1
-        # replace cm by cor coeffs
-        p3 = p3.toFullParams(free_param_corr_vec)
-        # get full param corr vector
-        full_param_corr_vec = p3[:, xxx.p_cm]
-        # make it absolute
-        rc_num_den_abs = np.abs(full_param_corr_vec)
+            # get corr coeff between num and den cm
+            # first, get free param corr mat
+            free_param_corr_mat = self.corr_mat
+            # convert mIndex to free params index
+            p3 = self.copy()
+            # replace cm by index
+            p3[:, xxx.p_cm] = np.arange(0, p3.shape[0], 1)
+            # lock all other pars
+            p3.linklock[:, xxx.p_dd] = 1
+            p3.linklock[:, xxx.p_df] = 1
+            p3.linklock[:, xxx.p_dp] = 1
+            # convert ot free params
+            p3_free = p3.toFreeParams()
+            # here we should get a list of indexes
+            # find where is mIndex and we did it
+            ind_free_pars_mIndex = np.where(p3_free == mIndex)[0][0]
+            # extract corr vector
+            free_param_corr_vec = free_param_corr_mat[:, ind_free_pars_mIndex]
+            # convert it to full params
+            p3 = self.copy()
+            # lock all other pars
+            p3.linklock[:, xxx.p_dd] = 1
+            p3.linklock[:, xxx.p_df] = 1
+            p3.linklock[:, xxx.p_dp] = 1
+            # replace cm by cor coeffs
+            p3 = p3.toFullParams(free_param_corr_vec)
+            # get full param corr vector
+            full_param_corr_vec = p3[:, xxx.p_cm]
+            # make it absolute
+            rc_num_den_abs = np.abs(full_param_corr_vec)
 
-        # calculate the final relCRB
-        rel_CRBs_ratio = np.sqrt( relCRBs_num**2 + relCRBs_den**2 - 2 * rc_num_den_abs * relCRBs_num * relCRBs_den )
-        # back to absCRB
-        abs_CRBs_ratio = p2[:, xxx.p_cm] * rel_CRBs_ratio / 100.0
-        p2._errors[:, xxx.p_cm] = abs_CRBs_ratio
+            # calculate the final relCRB
+            rel_CRBs_ratio = np.sqrt( relCRBs_num**2 + relCRBs_den**2 - 2 * rc_num_den_abs * relCRBs_num * relCRBs_den )
+            # back to absCRB
+            abs_CRBs_ratio = p2[:, xxx.p_cm] * rel_CRBs_ratio / 100.0
+            p2._errors[:, xxx.p_cm] = abs_CRBs_ratio
 
         return(p2)
 
