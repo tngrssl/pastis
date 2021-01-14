@@ -574,7 +574,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             # X selection done with asymmetric 90° pulse
             # we do not know much about this pulse. We can only say it is 3.4kHz large if the duration is 2ms
             log.debug("estimating CS displacement for (90x): this pulse is the weird asymmetric one, we have no idea what it is exactly!")
-            if(self.pulse_laser_exc_length == 2000.0):
+            if(self.sequence.pulse_laser_exc_length == 2000.0):
                 log.debug("since its duration is 2ms here, we assume, according to Oz & Tkac, MRM 65:901-910 (2011), that its bandwidth is 3.4kHz.")
                 bw_x_Hz = 3400.0
                 grad_x_Hz_m = bw_x_Hz / (self.voxel_size[0] * 0.001)
