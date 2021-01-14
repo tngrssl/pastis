@@ -48,6 +48,10 @@ SHRIMP can be used to process and quantify single-voxel Magnetic Resonance SPect
 
 ## TODO
 
+- add voxel size to sequence
+- move CSDE calculation to sequence class
+- add reco.MRSData2 to plot voxel on anatomy (cf. notebook)
+
 - slASER GAMMA implementation: impact for fit on not? check in vitro, etc.
 
 - Parallelize stuff: data rejecting approaches

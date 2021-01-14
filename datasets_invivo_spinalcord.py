@@ -900,8 +900,8 @@ p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/349-ap-p2-moelle/2020092
 
 # this dataset was interrupted, cannot read it... ;(
 p.dataset[1]["legend"] = "sLASER 10/2 NA=96 (repro)"
-p.dataset[0]["resp_bpm"] = 17
-p.dataset[0]["heart_bpm"] = 70
+p.dataset[1]["resp_bpm"] = 17
+p.dataset[1]["heart_bpm"] = 70
 p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/349-ap-p2-moelle/meas_MID102_slaser_R_N=10_2_longTE_SNR+++_FID63232.dat",
                                 "/home/tangir/crmbm/acq_twix/349-ap-p2-moelle/meas_MID101_slaser_R_N=10_2_longTE_SNR+++_FID63231.dat"]
 p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/349-ap-p2-moelle/20200925/01_0009_slaser-r-n",
