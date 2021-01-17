@@ -775,7 +775,7 @@ class mrs_sequence:
             log.error_new_attribute(key)
         object.__setattr__(self, key, value)
 
-    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0):
+    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, voxel_size=[10, 10, 10], fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0):
         """
         Initialize the sequence.
 
@@ -793,6 +793,8 @@ class mrs_sequence:
             Observed nuclei. Examples: "1H", "31P", etc.
         npts : int
             Number of acquisition points
+        voxel_size : list
+            Dimensions of voxel (mm)
         fs : float
             Acquisition bandwidth (Hz)
         f0 : float
@@ -827,6 +829,8 @@ class mrs_sequence:
         self.nuclei = nuclei
         # number of acquired time points (int)
         self.npts = npts
+        # voxel dimensions
+        self.voxel_size = voxel_size
         # sampling frequency (Hz)
         self.fs = fs
         # larmor frequency of water (MHz)
@@ -1383,7 +1387,7 @@ class mrs_sequence:
 class mrs_seq_press(mrs_sequence):
     """A class that represents a general PRESS sequence."""
 
-    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0, te1=np.nan, te2=np.nan):
+    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, voxel_size=[10, 10, 10], fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0, te1=np.nan, te2=np.nan):
         """
         Initialize a virtual PRESS sequence.
 
@@ -1401,6 +1405,8 @@ class mrs_seq_press(mrs_sequence):
             Observed nuclei. Examples: "1H", "31P", etc.
         npts : int
             Number of acquisition points
+        voxel_size : list
+            Dimensions of voxel (mm)
         fs : float
             Acquisition bandwidth (Hz)
         f0 : float
@@ -1422,7 +1428,7 @@ class mrs_seq_press(mrs_sequence):
         te2 : float
             Second part of TE (ms)
         """
-        super().__init__(te, tr, na, ds, nuclei, npts, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor)
+        super().__init__(te, tr, na, ds, nuclei, npts, voxel_size, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor)
         # name of sequence
         self.name = "press (not specific)"
         # type
@@ -1522,7 +1528,7 @@ class mrs_seq_press(mrs_sequence):
 class mrs_seq_steam(mrs_sequence):
     """A class that represents a general STEAM sequence."""
 
-    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0, tm=20.0):
+    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, voxel_size=[10, 10, 10], fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0, tm=20.0):
         """
         Initialize a virtual STEAM sequence.
 
@@ -1540,6 +1546,8 @@ class mrs_seq_steam(mrs_sequence):
             Observed nuclei. Examples: "1H", "31P", etc.
         npts : int
             Number of acquisition points
+        voxel_size : list
+            Dimensions of voxel (mm)
         fs : float
             Acquisition bandwidth (Hz)
         f0 : float
@@ -1559,7 +1567,7 @@ class mrs_seq_steam(mrs_sequence):
         tm : float
             Mixing time (ms)
         """
-        super().__init__(te, tr, na, ds, nuclei, npts, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor)
+        super().__init__(te, tr, na, ds, nuclei, npts, voxel_size, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor)
         # name of sequence
         self.name = "steam (not specific)"
         # type
@@ -1681,7 +1689,7 @@ class mrs_seq_steam(mrs_sequence):
 class mrs_seq_eja_svs_slaser(mrs_sequence):
     """A class that represents the semi-LASER sequence from CMRR."""
 
-    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0, exc_pulse_duration=2.0, exc_pulse_voltage=350.0, rfc_pulse_duration=9.0, rfc_pulse_fa=180.0, rfc_pulse_r=20.0, rfc_pulse_n=1.0, rfc_pulse_voltage=350.0, ref_pulse_voltage=300.0, spoiler_duration=1.0):
+    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, voxel_size=[10, 10, 10], fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0, exc_pulse_duration=2.0, exc_pulse_voltage=350.0, rfc_pulse_duration=9.0, rfc_pulse_fa=180.0, rfc_pulse_r=20.0, rfc_pulse_n=1.0, rfc_pulse_voltage=350.0, ref_pulse_voltage=300.0, spoiler_duration=1.0):
         """
         Initialize a virtual semi-LASER sequence.
 
@@ -1699,6 +1707,8 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
             Observed nuclei. Examples: "1H", "31P", etc.
         npts : int
             Number of acquisition points
+        voxel_size : list
+            Dimensions of voxel (mm)
         fs : float
             Acquisition bandwidth (Hz)
         f0 : float
@@ -1732,7 +1742,7 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
         spoiler_duration : float
             Spoiler duration (ms)
         """
-        super().__init__(te, tr, na, ds, nuclei, npts, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor)
+        super().__init__(te, tr, na, ds, nuclei, npts, voxel_size, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor)
         # name of sequence
         self.name = "eja_svs_slaser"
         # type
@@ -1785,6 +1795,56 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
 
         # freeze
         self.__isfrozen = True
+
+    def get_csde(self, voxel_size_mm_list=None):
+        """
+        Calculate chemical shift displacement in three directions.
+
+        Returns
+        -------
+        csd : numpy array of floats
+            Estimated CS displacement in %/ppm
+        """
+        # init
+        log.debug("estimating chemical shift displacement error...")
+        if(voxel_size_mm_list is None):
+            # TODO: I am not smart enough to make this work properly. Voxel orientation is sometimes modified meaning that RF pulses #1, #2 and #3 do not always select along RL, AP, HF or X, Y, Z. I am not very good with transformation matrix and stuff... :( So for now, I give the possibility to the user to input his voxel sizes in the order of pulsing.
+            voxel_size_mm_list = self.voxel_size
+
+        csd = [None, None, None]
+        df_abs_Hz = self.f0  # yes, 1ppm==f0[MHz]/1e6=297Hz at 7T
+
+        # assuming X-Y-Z is done with 90-180-180
+        log.info("estimating CS displacement for semiLASER: assuming (90x)-(180y)-(180z)!...")
+
+        # X selection done with asymmetric 90° pulse
+        # we do not know much about this pulse. We can only say it is 3.4kHz large if the duration is 2ms
+        log.debug("estimating CS displacement for (90x): this pulse is the weird asymmetric one, we have no idea what it is exactly!")
+        if(self.pulse_laser_exc_length == 2000.0):
+            log.debug("since its duration is 2ms here, we assume, according to Oz & Tkac, MRM 65:901-910 (2011), that its bandwidth is 3.4kHz.")
+            bw_x_Hz = 3400.0
+            grad_x_Hz_m = bw_x_Hz / (voxel_size_mm_list[0] * 0.001)
+            d_x_mm = 1000.0 * df_abs_Hz / grad_x_Hz_m
+            d_x_prct = d_x_mm / voxel_size_mm_list[0] * 100.0
+        else:
+            log.debug("since its duration is not 2ms here, we do not know its bandwith. Therefore, no way to calculate the CS displacement for this axis, sorry ;)")
+            d_x_m = None
+
+        # Y selection done with 180°
+        bw_y_Hz = self.pulse_laser_rfc_r / (self.pulse_laser_rfc_length / 1000000.0)
+        grad_y_Hz_m = bw_y_Hz / (voxel_size_mm_list[1] * 0.001)
+        d_y_mm = 1000.0 * df_abs_Hz / grad_y_Hz_m
+        d_y_prct = d_y_mm / voxel_size_mm_list[1] * 100.0
+
+        # Z selection done with 180°
+        bw_z_Hz = self.pulse_laser_rfc_r / (self.pulse_laser_rfc_length / 1000000.0)
+        grad_z_Hz_m = bw_z_Hz / (voxel_size_mm_list[2] * 0.001)
+        d_z_mm = 1000.0 * df_abs_Hz / grad_z_Hz_m
+        d_z_prct = d_z_mm / voxel_size_mm_list[2] * 100.0
+
+        csd = np.array([d_x_prct, d_y_prct, d_z_prct])
+
+        return(csd)
 
     def _sech(self, x):
         return(1.0 / np.cosh(x))
@@ -2247,7 +2307,7 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
 class mrs_seq_eja_svs_press(mrs_seq_press):
     """A class that represents the PRESS sequence from CMRR."""
 
-    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0, te1=np.nan, te2=np.nan):
+    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, voxel_size=[10, 10, 10], fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0, te1=np.nan, te2=np.nan):
         """
         Initialize a virtual STEAM sequence.
 
@@ -2265,6 +2325,8 @@ class mrs_seq_eja_svs_press(mrs_seq_press):
             Observed nuclei. Examples: "1H", "31P", etc.
         npts : int
             Number of acquisition points
+        voxel_size : list
+            Dimensions of voxel (mm)
         fs : float
             Acquisition bandwidth (Hz)
         f0 : float
@@ -2286,7 +2348,7 @@ class mrs_seq_eja_svs_press(mrs_seq_press):
         te2 : float
             Second part of TE (ms)
         """
-        super().__init__(te, tr, na, ds, nuclei, npts, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor, te1, te2)
+        super().__init__(te, tr, na, ds, nuclei, npts, voxel_size, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor, te1, te2)
         # name of sequence
         self.name = "eja_svs_press"
 
@@ -2294,7 +2356,7 @@ class mrs_seq_eja_svs_press(mrs_seq_press):
 class mrs_seq_eja_svs_steam(mrs_seq_steam):
     """A class that represents the STEAM sequence from CMRR."""
 
-    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0, tm=20.0):
+    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, voxel_size=[10, 10, 10], fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0, tm=20.0):
         """
         Initialize a virtual STEAM sequence.
 
@@ -2312,6 +2374,8 @@ class mrs_seq_eja_svs_steam(mrs_seq_steam):
             Observed nuclei. Examples: "1H", "31P", etc.
         npts : int
             Number of acquisition points
+        voxel_size : list
+            Dimensions of voxel (mm)
         fs : float
             Acquisition bandwidth (Hz)
         f0 : float
@@ -2331,7 +2395,7 @@ class mrs_seq_eja_svs_steam(mrs_seq_steam):
         tm : float
             Mixing time (ms)
         """
-        super().__init__(te, tr, na, ds, nuclei, npts, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor, tm)
+        super().__init__(te, tr, na, ds, nuclei, npts, voxel_size, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor, tm)
         # name of sequence
         self.name = "eja_svs_steam"
 
@@ -2339,7 +2403,7 @@ class mrs_seq_eja_svs_steam(mrs_seq_steam):
 class mrs_seq_fid(mrs_sequence):
     """A class that represents the pulse-acquire sequence (fid), which is actually a clone of the super class."""
 
-    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0):
+    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, voxel_size=[10, 10, 10], fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0):
         """
         Initialize a virtual FID sequence.
 
@@ -2357,6 +2421,8 @@ class mrs_seq_fid(mrs_sequence):
             Observed nuclei. Examples: "1H", "31P", etc.
         npts : int
             Number of acquisition points
+        voxel_size : list
+            Dimensions of voxel (mm)
         fs : float
             Acquisition bandwidth (Hz)
         f0 : float
@@ -2376,7 +2442,7 @@ class mrs_seq_fid(mrs_sequence):
         scaling_factor : float
             Scaling FID intensity factor
         """
-        super().__init__(te, tr, na, ds, nuclei, npts, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor)
+        super().__init__(te, tr, na, ds, nuclei, npts, voxel_size, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor)
         # name of sequence
         self.name = "fid"
 
@@ -2384,7 +2450,7 @@ class mrs_seq_fid(mrs_sequence):
 class mrs_seq_svs_se(mrs_seq_press):
     """A class that represents the PRESS sequence from SIEMENS."""
 
-    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0, te1=np.nan, te2=np.nan):
+    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, voxel_size=[10, 10, 10], fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0, te1=np.nan, te2=np.nan):
         """
         Initialize a virtual STEAM sequence.
 
@@ -2402,6 +2468,8 @@ class mrs_seq_svs_se(mrs_seq_press):
             Observed nuclei. Examples: "1H", "31P", etc.
         npts : int
             Number of acquisition points
+        voxel_size : list
+            Dimensions of voxel (mm)
         fs : float
             Acquisition bandwidth (Hz)
         f0 : float
@@ -2423,7 +2491,7 @@ class mrs_seq_svs_se(mrs_seq_press):
         te2 : float
             Second part of TE (ms)
         """
-        super().__init__(te, tr, na, nuclei, npts, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor, te1, te2)
+        super().__init__(te, tr, na, nuclei, npts, voxel_size, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor, te1, te2)
         # name of sequence
         self.name = "svs_se"
 
@@ -2431,7 +2499,7 @@ class mrs_seq_svs_se(mrs_seq_press):
 class mrs_seq_svs_st(mrs_seq_steam):
     """A class that represents the STEAM sequence from SIEMENS."""
 
-    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0, tm=20.0):
+    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, voxel_size=[10, 10, 10], fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0, tm=20.0):
         """
         Initialize a virtual STEAM sequence.
 
@@ -2449,6 +2517,8 @@ class mrs_seq_svs_st(mrs_seq_steam):
             Observed nuclei. Examples: "1H", "31P", etc.
         npts : int
             Number of acquisition points
+        voxel_size : list
+            Dimensions of voxel (mm)
         fs : float
             Acquisition bandwidth (Hz)
         f0 : float
@@ -2468,7 +2538,7 @@ class mrs_seq_svs_st(mrs_seq_steam):
         tm : float
             Mixing time (ms)
         """
-        super().__init__(te, tr, na, ds, nuclei, npts, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor, tm)
+        super().__init__(te, tr, na, ds, nuclei, npts, voxel_size, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor, tm)
         # name of sequence
         self.name = "svs_st"
 
@@ -2476,7 +2546,7 @@ class mrs_seq_svs_st(mrs_seq_steam):
 class mrs_seq_svs_st_vapor_643(mrs_seq_steam):
     """A class that represents the STEAM sequence from SIEMENS WiP 643."""
 
-    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0, tm=20.0):
+    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, voxel_size=[10, 10, 10], fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0, tm=20.0):
         """
         Initialize a virtual STEAM sequence.
 
@@ -2494,6 +2564,8 @@ class mrs_seq_svs_st_vapor_643(mrs_seq_steam):
             Observed nuclei. Examples: "1H", "31P", etc.
         npts : int
             Number of acquisition points
+        voxel_size : list
+            Dimensions of voxel (mm)
         fs : float
             Acquisition bandwidth (Hz)
         f0 : float
@@ -2513,7 +2585,7 @@ class mrs_seq_svs_st_vapor_643(mrs_seq_steam):
         tm : float
             Mixing time (ms)
         """
-        super().__init__(te, tr, na, ds, nuclei, npts, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor, tm)
+        super().__init__(te, tr, na, ds, nuclei, npts, voxel_size, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor, tm)
         # name of sequence
         self.name = "svs_st_vapor_643"
 

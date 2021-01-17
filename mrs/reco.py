@@ -50,7 +50,7 @@ class data_rejection_method(Enum):
 class MRSData2(suspect.mrsobjects.MRSData):
     """A class based on suspect's MRSData to store MRS data."""
 
-    def __new__(cls, data_filepath, physio_log_file=None, obj=None, dt=None, f0=None, te=None, tr=None, ppm0=None, voxel_dimensions=None, transform=None, metadata=None, data_ref=None, label="", offset_display=0.0, patient={}, sequence_obj=None, noise_level=None, data_rejection=None, data_file_hash=None, is_concatenated=None, is_rawdata=None):
+    def __new__(cls, data_filepath, physio_log_file=None, anatomy_folderpath=None, obj=None, dt=None, f0=None, te=None, tr=None, ppm0=None, voxel_dimensions=None, transform=None, metadata=None, data_ref=None, label="", offset_display=0.0, patient={}, sequence_obj=None, noise_level=None, data_rejection=None, data_file_hash=None, is_concatenated=None, is_rawdata=None):
         """
         Construct a MRSData2 object that inherits of Suspect's MRSData class. In short, the MRSData2 class is a copy of MRSData + my custom methods for post-processing. To create a MRSData2 object, you need give a path that points to a SIEMENS DICOM or a SIEMENS TWIX file.
 
@@ -60,6 +60,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
             Full absolute file path pointing to the stored signal (DCM or TWIX file) or the folder assuming that a dcm file named "original-primary_e09_0001.dcm" is stored inside.
         physio_log_file : string
             Full absolute file path pointing to a IDEA VB17 respiratory log file
+        anatomy_folderpath : string
+            Full absolute file path pointing a folder containing dicom DCM files contaning the anatomical images on which you want to dispaly the VOI
         obj,dt,f0,te,tr,ppm0,voxel_dimensions,transform,metadata
             Please check suspect's MRSData class for those arguments
         data_ref : MRSData2 object
@@ -115,7 +117,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         # read header
         mfr = io.SIEMENS_data_file_reader(data_filepath)
         # read data and get a suspect MRSData object
-        MRSData_obj = mfr.read_data()
+        MRSData_obj = mfr.data
         # get hash code
         hc = mfr.get_md5_hash()
 
@@ -206,6 +208,13 @@ class MRSData2(suspect.mrsobjects.MRSData):
             # save this
             obj._physio_file = physio_log_file
 
+        # anatomical images if any
+        if(anatomy_folderpath is None):
+            obj._anatomy_folderpath = None
+        else:
+            # save this
+            obj._anatomy_folderpath = anatomy_folderpath
+
         return(obj)
 
     def __array_finalize__(self, obj):
@@ -227,6 +236,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         self._display_offset = getattr(obj, 'display_offset', 0.0)
         self._patient = getattr(obj, 'patient', None)
         self._physio_file = getattr(obj, 'physio_file', None)
+        self._anatomy_folderpath = getattr(obj, 'anatomy_folderpath', None)
 
         self._sequence = getattr(obj, 'sequence', None)
         # replace by a copy
@@ -259,6 +269,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         obj2._display_offset = getattr(self, 'display_offset', 0.0)
         obj2._patient = getattr(self, 'patient', None)
         obj2._physio_file = getattr(self, 'physio_file', None)
+        obj2._anatomy_folderpath = getattr(self, 'anatomy_folderpath', None)
 
         obj2._sequence = getattr(self, 'sequence', None)
         # replace by a copy
@@ -350,6 +361,18 @@ class MRSData2(suspect.mrsobjects.MRSData):
             Path to physio recording file
         """
         return(self._physio_file)
+
+    @property
+    def anatomy_folderpath(self):
+        """
+        Property get function for anatomy_folderpath.
+
+        Returns
+        -------
+        self._anatomy_folderpath : string
+            Full absolute file path pointing a folder containing dicom DCM files contaning the anatomical images on which you want to dispaly the VOI
+        """
+        return(self._anatomy_folderpath)
 
     @property
     def sequence(self):
@@ -552,55 +575,6 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         pbar.finish("done")
         return(peak_trace, peak_trace_rel2mean, peak_trace_rel2firstpt)
-
-    def analyze_cs_displacement(self):
-        """
-        Calculate chemical shift displacement in three directions.
-
-        Returns
-        -------
-        csd : numpy array of floats
-            Estimated CS displacement in %/ppm
-        """
-        # init
-        log.debug("estimating chemical shift displacement error for [%s]..." % self.display_label)
-        csd = [None, None, None]
-        df_abs_Hz = self.f0  # yes, 1ppm==f0[MHz]/1e6=297Hz at 7T
-
-        if(type(self.sequence) == sim.mrs_seq_eja_svs_slaser):
-            # assuming X-Y-Z is done with 90-180-180
-            log.info("estimating CS displacement for semiLASER: assuming (90x)-(180y)-(180z)!...")
-
-            # X selection done with asymmetric 90° pulse
-            # we do not know much about this pulse. We can only say it is 3.4kHz large if the duration is 2ms
-            log.debug("estimating CS displacement for (90x): this pulse is the weird asymmetric one, we have no idea what it is exactly!")
-            if(self.sequence.pulse_laser_exc_length == 2000.0):
-                log.debug("since its duration is 2ms here, we assume, according to Oz & Tkac, MRM 65:901-910 (2011), that its bandwidth is 3.4kHz.")
-                bw_x_Hz = 3400.0
-                grad_x_Hz_m = bw_x_Hz / (self.voxel_size[0] * 0.001)
-                d_x_m = 1000.0 * df_abs_Hz / grad_x_Hz_m
-                d_x_prct = d_x_m / self.voxel_size[0] * 100.0
-            else:
-                log.debug("since its duration is not 2ms here, we do not know its bandwith. Therefore, no way to calculate the CS displacement for this axis, sorry ;)")
-                d_x_m = None
-
-            # Y selection done with 180°
-            bw_y_Hz = self.pulse_laser_rfc_r / (self.pulse_laser_rfc_length / 1000000.0)
-            grad_y_Hz_m = bw_y_Hz / (self.voxel_size[1] * 0.001)
-            d_y_m = 1000.0 * df_abs_Hz / grad_y_Hz_m
-            d_y_prct = d_y_m / self.voxel_size[1] * 100.0
-
-            # Z selection done with 180°
-            bw_z_Hz = self.pulse_laser_rfc_r / (self.pulse_laser_rfc_length / 1000000.0)
-            grad_z_Hz_m = bw_z_Hz / (self.voxel_size[2] * 0.001)
-            d_z_m = 1000.0 * df_abs_Hz / grad_z_Hz_m
-            d_z_prct = d_z_m / self.voxel_size[2] * 100.0
-
-            csd = np.array([d_x_prct, d_y_prct, d_z_prct])
-        else:
-            log.warning("no idea how to calculate CS displacement for this sequence...")
-
-        return(csd)
 
     def correct_intensity_scaling_nd(self, scaling_factor_rawdata=1e8, scaling_factor_dcm=1.0):
         """
@@ -2918,6 +2892,39 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         return(lw)
 
+    def display_voi_anatomy_nd(self):
+        """
+        Display the VOI on a anatomical image of your choice. Experimental for now, just following tutorial here: https://suspect.readthedocs.io/en/latest/notebooks/tut06_mpl.html
+
+        * Works with multi-dimensional signals.
+        """
+        log.debug("displaying VOI [%s]..." % self.display_label)
+
+        # read dicom images
+        t2w = suspect.image.load_dicom_volume(self.anatomy_folderpath + "/original-primary-m-norm-nd_e01_0001.dcm")
+
+        # find best slice
+        pcg_centre = self.to_scanner(0, 0, 0)
+        pcg_centre_index = t2w.from_scanner(*pcg_centre).round().astype(int)
+
+        # VOI drawing coordinates
+        # TODO: this works only for sagittal images (spinal cord)
+        vx = self.sequence.voxel_size  # mm (will need cm)
+        corner_coords_pcg = [[0,    -vx[1] / 20.0,   -vx[2] / 20.0],
+                             [0,    -vx[1] / 20.0,   vx[2] / 20.0],
+                             [0,    vx[1] / 20.0,    vx[2] / 20.0],
+                             [0,    vx[1] / 20.0,    -vx[2] / 20.0],
+                             [0,    -vx[1] / 20.0,   -vx[2] / 20.0]]
+        corner_coords = np.array([t2w.from_scanner(*self.to_scanner(*coord)) for coord in corner_coords_pcg])
+
+        plt.figure(240).canvas.set_window_title("display_voi_anatomy_nd (mrs.reco.MRSData2)")
+        plt.cla()
+        plt.imshow(t2w[pcg_centre_index[2]], cmap=plt.cm.gray)
+        plt.plot(corner_coords[:, 0], corner_coords[:, 1], 'red')
+        plt.xticks([])
+        plt.yticks([])
+        plt.show()
+
     def display_spectrum_1d(self, ifig=1, display_range=[1, 6], magnitude_mode=False):
         """
         Display spectrum in figure 'ifig', overlaying if needed.
@@ -3189,6 +3196,10 @@ class pipeline:
                                   "range_ppm": self.settings["display_range_ppm"],
                                   # display spectrum in magnitude mode?
                                   "magnitude_mode": False
+                                  }
+        # --- job: VOI display on anatomical images ---
+        self.job["displaying anatomy"] = {0:
+                                  {"func": MRSData2.display_voi_anatomy_nd, "name": "overlaying VOI on anatomical image"}
                                   }
 
         # --- job: automatic rephasing ---
@@ -3715,6 +3726,7 @@ class pipeline:
         for i, d in enumerate(self.dataset):
             this_legend = d["legend"]
             this_physio_filename = d["physio-file"]
+            this_imaging_filename = d["imaging-file"]
 
             for dtype in ["raw", "dcm"]:
                 # check if any data file to read
@@ -3725,7 +3737,7 @@ class pipeline:
 
                 this_data_ref_filename = d[dtype]["files"][1]
                 log.info("reading data [" + this_legend + "]")
-                s = MRSData2(this_data_filename, this_physio_filename)
+                s = MRSData2(this_data_filename, this_physio_filename, this_imaging_filename)
                 log.debug("got a " + str(s.shape) + " vector")
                 # set ppm reference
                 s.ppm0 = self.settings["ppm0"]
@@ -3789,6 +3801,7 @@ class pipeline:
         # remove display job if we don't want to display
         if(self.settings["display"] is False):
             self.job_list.remove(self.job["displaying"])
+            self.job_list.remove(self.job["displaying anatomy"])
 
         # for each job
         for k, this_job in enumerate(self.job_list):
