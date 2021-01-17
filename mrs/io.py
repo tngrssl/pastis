@@ -142,33 +142,13 @@ class SIEMENS_data_file_reader(data_file_reader):
             log.debug("reading DICOM header...")
             self.dcm_header = pydicom.dcmread(self.fullfilepath)
 
+        # and read data and store it
+        self.data = self._read_data()
+
         # freeze
         self.__isfrozen = True
 
-    def is_rawdata(self):
-        """
-        Return true if data is read from a TWIX file.
-
-        Returns
-        -------
-        self.file_ext == '.dat' : boolean
-            True if TWIX file
-        """
-        return(self.file_ext == '.dat')
-
-    def get_number_rx_channels(self):
-        """
-        Return the number of channels.
-
-        Returns
-        -------
-        nchan : int
-            Number of channels
-        """
-        nchan = self.read_param_num("iMaxNoOfRxChannels")
-        return(int(nchan))
-
-    def read_data(self):
+    def _read_data(self):
         """
         Read MRS data from file and return a suspect's MRSData object.
 
@@ -198,6 +178,29 @@ class SIEMENS_data_file_reader(data_file_reader):
             log.error("unknown data file format!?")
 
         return(MRSData_obj)
+
+    def is_rawdata(self):
+        """
+        Return true if data is read from a TWIX file.
+
+        Returns
+        -------
+        self.file_ext == '.dat' : boolean
+            True if TWIX file
+        """
+        return(self.file_ext == '.dat')
+
+    def get_number_rx_channels(self):
+        """
+        Return the number of channels.
+
+        Returns
+        -------
+        nchan : int
+            Number of channels
+        """
+        nchan = self.read_param_num("iMaxNoOfRxChannels")
+        return(int(nchan))
 
     def read_param_num(self, param_name, file_index=0):
         """
@@ -478,13 +481,17 @@ class SIEMENS_data_file_reader(data_file_reader):
         npts = int(self.read_param_num("lVectorSize"))
         log.debug("extracted number of points (%d)" % npts)
 
+        # voxel size (job alraedy done by suspect, grab it from MRSData object)
+        voxel_size = self.data.voxel_size
+        log.debug("extracted voxel size (%.2f x %.2f x %.2f mm3)" % (voxel_size[0], voxel_size[1], voxel_size[2]))
+
         # dwell time (btw already extracted within suspect, this is a bit redandent)
         dt = self.read_param_num("DwellTime") * 1e-9
         log.debug("extracted dwell time (%.2f)" % dt)
 
         # f0 frequency (btw already extracted within suspect, this is a bit redandent)
         f0 = self.read_param_num("Frequency") * 1e-6
-        log.debug("extracted dwell time (%.6f)" % f0)
+        log.debug("extracted f0 (%.6f)" % f0)
 
         # special timestamp
         ulTimeStamp_ms = self._get_sequence_timestamp()
@@ -538,22 +545,22 @@ class SIEMENS_data_file_reader(data_file_reader):
             log.debug("extracted LASER spoiler length (%.2f)" % spoiler_length)
 
             # build sequence object
-            sequence_obj = sim.mrs_seq_eja_svs_slaser(te, tr, na, ds, nucleus, npts, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0, pulse_laser_exc_length / 1000.0, pulse_laser_exc_voltage, pulse_laser_rfc_length / 1000.0, pulse_laser_rfc_fa, pulse_laser_rfc_r, pulse_laser_rfc_n, pulse_laser_rfc_voltage, spoiler_length / 1000.0)
+            sequence_obj = sim.mrs_seq_eja_svs_slaser(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0, pulse_laser_exc_length / 1000.0, pulse_laser_exc_voltage, pulse_laser_rfc_length / 1000.0, pulse_laser_rfc_fa, pulse_laser_rfc_r, pulse_laser_rfc_n, pulse_laser_rfc_voltage, spoiler_length / 1000.0)
 
         elif(sequence_name == "eja_svs_press"):
-            sequence_obj = sim.mrs_seq_eja_svs_press(te, tr, na, ds, nucleus, npts, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
+            sequence_obj = sim.mrs_seq_eja_svs_press(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
 
         elif(sequence_name == "eja_svs_steam"):
-            sequence_obj = sim.mrs_seq_eja_svs_steam(te, tr, na, ds, nucleus, npts, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
+            sequence_obj = sim.mrs_seq_eja_svs_steam(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
 
         elif(sequence_name == "fid"):
-            sequence_obj = sim.mrs_seq_fid(te, tr, na, ds, nucleus, npts, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
+            sequence_obj = sim.mrs_seq_fid(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
 
         elif(sequence_name == "svs_se"):
-            sequence_obj = sim.mrs_seq_svs_se(te, tr, na, ds, nucleus, npts, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
+            sequence_obj = sim.mrs_seq_svs_se(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
 
         elif(sequence_name == "svs_st"):
-            sequence_obj = sim.mrs_seq_svs_st(te, tr, na, ds, nucleus, npts, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
+            sequence_obj = sim.mrs_seq_svs_st(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
 
         elif(sequence_name == "svs_st_vapor_643"):
             log.debug("this is CMRR's STEAM sequence, let's extract some specific parameters!")
@@ -563,11 +570,11 @@ class SIEMENS_data_file_reader(data_file_reader):
             log.debug("extracted TM value (%.0fms)" % TM_ms)
 
             # build sequence object
-            sequence_obj = sim.mrs_seq_svs_st_vapor_643(te, tr, na, ds, nucleus, npts, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0, TM_ms)
+            sequence_obj = sim.mrs_seq_svs_st_vapor_643(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0, TM_ms)
 
         elif(sequence_name == "bow_isis_15"):
             # TODO : create a sequence implementation for ISIS?
-            sequence_obj = sim.mrs_seq_fid(te, tr, na, ds, nucleus, npts, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
+            sequence_obj = sim.mrs_seq_fid(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
 
         elif(sequence_name is None):
             sequence_obj = None

@@ -17,7 +17,7 @@ SHRIMP can be used to process and quantify single-voxel Magnetic Resonance SPect
 
 ## Features
 
-- Read raw data from Siemens (TWIX format)
+- Read raw data from Siemens (TWIX VB17 format preferred)
 - Read dicom data
 - Data processing
 	- Automatic phasing
@@ -46,20 +46,4 @@ SHRIMP can be used to process and quantify single-voxel Magnetic Resonance SPect
 	- Cramér-Rao Bounds estimations
 - Dataframe-based final stats
 
-## TODO
 
-- add voxel size to sequence
-- move CSDE calculation to sequence class
-- add reco.MRSData2 to plot voxel on anatomy (cf. notebook)
-
-- slASER GAMMA implementation: impact for fit on not? check in vitro, etc.
-
-- Parallelize stuff: data rejecting approaches
-
-- Find a gitable non-binary format to store the metabolite db and basis sets (I was thinking of FODS but it is not really implemented in conda...)
-
-- HDF5/ISMRMD format save/load: for now, only save the MRS signal with a few attributes. If needed, will complete implementation
-
-- Implement partial volume stuff for absolute quantification
-
-- Merge with Yasmin's code for DW MRS
