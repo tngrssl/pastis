@@ -1,10 +1,10 @@
-# SHRIMP
+# PASTIS
 
-## SHRIMP
+## PASTIS
 
-SHRIMP stands for Spectroscopy Half-baked Resonance using Insane Magnetic Processing. That's a temporary acronym ;)
+PASTIS stands for (P)rocessing (AS)sessment (T)echnique for (I)mproved (S)pectroscopy ;)
 
-SHRIMP can be used to process and quantify single-voxel Magnetic Resonance SPectroscopy (MRS) data. It can also simulate MRS data using various MRS sequences for different B0 fields.
+PASTIS can be used to process and quantify single-voxel Magnetic Resonance SPectroscopy (MRS) data. It can also simulate MRS data using various MRS sequences for different B0 fields.
 
 ## Dependencies
 
