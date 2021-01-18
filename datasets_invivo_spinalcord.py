@@ -23,7 +23,7 @@ log.setLevel(log.DEBUG)
 rdb = db.data_db("/home/tangir/crmbm/acq_db/sc.pkl")
 
 # display stuff?
-display_stuff = False
+display_stuff = True
 
 # standard spinal cord template
 p = reco.pipeline()
@@ -52,6 +52,35 @@ p.job["data-rejecting"]["auto_method_list"] = [reco.data_rejection_method.AUTO_A
 
 p.settings["display"] = display_stuff
 p.save_template("sc_std_nows")
+
+# standard spinal cord template with VOI display (experimental)
+p = reco.pipeline()
+p.job_list = [  p.job["displaying anatomy"],
+                p.job["phasing"],
+                p.job["scaling"],
+                # p.job["FID modulus"],
+                p.job["channel-combining"],
+                # p.job["concatenate"],
+                p.job["noise-estimation"],
+                p.job["zero-filling"],
+                # p.job["physio-analysis"],
+                p.job["apodizing"],
+                p.job["realigning"],
+                p.job["data-rejecting"],
+                p.job["averaging"],
+                p.job["calibrating"],
+                # p.job["water-removal"],
+                p.job["cropping"],
+                p.job["displaying"]
+                ]
+
+p.job["data-rejecting"]["auto_method_list"] = [reco.data_rejection_method.AUTO_AMPLITUDE,
+                                                reco.data_rejection_method.AUTO_LINEWIDTH,
+                                                reco.data_rejection_method.AUTO_FREQUENCY,
+                                                reco.data_rejection_method.AUTO_PHASE]
+
+p.settings["display"] = display_stuff
+p.save_template("sc_std_nows_anat")
 
 # standard spinal cord template with concatenate feature (for the first 2 crappy datasets)
 p = reco.pipeline("sc_std_nows")
@@ -593,11 +622,12 @@ p.save_datasets(rdb)
 get_ipython().magic("clear")
 plt.close("all")
 
-p = reco.pipeline("sc_std_nows")
+p = reco.pipeline("sc_std_nows_anat")
 
 p.dataset[0]["legend"] = "sLASER 20:1 (REF with OVS)"
 p.dataset[0]["resp_bpm"] = 13
 p.dataset[0]["heart_bpm"] = 55
+p.dataset[0]["imaging-file"] = "/home/tangir/crmbm/acq/300-pm-p2-moelle/20200128/01_0005_t2-tse-sag-2d-10sl-p2-trig-s4-nd"
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/300-pm-p2-moelle/meas_MID68_slaser_R_N=20+_1_longTE_SNR++++_FID50926.dat",
                                 "/home/tangir/crmbm/acq_twix/300-pm-p2-moelle/meas_MID69_slaser_R_N=20+_1_longTE_SNR++++_FID50927.dat"]
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/300-pm-p2-moelle/20200128/01_0011_slaser-r-n/original-primary_e09_0001.dcm",
@@ -606,12 +636,14 @@ p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/300-pm-p2-moelle/2020012
 p.dataset[1]["legend"] = "STEAM IR (REF with OVS)"
 p.dataset[1]["resp_bpm"] = 13
 p.dataset[1]["heart_bpm"] = 55
+p.dataset[1]["imaging-file"] = "/home/tangir/crmbm/acq/300-pm-p2-moelle/20200128/01_0005_t2-tse-sag-2d-10sl-p2-trig-s4-nd"
 p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/300-pm-p2-moelle/meas_MID62_steam_shortTE_SNR+_FID50920.dat",
                                 "/home/tangir/crmbm/acq_twix/300-pm-p2-moelle/meas_MID64_steam_shortTE_SNR+_FID50922.dat"]
 
 p.dataset[2]["legend"] = "sLASER IR 5:5 (REF with OVS)"
 p.dataset[2]["resp_bpm"] = 13
 p.dataset[2]["heart_bpm"] = 55
+p.dataset[2]["imaging-file"] = "/home/tangir/crmbm/acq/300-pm-p2-moelle/20200128/01_0005_t2-tse-sag-2d-10sl-p2-trig-s4-nd"
 p.dataset[2]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/300-pm-p2-moelle/meas_MID73_slaser_R_N=5_5+_shortTE_SNR++_FID50931.dat",
                                 "/home/tangir/crmbm/acq_twix/300-pm-p2-moelle/meas_MID74_slaser_R_N=5_5+_shortTE_SNR++_FID50932.dat"]
 
