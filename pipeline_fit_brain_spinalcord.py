@@ -26,7 +26,7 @@ plt.rcParams['figure.max_open_warning'] = 1000
 plt.rcParams['font.size'] = 9
 log.setLevel(log.DEBUG)
 
-rdb = db.data_db("/home/tangir/crmbm/acq_db/brain.pkl")
+rdb = db.data_db("/home/tangir/crmbm/acq_db/sc_nodr_norea.pkl")
 
 # fast test: only last fit strategy only
 only_one_fit_strategy = False
@@ -46,8 +46,8 @@ df_sel = rdb.df_reco
 fit_stategies_list = []
 
 # list of sequence to try
-fit_strategies_seq_list = [sim.mrs_sequence, sim.mrs_seq_press]
-#fit_strategies_seq_list = [sim.mrs_seq_press]
+#fit_strategies_seq_list = [sim.mrs_sequence, sim.mrs_seq_press]
+fit_strategies_seq_list = [sim.mrs_seq_press]
 
 # init metabolite basis set and linklock
 meta_bs = sim.metabolite_basis_set()
@@ -380,7 +380,7 @@ for this_hash, this_dataset in zip(df_sel.index, df_sel["dataset"]):
             seq = this_data.sequence
         else:
             # custom sequence
-            seq = this_fit_strategy.sequence(seq.te, seq.tr, seq.na, seq.ds, seq.nuclei, seq.npts, seq.fs, seq.f0)
+            seq = this_fit_strategy.sequence(seq.te, seq.tr, seq.na, seq.ds, seq.nuclei, seq.npts, seq.voxel_size, seq.fs, seq.f0)
 
         # init
         seq.initialize(meta_bs)

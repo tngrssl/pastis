@@ -884,8 +884,8 @@ class mrs_sequence:
             obj._t = self._t.copy()
         if(self._last_params is not None):
             obj._last_params = self._last_params.copy()
-        if(self._last_model is not None):
-            obj._last_model = self._last_model.copy()
+
+        obj._last_model = None
 
         return(obj)
 
@@ -1378,8 +1378,8 @@ class mrs_sequence:
 
         # adding a few attributes
         s._te = self.te
-        s._sequence = self
-        s._noise_level = s.analyze_noise_nd()
+        s._sequence = self.copy()
+        s.analyze_noise_nd()
         s.set_display_label(lbl)
         return(s)
 
@@ -1435,12 +1435,12 @@ class mrs_seq_press(mrs_sequence):
         self.exc_type = sequence_exc_type.SPIN_ECHO
         # TE timing
         self.te = te
-        if(te1 is not np.nan and te2 is not np.nan):
+        if(np.isnan(te1) or np.isnan(te2)):
+            self.te1 = self.te / 2.0
+            self.te2 = self.te / 2.0
+        else:
             self.te1 = te1
             self.te2 = te2
-        else:
-            self.te1 = np.nan
-            self.te2 = np.nan
 
         # flip phase for PRESS
         self.additional_phi0 = np.pi
@@ -1479,18 +1479,12 @@ class mrs_seq_press(mrs_sequence):
         # PRESS timing implementation
         # 90-a-180-b-c-180-d-FID
         # all in ms
-        if(self.te1 is np.nan and self.te2 is np.nan):
-            # not TE1/TE2 specified, assume a symmetric scheme
-            a = self.te / 4.0
-            bc = self.te / 2.0
-            d = self.te / 4.0
-        else:
-            # TE1/TE2 timing
-            ab = self.te1
-            cd = self.te2
-            a = ab / 2.0
-            bc = ab / 2.0 + cd / 2.0
-            d = cd / 2.0
+        # TE1/TE2 timing
+        ab = self.te1
+        cd = self.te2
+        a = ab / 2.0
+        bc = ab / 2.0 + cd / 2.0
+        d = cd / 2.0
 
         # delay list in seconds
         evol_delays_s = np.array([a, bc, d]) / 1000.0
@@ -2588,6 +2582,67 @@ class mrs_seq_svs_st_vapor_643(mrs_seq_steam):
         super().__init__(te, tr, na, ds, nuclei, npts, voxel_size, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor, tm)
         # name of sequence
         self.name = "svs_st_vapor_643"
+
+
+class mrs_seq_svs_DW_slaser_b(mrs_seq_press):
+    """A class that represents the DW semi-LASER sequence that Yasmin's wrote (temporarly based on PRESS)."""
+
+    def __init__(self, te, tr=3500.0, na=128, ds=4, nuclei="1H", npts=4096 * 4, voxel_size=[10, 10, 10], fs=5000.0, f0=297.2062580, vref=250.0, shims=[], timestamp=np.nan, gating_mode=gating_signal_source.NO_GATING, eff_acquisition_time=np.nan, scaling_factor=1.0, te1=np.nan, te2=np.nan, directions_list=None, bvalues_list=None, n_b0=None):
+        """
+        Initialize a virtual STEAM sequence.
+
+        Parameters
+        ----------
+        te : float
+            Echo time (ms)
+        tr : float
+            Repetition time (ms)
+        na : int
+            Number of averages/excitations
+        ds : int
+            Number of summy scans
+        nuclei : string
+            Observed nuclei. Examples: "1H", "31P", etc.
+        npts : int
+            Number of acquisition points
+        voxel_size : list
+            Dimensions of voxel (mm)
+        fs : float
+            Acquisition bandwidth (Hz)
+        f0 : float
+            Water Larmor frequency (MHz)
+        vref : float
+            Reference voltage (V)
+        shims : list of floats
+            List of shim voltages in volts
+        timestamp : float
+            Timestamp in ms
+        gating_mode : gating_signal_source
+            Acquisition triggering mode
+        eff_acquisition_time : float
+            Effective acquisition time (s)
+        scaling_factor : float
+            Scaling FID intensity factor
+        te1 : float
+            First part of TE (ms)
+        te2 : float
+            Second part of TE (ms)
+        directions_list : list
+            List of directions used for diffusion-weighting
+        bvalues_list : list
+            List of bvalues used for diffusion-weighting
+        n_b0 : int
+            Number of b0 scans
+        """
+        super().__init__(te, tr, na, ds, nuclei, npts, voxel_size, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor, te1, te2)
+        # name of sequence
+        self.name = "svs_DW_slaser_b"
+        # directions
+        self.directions = directions_list
+        # bvalues
+        self.bvalues = bvalues_list
+        # number of b0
+        self.n_b0 = n_b0
 
 
 class metabolite_basis_set(dict):

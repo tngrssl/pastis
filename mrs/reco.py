@@ -230,7 +230,9 @@ class MRSData2(suspect.mrsobjects.MRSData):
         self.data_ref = getattr(obj, 'data_ref', None)
         # replace by a copy
         if(self.data_ref is not None):
-            self._data_ref = obj.data_ref.copy()
+            self.data_ref = obj.data_ref.copy()
+        else:
+            self.data_ref = None
 
         self._display_label = getattr(obj, 'display_label', None)
         self._display_offset = getattr(obj, 'display_offset', 0.0)
@@ -263,7 +265,9 @@ class MRSData2(suspect.mrsobjects.MRSData):
         obj2.data_ref = getattr(self, 'data_ref', None)
         # replace by a copy
         if(obj2.data_ref is not None):
-            obj2._data_ref = self.data_ref.copy()
+            obj2.data_ref = self.data_ref.copy()
+        else:
+            self.data_ref = None
 
         obj2._display_label = getattr(self, 'display_label', None)
         obj2._display_offset = getattr(self, 'display_offset', 0.0)
@@ -576,6 +580,479 @@ class MRSData2(suspect.mrsobjects.MRSData):
         pbar.finish("done")
         return(peak_trace, peak_trace_rel2mean, peak_trace_rel2firstpt)
 
+    def analyze_noise_nd(self, n_pts=100):
+        """
+        Measure noise level in time domain and store it in the "noise_level" attribute. This is usefull to keep track of the original noise level for later use, CRB normalization durnig quantification for example.
+
+        * Works with multi-dimensional signals.
+        * Returns a multi-dimensional signal.
+
+        Parameters
+        ----------
+        n_pts : int
+            Apodization factor in Hz
+
+        Returns
+        -------
+        noise_lev : float
+            Time-domain noise level
+        """
+        log.debug("estimating noise level for [%s]..." % self.display_label)
+
+        s = self.copy()
+        s_real = np.real(s)
+
+        # average if needed
+        while(s_real.ndim > 1):
+            s_real = np.mean(s_real, axis=0)
+
+        # init
+        log.debug("estimating noise level in FID using last %d points..." % n_pts)
+        # noise is the std of the last real points, but that is not so simple
+        # we really want real noise, not zeros from zero-filling
+        s_nonzero_mask = (s_real != 0.0)
+        s_analyze = s_real[s_nonzero_mask]
+        # now take the last 100 points
+        noise_lev = np.std(s_analyze[-n_pts:-1])
+        log.info("noise level = %.2E" % noise_lev)
+
+        # changing noise level attribute
+        log.debug("updating noise level...")
+        s._noise_level = noise_lev
+
+        # if any ref data available, we crop it too (silently)
+        if(s.data_ref is not None):
+            s.data_ref = s.data_ref.analyze_noise_nd(n_pts)
+
+        return(s)
+
+    def analyze_physio_2d(self, peak_range=[4.5, 5], delta_time_range=1000.0, display=False):
+        """
+        Analyze the physiological signal and try to correlate it to a peak amplitude, linewidth, frequency shift and phase variations.
+
+        * Works only with a 2D [averages,timepoints] signal.
+
+        Parameters
+        ----------
+        peak_range : array [2]
+            Range in ppm used to analyze peak phase when no reference signal is specified
+        delta_time_range : float
+            Range in ms used to correlate / match the NMR and the physiological signal. Yes, since we are not really sure of the start timestamp we found in the TWIX header, we try to match perfectly the two signals.
+        display : boolean
+            Display correction process (True) or not (False)
+        """
+        log.debug("analyzing physiological signals for [%s]..." % self.display_label)
+        # dimensions check
+        if(self.ndim != 2):
+            log.error("this method only works for 2D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
+
+        # init
+        if(self._physio_file is None):
+            # no physio signal here, exiting
+            log.error("no error physiological recording file provided!")
+            return()
+
+        # read data
+        [rt, rup, rd, rr] = io.read_physio_file(self._physio_file)
+        resp_trace = [rt, rup, rd, rr]
+        # physio signal
+        resp_t = resp_trace[0]
+        resp_s = resp_trace[3]
+
+        # perform peak analysis
+        peak_prop_abs, _, _ = self.correct_zerofill_nd()._analyze_peak_2d(peak_range)
+
+        # init
+        mri_t = np.linspace(self.sequence.timestamp, self.sequence.timestamp + self.sequence.tr * peak_prop_abs.shape[0], peak_prop_abs.shape[0])
+        dt_array = np.arange(-delta_time_range / 2.0, delta_time_range / 2.0, 1.0)
+        cc_2d = np.zeros([dt_array.shape[0], 4])
+
+        # shift signal and calculate corr coeff
+        pbar = log.progressbar("correlating signals", dt_array.shape[0])
+        for idt, dt in enumerate(dt_array):
+            # build time scale
+            this_resp_t_interp = mri_t.copy() + dt
+            this_resp_s_interp = np.interp(this_resp_t_interp, resp_t, resp_s)
+
+            # now crop the signals to have the same length
+            final_length = min(this_resp_s_interp.shape[0], peak_prop_abs.shape[0])
+            this_mri_t = mri_t[0:final_length]
+            this_params_trace = peak_prop_abs[0:final_length, :]
+            this_resp_s_interp = this_resp_s_interp[0:final_length]
+
+            # now remove points where resp trace is at 0 or 1
+            mm = np.logical_and(this_resp_s_interp > 0, this_resp_s_interp < 1)
+            this_resp_s_interp = this_resp_s_interp[mm]
+            this_params_trace = this_params_trace[mm, :]
+
+            # now, for each parameter
+            for p in range(4):
+                # estimate some R coeff
+                cc = np.corrcoef(this_resp_s_interp, this_params_trace[:, p])
+                cc_2d[idt, p] = cc[0, 1]
+
+            pbar.update(idt)
+
+        # find time shift that gives best correlation for each parameter
+        best_dt_per_par = np.zeros(4)
+        for p in range(4):
+            i_maxcorr = np.argmax(np.abs(cc_2d[:, p]))
+            best_dt = dt_array[i_maxcorr]
+            best_dt_per_par[p] = best_dt
+
+        # find time shift that gives best correlation for all 4 parameters
+        cc_2d_all = np.sum(np.abs(cc_2d), axis=1)
+        i_maxcorr = np.argmax(cc_2d_all)
+        best_dt_all = dt_array[i_maxcorr]
+        pbar.finish("done")
+
+        # some info in the term
+        st_ms = self.sequence.timestamp
+        st_str = datetime.fromtimestamp(st_ms / 1000 - 3600).strftime('%H:%M:%S')
+        log.info("data timestamp=\t" + str(st_ms) + "ms\t" + st_str)
+        log.info("best start time for...")
+
+        st_ms = self.sequence.timestamp + best_dt_per_par[0]
+        st_str = datetime.fromtimestamp(st_ms / 1000 - 3600).strftime('%H:%M:%S')
+        log.info("amplitude=\t\t" + str(st_ms) + "ms\t" + st_str)
+        st_ms = self.sequence.timestamp + best_dt_per_par[1]
+        st_str = datetime.fromtimestamp(st_ms / 1000 - 3600).strftime('%H:%M:%S')
+        log.info("linewidth=\t\t" + str(st_ms) + "ms\t" + st_str)
+        st_ms = self.sequence.timestamp + best_dt_per_par[2]
+        st_str = datetime.fromtimestamp(st_ms / 1000 - 3600).strftime('%H:%M:%S')
+        log.info("frequency=\t\t" + str(st_ms) + "ms\t" + st_str)
+        st_ms = self.sequence.timestamp + best_dt_per_par[3]
+        st_str = datetime.fromtimestamp(st_ms / 1000 - 3600).strftime('%H:%M:%S')
+        log.info("phase=\t\t" + str(st_ms) + "ms\t" + st_str)
+        st_ms = self.sequence.timestamp + best_dt_all
+        st_str = datetime.fromtimestamp(st_ms / 1000 - 3600).strftime('%H:%M:%S')
+        log.info("total=\t\t" + str(st_ms) + "ms\t" + st_str)
+
+        imaxR = np.argmax(best_dt_per_par)
+        best_dt = best_dt_per_par[imaxR]
+        st_ms = self.sequence.timestamp + best_dt
+        st_str = datetime.fromtimestamp(st_ms / 1000 - 3600).strftime('%H:%M:%S')
+        log.info("max R for=\t\t" + str(st_ms) + "ms\t" + st_str)
+
+        # time shift the signals with optimal shift
+        # build time scale
+        this_resp_t_interp = mri_t.copy() + best_dt
+        this_resp_s_interp = np.interp(this_resp_t_interp, resp_t, resp_s)
+
+        # now crop the signals to have the same length
+        final_length = min(this_resp_s_interp.shape[0], peak_prop_abs.shape[0])
+        this_mri_t = mri_t[0:final_length]
+        this_params_trace = peak_prop_abs[0:final_length, :]
+        this_resp_s_interp = this_resp_s_interp[0:final_length]
+
+        # evaluate correlation coeff.
+        # for each parameter
+        cc_final = np.zeros(4)
+        for p in range(4):
+            # estimate some R coeff
+            cc = np.corrcoef(this_resp_s_interp, this_params_trace[:, p])
+            cc_final[p] = cc[0, 1]
+
+        # now let's talk about FFT
+        log.debug("FFT analysis...")
+        nFFT = 2048
+        # freq axis for resp trace
+        resp_f_axis = np.fft.fftshift(np.fft.fftfreq(nFFT, d=(resp_t[1] - resp_t[0]) / 1000.0))  # Hz ou  / s
+        resp_f_axis_bpm = resp_f_axis * 60.0  # / min
+        # freq axis for params traces
+        this_params_trace_f_axis = np.fft.fftshift(np.fft.fftfreq(nFFT, d=self.tr / 1000.0))  # Hz ou  / s
+        this_params_trace_f_axis_bpm = this_params_trace_f_axis * 60.0  # / min
+
+        # FFT of resp. trace
+        resp_fft = np.abs(np.fft.fftshift(np.fft.fft((resp_s - np.mean(resp_s)) * signal.windows.hann(resp_s.shape[0]), nFFT, norm='ortho')))
+
+        # FFT of params traces
+        this_params_trace_fft = np.zeros([nFFT, 4])
+        for p in range(4):
+            this_params_trace_fft[:, p] = np.abs(np.fft.fftshift(np.fft.fft((this_params_trace[:, p] - np.mean(this_params_trace[:, p])) * signal.windows.hann(this_params_trace.shape[0]), nFFT, axis=0, norm='ortho'), axes=0))
+
+        if(display):
+            # display the cross-correlation plots
+            fig = plt.figure(100)
+            fig.clf()
+            axs = fig.subplots(2, 2, sharex='all')
+            fig.canvas.set_window_title("analyze_physio_2d_1 (mrs.reco.MRSData2)")
+            fig.suptitle("analyzing physiological signals for [%s]" % self.display_label)
+
+            p = 0
+            for ix in range(2):
+                for iy in range(2):
+                    axs[ix, iy].plot(dt_array, cc_2d[:, p], '-', linewidth=1)
+                    axs[ix, iy].axvline(x=best_dt_per_par[p], color='r', linestyle='-')
+                    axs[ix, iy].axvline(x=best_dt, color='r', linestyle='--')
+                    axs[ix, iy].set_xlabel('time shift (ms)')
+                    axs[ix, iy].grid('on')
+                    p = p + 1
+
+            axs[0, 0].set_ylabel('R amplitude vs. resp.')
+            axs[0, 1].set_ylabel('R linewidth. vs. resp.')
+            axs[1, 0].set_ylabel('R frequency vs. resp.')
+            axs[1, 1].set_ylabel('R phase vs. resp.')
+
+            fig.subplots_adjust()
+            fig.show()
+
+            # display time signals
+            fig = plt.figure(101)
+            fig.clf()
+            axs = fig.subplots(2, 2, sharex='all')
+            fig.canvas.set_window_title("analyze_physio_2d_2 (mrs.reco.MRSData2)")
+            fig.suptitle("analyzing physiological signals for [%s]" % self.display_label)
+
+            p = 0
+            for ix in range(2):
+                for iy in range(2):
+                    if(cc_final[p] > 0):
+                        axs[ix, iy].plot(resp_t - best_dt, resp_s, 'k-', label='resp. original')
+                        axs[ix, iy].plot(this_mri_t, this_resp_s_interp, 'b-', label='resp. resampled')
+                    else:
+                        axs[ix, iy].plot(resp_t - best_dt, 1.0 - resp_s, 'k-', label='resp. original')
+                        axs[ix, iy].plot(this_mri_t, 1.0 - this_resp_s_interp, 'b-', label='resp. resampled')
+
+                    ax2 = axs[ix, iy].twinx()
+                    ax2.plot(this_mri_t, this_params_trace[:, p], 'rx-', label='MR peak property')
+                    axs[ix, iy].set_xlabel('time (ms)')
+                    axs[ix, iy].grid('on')
+                    axs[ix, iy].legend(bbox_to_anchor=(1.05, 1), loc=2, mode='expand', borderaxespad=0)
+                    ax2.legend(bbox_to_anchor=(1.05, 1), loc=3, mode='expand', borderaxespad=0)
+                    p = p + 1
+
+            axs[0, 0].set_ylabel('Rel. amplitude change (%)')
+            axs[0, 1].set_ylabel('Abs. linewidth (Hz)')
+            axs[1, 0].set_ylabel('Abs. frequency (Hz)')
+            axs[1, 1].set_ylabel('Abs. phase shift (rd)')
+
+            fig.subplots_adjust()
+            fig.show()
+
+            # display correlation plots
+            fig = plt.figure(102)
+            fig.clf()
+            axs = fig.subplots(2, 2, sharex='all')
+            fig.canvas.set_window_title("analyze_physio_2d_3 (mrs.reco.MRSData2)")
+            fig.suptitle("analyzing physiological signals for [%s]" % self.display_label)
+
+            p = 0
+            for ix in range(2):
+                for iy in range(2):
+                    axs[ix, iy].scatter(this_resp_s_interp, this_params_trace[:, p])
+                    axs[ix, iy].set_xlabel('resp. (u.a)')
+                    axs[ix, iy].grid('on')
+                    axs[ix, iy].set_title("R=" + str(cc_final[p]))
+                    p = p + 1
+
+            axs[0, 0].set_ylabel('Rel. amplitude change (%)')
+            axs[0, 1].set_ylabel('Abs. linewidth (Hz)')
+            axs[1, 0].set_ylabel('Abs. frequency (Hz)')
+            axs[1, 1].set_ylabel('Abs. phase shift (rd)')
+
+            fig.subplots_adjust()
+            fig.show()
+
+            # display FFT plots
+            fig = plt.figure(103)
+            fig.clf()
+            axs = fig.subplots(2, 2, sharex='all')
+            fig.canvas.set_window_title("analyze_physio_2d_4 (mrs.reco.MRSData2)")
+            fig.suptitle("analyzing physiological signals for [%s]" % self.display_label)
+
+            p = 0
+            for ix in range(2):
+                for iy in range(2):
+                    axs[ix, iy].plot(resp_f_axis_bpm, resp_fft, 'k-', label='resp.')
+                    ax2 = axs[ix, iy].twinx()
+                    ax2.plot(this_params_trace_f_axis_bpm, this_params_trace_fft[:, p], 'r-', label='MR peak property')
+                    axs[ix, iy].set_xlabel('frequency (BPM or 1 / min)')
+                    axs[ix, iy].grid('on')
+                    axs[ix, iy].set_xlim(0, 60.0)
+                    axs[ix, iy].legend(bbox_to_anchor=(1.05, 1), loc=2, mode='expand', borderaxespad=0)
+                    ax2.legend(bbox_to_anchor=(1.05, 1), loc=3, mode='expand', borderaxespad=0)
+                    p = p + 1
+
+            axs[0, 0].set_ylabel('Rel. amplitude change (FFT)')
+            axs[0, 1].set_ylabel('Abs. linewidth (FFT)')
+            axs[1, 0].set_ylabel('Abs. frequency (FFT)')
+            axs[1, 1].set_ylabel('Abs. phase shift (FFT)')
+
+            fig.subplots_adjust()
+            fig.show()
+
+        # done
+
+    def analyze_snr_1d(self, peak_range, noise_range=[-2, -1], magnitude_mode=False, display=False, display_range=[1, 6]):
+        """
+        Estimate the SNR of a peak in the spectrum ; chemical shift ranges for the peak and the noise regions are specified by the user. Can also look at time-domain SNR. Works only for a 1D MRSData2 objects.
+
+        * Works only with a 1D [timepoints] signal.
+
+        Parameters
+        ----------
+        peak_range : list [2]
+            Range in ppm used to find a peak of interest
+        noise_range : list [2]
+            Range in ppm used to estimate noise
+        magnitude_mode : boolean
+            analyze signal in magnitude mode (True) or the real part (False)
+        display : boolean
+            Display process (True) or not (False)
+        display_range : list [2]
+            Range in ppm used for display
+
+        Returns
+        -------
+        snr : float
+            Resulting SNR value
+        s : float
+            Resulting signal value
+        n : float
+            Resulting noise value
+        """
+        log.debug("analyzing SNR for [%s]..." % self.display_label)
+        # dimensions check
+        if(self.ndim != 1):
+            log.error("this method only works for 1D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
+
+        # init
+        s = self.copy()
+        # display
+        if(display):
+            fig = plt.figure(110)
+            fig.clf()
+            axs = fig.subplots(2, 1, sharex='all', sharey='all')
+            fig.canvas.set_window_title("analyze_snr_1d (mrs.reco.MRSData2)")
+            fig.suptitle("analyzing SNR for [%s]" % self.display_label)
+
+        # find maximum peak in range
+        sf = s.spectrum()
+        _, ppm_peak, peak_val, _, _, _ = s._analyze_peak_1d(peak_range)
+        if(magnitude_mode):
+            log.debug("measuring the MAGNITUDE intensity at %0.2fppm!" % ppm_peak)
+            snr_signal = np.abs(peak_val)
+            sf_noise = np.abs(sf)
+        else:
+            log.debug("measuring the REAL intensity at %0.2fppm!" % ppm_peak)
+            snr_signal = np.real(peak_val)
+            sf_noise = np.real(sf)
+
+        # estimate noise in user specified spectral region
+        ppm = s.frequency_axis_ppm()
+        log.debug("estimating noise from %0.2f to %0.2fppm region!" % (noise_range[0], noise_range[1]))
+        ippm_noise_range = (noise_range[0] < ppm) & (ppm < noise_range[1])
+        snr_noise = np.std(sf_noise[ippm_noise_range])
+
+        if(display):
+            axs[0].plot(ppm, np.real(sf), 'k-', linewidth=1)
+            axs[0].set_xlim(display_range[1], display_range[0])
+            axs[0].set_xlabel('chemical shift (ppm)')
+            axs[0].set_ylabel('real part')
+            axs[0].grid('on')
+
+            axs[1].plot(ppm, np.abs(sf), 'k-', linewidth=1)
+            axs[1].set_xlim(display_range[1], display_range[0])
+            axs[1].set_xlabel('chemical shift (ppm)')
+            axs[1].set_ylabel('magnitude mode')
+            axs[1].grid('on')
+
+            if(magnitude_mode):
+                ax = axs[1]
+            else:
+                ax = axs[0]
+
+            # show peak of interest
+            ax.plot(ppm_peak, snr_signal, 'ro')
+            ax.axvline(x=ppm_peak, color='r', linestyle='--')
+            # show noise region
+            ax.plot(ppm[ippm_noise_range], sf_noise[ippm_noise_range], 'bo')
+
+        # finish display
+        if(display):
+            fig.subplots_adjust()
+            fig.show()
+
+        # that's it
+        snr = snr_signal / snr_noise
+        log.info("results for [" + s.display_label + "] coming...")
+        log.info("S = %.2E, N = %.2E, SNR = %0.2f!" % (snr_signal, snr_noise, snr))
+
+        return(snr, snr_signal, snr_noise)
+
+    def analyze_linewidth_1d(self, POI_range_ppm, magnitude_mode=False, display=False, display_range=[1, 6]):
+        """
+        Estimate the linewidth of a peak in the spectrum ; chemical shift ranges for the peak and the noise regions are specified by the user.
+
+        * Works only with a 1D [timepoints] signal.
+
+        Parameters
+        ----------
+        POI_range_ppm : list [2]
+            Range in ppm used to find a peak of interest
+        magnitude_mode : boolean
+            analyze signal in magnitude mode (True) or the real part (False)
+        display : boolean
+            Display process (True) or not (False)
+        display_range : list [2]
+            Range in ppm used for display
+
+        Returns
+        -------
+        lw : float
+            Linewidth in Hz
+        """
+        log.debug("analyzing peak linewidth for [%s]..." % self.display_label)
+        # dimensions check
+        if(self.ndim != 1):
+            log.error("this method only works for 1D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
+
+        # init
+        s = self.copy()
+
+        # call 1D peak analysis
+        _, ppm_peak, _, lw, peak_seg_ppm, peak_seg_val = s._analyze_peak_1d(POI_range_ppm)
+        if(magnitude_mode):
+            log.debug("estimating the MAGNITUDE peak linewidth at %0.2fppm!" % ppm_peak)
+        else:
+            log.debug("estimating the REAL peak linewidth at %0.2fppm!" % ppm_peak)
+
+        log.info("results for [" + s.display_label + "] coming...")
+        log.info("LW = %0.2f Hz!" % lw)
+
+        if(display):
+            ppm = s.frequency_axis_ppm()
+            sf = s.spectrum()
+
+            fig = plt.figure(120)
+            fig.clf()
+            axs = fig.subplots(2, 1, sharex='all', sharey='all')
+            fig.canvas.set_window_title("analyze_linewidth_1d (mrs.reco.MRSData2)")
+            fig.suptitle("analyzing peak linewidth for [%s]" % self.display_label)
+
+            axs[0].plot(ppm, np.real(sf), 'k-', linewidth=1)
+            axs[0].set_xlim(display_range[1], display_range[0])
+            axs[0].set_xlabel('chemical shift (ppm)')
+            axs[0].set_ylabel('real part')
+            axs[0].grid('on')
+
+            axs[1].plot(ppm, np.abs(sf), 'k-', linewidth=1)
+            axs[1].set_xlim(display_range[1], display_range[0])
+            axs[1].set_xlabel('chemical shift (ppm)')
+            axs[1].set_ylabel('magnitude mode')
+            axs[1].grid('on')
+
+            if(magnitude_mode):
+                axs[1].plot(peak_seg_ppm, np.abs(peak_seg_val), 'r-')
+            else:
+                axs[0].plot(peak_seg_ppm, np.real(peak_seg_val), 'r-')
+
+            fig.subplots_adjust()
+            fig.show()
+
+        return(lw)
+
     def correct_intensity_scaling_nd(self, scaling_factor_rawdata=1e8, scaling_factor_dcm=1.0):
         """
         Amplify the FID signals. Sounds useless but can actually help during quantification! Yes, it is not a good idea to fit signals which have intensities around 1e-6 or lower because of various fit tolerances and also digital problems (epsilon).
@@ -677,7 +1154,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 s_disp = np.mean(s_disp, axis=0)
                 s_zf_disp = np.mean(s_zf_disp, axis=0)
 
-            fig = plt.figure(100)
+            fig = plt.figure(130)
             fig.clf()
             axs = fig.subplots(2, 2, sharex='row', sharey='row')
             fig.canvas.set_window_title("correct_zerofill_nd (mrs.reco.MRSData2)")
@@ -715,51 +1192,96 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         return(s_zf)
 
-    def analyze_noise_nd(self, n_pts=100):
+    def correct_time_shift_nd(self, time_shift_us=-375, display=False, display_range=[1, 6]):
         """
-        Measure noise level in time domain and store it in the "noise_level" attribute. This is usefull to keep track of the original noise level for later use, CRB normalization durnig quantification for example.
+        Shift time signals of Zero-fill MRS data signals along the time axis.
+
+        Parameters
+        ----------
+        time_shift_us : float
+            Time shift to apply to time signals. Negative means the beginning of the FIDs will be eaten up and circshifted at the end.
+        display : boolean
+            Display correction process (True) or not (False)
+        display_range : list [2]
+            Range in ppm used for display
 
         * Works with multi-dimensional signals.
         * Returns a multi-dimensional signal.
 
-        Parameters
-        ----------
-        n_pts : int
-            Apodization factor in Hz
-
         Returns
         -------
-        noise_lev : float
-            Time-domain noise level
+        s_shifted : MRSData2 numpy array [averages,channels,timepoints]
+            Resulting shifted data stored in a MRSData2 object
         """
-        log.debug("estimating noise level for [%s]..." % self.display_label)
-
-        s = self.copy()
-        s_real = np.real(s)
-
-        # average if needed
-        while(s_real.ndim > 1):
-            s_real = np.mean(s_real, axis=0)
+        log.debug("time-shifting [%s]..." % self.display_label)
 
         # init
-        log.debug("estimating noise level in FID using last %d points..." % n_pts)
-        # noise is the std of the last real points, but that is not so simple
-        # we really want real noise, not zeros from zero-filling
-        s_nonzero_mask = (s_real != 0.0)
-        s_analyze = s_real[s_nonzero_mask]
-        # now take the last 100 points
-        noise_lev = np.std(s_analyze[-n_pts:-1])
-        log.info("noise level = %.2E" % noise_lev)
+        s = self.copy()
 
-        # changing noise level attribute
-        log.debug("updating noise level...")
-        s._noise_level = noise_lev
+        # prepare frequency vector
+        f = s.frequency_axis()
+        if(s.ndim > 1):
+            f_tiles = list(s.shape)
+            f_tiles[-1] = 1
+            f = np.tile(f, f_tiles)
+
+        # fft
+        sf = np.fft.fftshift(np.fft.fft(s, axis=-1), axes=-1)
+        # apply phase 1st order in frequency-frequency domain (which is equivalent to a time shift in time domain)
+        sf_shifted = sf * np.exp(1j * 2.0 * np.pi * -time_shift_us / 1000000.0 * f)
+        # fft back and prey
+        s_shifted = np.fft.ifft(np.fft.ifftshift(sf_shifted, axes=-1), axis=-1)
+
+        # convert back to MRSData2
+        s_shifted = self.inherit(s_shifted)
+
+        if(display):
+            t = s.time_axis() * 1000000.0  # us
+            ppm = s.frequency_axis_ppm()
+
+            s_disp = s.copy()
+            s_shifted_disp = s_shifted.copy()
+            while(s_disp.ndim > 1):
+                s_disp = np.mean(s_disp, axis=0)
+                s_shifted_disp = np.mean(s_shifted_disp, axis=0)
+
+            fig = plt.figure(140)
+            fig.clf()
+            axs = fig.subplots(2, 2, sharex='row', sharey='row')
+            fig.canvas.set_window_title("correct_time_shift_nd (mrs.reco.MRSData2)")
+            fig.suptitle("time-shifting [%s]" % self.display_label)
+
+            axs[0, 0].plot(t, np.real(s_disp), 'k-', linewidth=1)
+            axs[0, 0].set_xlabel('time (us)')
+            axs[0, 0].set_ylabel('original')
+            axs[0, 0].grid('on')
+
+            axs[0, 1].plot(t, np.real(s_shifted_disp), 'b-', linewidth=1)
+            axs[0, 1].set_xlabel('time (us)')
+            axs[0, 1].set_ylabel('time-shifted')
+            axs[0, 1].grid('on')
+
+            axs[1, 0].plot(ppm, s_disp.spectrum().real, 'k-', linewidth=1)
+            axs[1, 0].set_xlabel('chemical shift (ppm)')
+            axs[1, 0].set_ylabel('original')
+            axs[1, 0].set_xlim(display_range[1], display_range[0])
+            axs[1, 0].grid('on')
+
+            axs[1, 1].plot(ppm, s_shifted_disp.spectrum().real, 'b-', linewidth=1)
+            axs[1, 1].set_xlabel("chemical shift (ppm)")
+            axs[1, 1].set_ylabel('time-shifted')
+            axs[1, 1].set_xlim(display_range[1], display_range[0])
+            axs[1, 1].grid('on')
+
+            fig.subplots_adjust()
+            fig.show()
 
         # if any ref data available, we crop it too (silently)
-        if(s.data_ref is not None):
-            s.data_ref = s.data_ref.analyze_noise_nd(n_pts)
+        if(s_shifted.data_ref is not None):
+            s_shifted.data_ref = s_shifted.data_ref.correct_time_shift_nd(time_shift_us)
 
-        return(s)
+        return(s_shifted)
+
 
     def correct_phase_3d(self, use_ref_data=True, peak_range=[4.5, 5], average_per_channel_mode=False, first_point_fid_mode=False, phase_order=0, phase_offset=0.0, display=False, display_range=[1, 6]):
         """
@@ -845,7 +1367,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         if(display):
             # prepare subplots
-            fig = plt.figure(110)
+            fig = plt.figure(150)
             fig.clf()
             axs = fig.subplots(2, 3, sharex='col')
             fig.canvas.set_window_title("correct_phase_3d (mrs.reco.MRSData2)")
@@ -1158,264 +1680,6 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         return(s_ma)
 
-    def analyze_physio_2d(self, peak_range=[4.5, 5], delta_time_range=1000.0, display=False):
-        """
-        Analyze the physiological signal and try to correlate it to a peak amplitude, linewidth, frequency shift and phase variations.
-
-        * Works only with a 2D [averages,timepoints] signal.
-
-        Parameters
-        ----------
-        peak_range : array [2]
-            Range in ppm used to analyze peak phase when no reference signal is specified
-        delta_time_range : float
-            Range in ms used to correlate / match the NMR and the physiological signal. Yes, since we are not really sure of the start timestamp we found in the TWIX header, we try to match perfectly the two signals.
-        display : boolean
-            Display correction process (True) or not (False)
-        """
-        log.debug("analyzing physiological signals for [%s]..." % self.display_label)
-        # dimensions check
-        if(self.ndim != 2):
-            log.error("this method only works for 2D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
-
-        # init
-        if(self._physio_file is None):
-            # no physio signal here, exiting
-            log.error("no error physiological recording file provided!")
-            return()
-
-        # read data
-        [rt, rup, rd, rr] = io.read_physio_file(self._physio_file)
-        resp_trace = [rt, rup, rd, rr]
-        # physio signal
-        resp_t = resp_trace[0]
-        resp_s = resp_trace[3]
-
-        # perform peak analysis
-        peak_prop_abs, _, _ = self.correct_zerofill_nd()._analyze_peak_2d(peak_range)
-
-        # init
-        mri_t = np.linspace(self.sequence.timestamp, self.sequence.timestamp + self.sequence.tr * peak_prop_abs.shape[0], peak_prop_abs.shape[0])
-        dt_array = np.arange(-delta_time_range / 2.0, delta_time_range / 2.0, 1.0)
-        cc_2d = np.zeros([dt_array.shape[0], 4])
-
-        # shift signal and calculate corr coeff
-        pbar = log.progressbar("correlating signals", dt_array.shape[0])
-        for idt, dt in enumerate(dt_array):
-            # build time scale
-            this_resp_t_interp = mri_t.copy() + dt
-            this_resp_s_interp = np.interp(this_resp_t_interp, resp_t, resp_s)
-
-            # now crop the signals to have the same length
-            final_length = min(this_resp_s_interp.shape[0], peak_prop_abs.shape[0])
-            this_mri_t = mri_t[0:final_length]
-            this_params_trace = peak_prop_abs[0:final_length, :]
-            this_resp_s_interp = this_resp_s_interp[0:final_length]
-
-            # now remove points where resp trace is at 0 or 1
-            mm = np.logical_and(this_resp_s_interp > 0, this_resp_s_interp < 1)
-            this_resp_s_interp = this_resp_s_interp[mm]
-            this_params_trace = this_params_trace[mm, :]
-
-            # now, for each parameter
-            for p in range(4):
-                # estimate some R coeff
-                cc = np.corrcoef(this_resp_s_interp, this_params_trace[:, p])
-                cc_2d[idt, p] = cc[0, 1]
-
-            pbar.update(idt)
-
-        # find time shift that gives best correlation for each parameter
-        best_dt_per_par = np.zeros(4)
-        for p in range(4):
-            i_maxcorr = np.argmax(np.abs(cc_2d[:, p]))
-            best_dt = dt_array[i_maxcorr]
-            best_dt_per_par[p] = best_dt
-
-        # find time shift that gives best correlation for all 4 parameters
-        cc_2d_all = np.sum(np.abs(cc_2d), axis=1)
-        i_maxcorr = np.argmax(cc_2d_all)
-        best_dt_all = dt_array[i_maxcorr]
-        pbar.finish("done")
-
-        # some info in the term
-        st_ms = self.sequence.timestamp
-        st_str = datetime.fromtimestamp(st_ms / 1000 - 3600).strftime('%H:%M:%S')
-        log.info("data timestamp=\t" + str(st_ms) + "ms\t" + st_str)
-        log.info("best start time for...")
-
-        st_ms = self.sequence.timestamp + best_dt_per_par[0]
-        st_str = datetime.fromtimestamp(st_ms / 1000 - 3600).strftime('%H:%M:%S')
-        log.info("amplitude=\t\t" + str(st_ms) + "ms\t" + st_str)
-        st_ms = self.sequence.timestamp + best_dt_per_par[1]
-        st_str = datetime.fromtimestamp(st_ms / 1000 - 3600).strftime('%H:%M:%S')
-        log.info("linewidth=\t\t" + str(st_ms) + "ms\t" + st_str)
-        st_ms = self.sequence.timestamp + best_dt_per_par[2]
-        st_str = datetime.fromtimestamp(st_ms / 1000 - 3600).strftime('%H:%M:%S')
-        log.info("frequency=\t\t" + str(st_ms) + "ms\t" + st_str)
-        st_ms = self.sequence.timestamp + best_dt_per_par[3]
-        st_str = datetime.fromtimestamp(st_ms / 1000 - 3600).strftime('%H:%M:%S')
-        log.info("phase=\t\t" + str(st_ms) + "ms\t" + st_str)
-        st_ms = self.sequence.timestamp + best_dt_all
-        st_str = datetime.fromtimestamp(st_ms / 1000 - 3600).strftime('%H:%M:%S')
-        log.info("total=\t\t" + str(st_ms) + "ms\t" + st_str)
-
-        imaxR = np.argmax(best_dt_per_par)
-        best_dt = best_dt_per_par[imaxR]
-        st_ms = self.sequence.timestamp + best_dt
-        st_str = datetime.fromtimestamp(st_ms / 1000 - 3600).strftime('%H:%M:%S')
-        log.info("max R for=\t\t" + str(st_ms) + "ms\t" + st_str)
-
-        # time shift the signals with optimal shift
-        # build time scale
-        this_resp_t_interp = mri_t.copy() + best_dt
-        this_resp_s_interp = np.interp(this_resp_t_interp, resp_t, resp_s)
-
-        # now crop the signals to have the same length
-        final_length = min(this_resp_s_interp.shape[0], peak_prop_abs.shape[0])
-        this_mri_t = mri_t[0:final_length]
-        this_params_trace = peak_prop_abs[0:final_length, :]
-        this_resp_s_interp = this_resp_s_interp[0:final_length]
-
-        # evaluate correlation coeff.
-        # for each parameter
-        cc_final = np.zeros(4)
-        for p in range(4):
-            # estimate some R coeff
-            cc = np.corrcoef(this_resp_s_interp, this_params_trace[:, p])
-            cc_final[p] = cc[0, 1]
-
-        # now let's talk about FFT
-        log.debug("FFT analysis...")
-        nFFT = 2048
-        # freq axis for resp trace
-        resp_f_axis = np.fft.fftshift(np.fft.fftfreq(nFFT, d=(resp_t[1] - resp_t[0]) / 1000.0))  # Hz ou  / s
-        resp_f_axis_bpm = resp_f_axis * 60.0  # / min
-        # freq axis for params traces
-        this_params_trace_f_axis = np.fft.fftshift(np.fft.fftfreq(nFFT, d=self.tr / 1000.0))  # Hz ou  / s
-        this_params_trace_f_axis_bpm = this_params_trace_f_axis * 60.0  # / min
-
-        # FFT of resp. trace
-        resp_fft = np.abs(np.fft.fftshift(np.fft.fft((resp_s - np.mean(resp_s)) * signal.windows.hann(resp_s.shape[0]), nFFT, norm='ortho')))
-
-        # FFT of params traces
-        this_params_trace_fft = np.zeros([nFFT, 4])
-        for p in range(4):
-            this_params_trace_fft[:, p] = np.abs(np.fft.fftshift(np.fft.fft((this_params_trace[:, p] - np.mean(this_params_trace[:, p])) * signal.windows.hann(this_params_trace.shape[0]), nFFT, axis=0, norm='ortho'), axes=0))
-
-        if(display):
-            # display the cross-correlation plots
-            fig = plt.figure(120)
-            fig.clf()
-            axs = fig.subplots(2, 2, sharex='all')
-            fig.canvas.set_window_title("analyze_physio_2d_1 (mrs.reco.MRSData2)")
-            fig.suptitle("analyzing physiological signals for [%s]" % self.display_label)
-
-            p = 0
-            for ix in range(2):
-                for iy in range(2):
-                    axs[ix, iy].plot(dt_array, cc_2d[:, p], '-', linewidth=1)
-                    axs[ix, iy].axvline(x=best_dt_per_par[p], color='r', linestyle='-')
-                    axs[ix, iy].axvline(x=best_dt, color='r', linestyle='--')
-                    axs[ix, iy].set_xlabel('time shift (ms)')
-                    axs[ix, iy].grid('on')
-                    p = p + 1
-
-            axs[0, 0].set_ylabel('R amplitude vs. resp.')
-            axs[0, 1].set_ylabel('R linewidth. vs. resp.')
-            axs[1, 0].set_ylabel('R frequency vs. resp.')
-            axs[1, 1].set_ylabel('R phase vs. resp.')
-
-            fig.subplots_adjust()
-            fig.show()
-
-            # display time signals
-            fig = plt.figure(121)
-            fig.clf()
-            axs = fig.subplots(2, 2, sharex='all')
-            fig.canvas.set_window_title("analyze_physio_2d_2 (mrs.reco.MRSData2)")
-            fig.suptitle("analyzing physiological signals for [%s]" % self.display_label)
-
-            p = 0
-            for ix in range(2):
-                for iy in range(2):
-                    if(cc_final[p] > 0):
-                        axs[ix, iy].plot(resp_t - best_dt, resp_s, 'k-', label='resp. original')
-                        axs[ix, iy].plot(this_mri_t, this_resp_s_interp, 'b-', label='resp. resampled')
-                    else:
-                        axs[ix, iy].plot(resp_t - best_dt, 1.0 - resp_s, 'k-', label='resp. original')
-                        axs[ix, iy].plot(this_mri_t, 1.0 - this_resp_s_interp, 'b-', label='resp. resampled')
-
-                    ax2 = axs[ix, iy].twinx()
-                    ax2.plot(this_mri_t, this_params_trace[:, p], 'rx-', label='MR peak property')
-                    axs[ix, iy].set_xlabel('time (ms)')
-                    axs[ix, iy].grid('on')
-                    axs[ix, iy].legend(bbox_to_anchor=(1.05, 1), loc=2, mode='expand', borderaxespad=0)
-                    ax2.legend(bbox_to_anchor=(1.05, 1), loc=3, mode='expand', borderaxespad=0)
-                    p = p + 1
-
-            axs[0, 0].set_ylabel('Rel. amplitude change (%)')
-            axs[0, 1].set_ylabel('Abs. linewidth (Hz)')
-            axs[1, 0].set_ylabel('Abs. frequency (Hz)')
-            axs[1, 1].set_ylabel('Abs. phase shift (rd)')
-
-            fig.subplots_adjust()
-            fig.show()
-
-            # display correlation plots
-            fig = plt.figure(122)
-            fig.clf()
-            axs = fig.subplots(2, 2, sharex='all')
-            fig.canvas.set_window_title("analyze_physio_2d_3 (mrs.reco.MRSData2)")
-            fig.suptitle("analyzing physiological signals for [%s]" % self.display_label)
-
-            p = 0
-            for ix in range(2):
-                for iy in range(2):
-                    axs[ix, iy].scatter(this_resp_s_interp, this_params_trace[:, p])
-                    axs[ix, iy].set_xlabel('resp. (u.a)')
-                    axs[ix, iy].grid('on')
-                    axs[ix, iy].set_title("R=" + str(cc_final[p]))
-                    p = p + 1
-
-            axs[0, 0].set_ylabel('Rel. amplitude change (%)')
-            axs[0, 1].set_ylabel('Abs. linewidth (Hz)')
-            axs[1, 0].set_ylabel('Abs. frequency (Hz)')
-            axs[1, 1].set_ylabel('Abs. phase shift (rd)')
-
-            fig.subplots_adjust()
-            fig.show()
-
-            # display FFT plots
-            fig = plt.figure(123)
-            fig.clf()
-            axs = fig.subplots(2, 2, sharex='all')
-            fig.canvas.set_window_title("analyze_physio_2d_4 (mrs.reco.MRSData2)")
-            fig.suptitle("analyzing physiological signals for [%s]" % self.display_label)
-
-            p = 0
-            for ix in range(2):
-                for iy in range(2):
-                    axs[ix, iy].plot(resp_f_axis_bpm, resp_fft, 'k-', label='resp.')
-                    ax2 = axs[ix, iy].twinx()
-                    ax2.plot(this_params_trace_f_axis_bpm, this_params_trace_fft[:, p], 'r-', label='MR peak property')
-                    axs[ix, iy].set_xlabel('frequency (BPM or 1 / min)')
-                    axs[ix, iy].grid('on')
-                    axs[ix, iy].set_xlim(0, 60.0)
-                    axs[ix, iy].legend(bbox_to_anchor=(1.05, 1), loc=2, mode='expand', borderaxespad=0)
-                    ax2.legend(bbox_to_anchor=(1.05, 1), loc=3, mode='expand', borderaxespad=0)
-                    p = p + 1
-
-            axs[0, 0].set_ylabel('Rel. amplitude change (FFT)')
-            axs[0, 1].set_ylabel('Abs. linewidth (FFT)')
-            axs[1, 0].set_ylabel('Abs. frequency (FFT)')
-            axs[1, 1].set_ylabel('Abs. phase shift (FFT)')
-
-            fig.subplots_adjust()
-            fig.show()
-
-        # done
-
     def correct_analyze_and_reject_2d(self, peak_range=[4.5, 5], moving_Naverages=1, peak_properties_ranges={"amplitude (%)": None, "linewidth (Hz)": [5.0, 30.0], "chemical shift (ppm)": 0.5, "phase std. factor (%)": 60.0}, peak_properties_rel2mean=True, auto_method_list=None, auto_adjust_allowed_snr_change=0.0, display=False, display_range=[1, 6]):
         """
         Analyze peak in each average in terms intensity, linewidth, chemical shift and phase and reject data if one of these parameters goes out of the min / max bounds. Usefull to understand what the hell went wrong during your acquisition when you have the raw data (TWIX) and to try to improve things a little. You can choose to set the bounds manually or automatically based on a peak property (amplitude, linewidth, frequency, phase). And you can run several automatic adjusment methods, the one giving the highest SNR and/or the lowest peak linewidth will be selected.
@@ -1676,7 +1940,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 # plot SNR / LW combinaisons and optimal choice
                 if(display):
                     # plot the SNRs versus LWs
-                    fig = plt.figure(129 + (iround_data_rej - 1) * 4 + 1)
+                    fig = plt.figure(159 + (iround_data_rej - 1) * 4 + 1)
                     if(not display_axes_ready[0]):
                         # we just created the figure, let's create the axes
                         fig.clf()
@@ -1703,7 +1967,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                     fig.show()
 
                     # plot the data rejection percentage
-                    fig = plt.figure(129 + (iround_data_rej - 1) * 4 + 2)
+                    fig = plt.figure(159 + (iround_data_rej - 1) * 4 + 2)
                     if(not display_axes_ready[1]):
                         # we just created the figure, let's create the axes
                         fig.clf()
@@ -1831,7 +2095,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         # final display
         if(display):
 
-            fig = plt.figure(129 + (iround_data_rej - 1) * 4 + 3)
+            fig = plt.figure(159 + (iround_data_rej - 1) * 4 + 3)
             fig.clf()
             axs = fig.subplots(2, 3, sharex='all')
             fig.canvas.set_window_title("correct_analyze_and_reject_2d (summary) (mrs.reco.MRSData2)")
@@ -1923,7 +2187,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             s_cor_avg.set_display_label("corrected spectrum")
             s_rej_avg.set_display_label("rejected spectrum")
 
-            fig = plt.figure(129 + (iround_data_rej - 1) * 4 + 4)
+            fig = plt.figure(159 + (iround_data_rej - 1) * 4 + 4)
             fig.clf()
             ax = fig.subplots()
             fig.canvas.set_window_title("correct_analyze_and_reject_2d (rej. data) (mrs.reco.MRSData2)")
@@ -2087,7 +2351,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             # final display
             if(display):
 
-                fig = plt.figure(140)
+                fig = plt.figure(180)
                 fig.clf()
                 axs = fig.subplots(2, 3, sharex='all', sharey='all')
                 fig.canvas.set_window_title("correct_realign_2d (mrs.reco.MRSData2)")
@@ -2185,7 +2449,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 ppm = s.frequency_axis_ppm()
                 ppm_mean = s_mean.frequency_axis_ppm()
 
-                fig = plt.figure(150)
+                fig = plt.figure(190)
                 fig.clf()
                 axs = fig.subplots(2, 1, sharex='all', sharey='all')
                 fig.canvas.set_window_title("correct_average_2d (mrs.reco.MRSData2)")
@@ -2263,7 +2527,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         s_phased = self.inherit(s_phased)
 
         if(display):
-            fig = plt.figure(160)
+            fig = plt.figure(200)
             fig.clf()
             axs = fig.subplots(2, 1, sharex='all', sharey='all')
             fig.canvas.set_window_title("correct_phase_1d (mrs.reco.MRSData2)")
@@ -2341,7 +2605,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             ppm = s_disp.frequency_axis_ppm()
             ppm_apo = s_apo_disp.frequency_axis_ppm()
 
-            fig = plt.figure(170)
+            fig = plt.figure(210)
             fig.clf()
             axs = fig.subplots(2, 2, sharex='row', sharey='row')
             fig.canvas.set_window_title("correct_apodization (mrs.reco.MRSData2)")
@@ -2425,7 +2689,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             ppm = s.frequency_axis_ppm()
             ppm_crop = s_crop.frequency_axis_ppm()
 
-            fig = plt.figure(180)
+            fig = plt.figure(220)
             fig.clf()
             axs = fig.subplots(2, 2, sharex='row', sharey='row')
             fig.canvas.set_window_title("correct_crop_1d (mrs.reco.MRSData2)")
@@ -2526,7 +2790,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         # display this over the data
         if(display):
-            fig = plt.figure(190)
+            fig = plt.figure(230)
             fig.clf()
             axs = fig.subplots(2, 1, sharex='all', sharey='all')
             fig.canvas.set_window_title("correct_water_removal_1d (mrs.reco.MRSData2)")
@@ -2602,7 +2866,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         s_shifted = s.adjust_frequency(-df)
 
         if(display):
-            fig = plt.figure(200)
+            fig = plt.figure(240)
             fig.clf()
             axs = fig.subplots(2, 1, sharex='all', sharey='all')
             fig.canvas.set_window_title("correct_freqshift_1d (mrs.reco.MRSData2)")
@@ -2683,7 +2947,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         s_filtered = self.inherit(s_filtered)
 
         if(display):
-            fig = plt.figure(210)
+            fig = plt.figure(250)
             fig.clf()
             axs = fig.subplots(2, 2)
             fig.canvas.set_window_title("correct_bandpass_filtering_1d (mrs.reco.MRSData2)")
@@ -2723,175 +2987,6 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         return(s_filtered)
 
-    def analyze_snr_1d(self, peak_range, noise_range=[-2, -1], magnitude_mode=False, display=False, display_range=[1, 6]):
-        """
-        Estimate the SNR of a peak in the spectrum ; chemical shift ranges for the peak and the noise regions are specified by the user. Can also look at time-domain SNR. Works only for a 1D MRSData2 objects.
-
-        * Works only with a 1D [timepoints] signal.
-
-        Parameters
-        ----------
-        peak_range : list [2]
-            Range in ppm used to find a peak of interest
-        noise_range : list [2]
-            Range in ppm used to estimate noise
-        magnitude_mode : boolean
-            analyze signal in magnitude mode (True) or the real part (False)
-        display : boolean
-            Display process (True) or not (False)
-        display_range : list [2]
-            Range in ppm used for display
-
-        Returns
-        -------
-        snr : float
-            Resulting SNR value
-        s : float
-            Resulting signal value
-        n : float
-            Resulting noise value
-        """
-        log.debug("analyzing SNR for [%s]..." % self.display_label)
-        # dimensions check
-        if(self.ndim != 1):
-            log.error("this method only works for 1D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
-
-        # init
-        s = self.copy()
-        # display
-        if(display):
-            fig = plt.figure(220)
-            fig.clf()
-            axs = fig.subplots(2, 1, sharex='all', sharey='all')
-            fig.canvas.set_window_title("analyze_snr_1d (mrs.reco.MRSData2)")
-            fig.suptitle("analyzing SNR for [%s]" % self.display_label)
-
-        # find maximum peak in range
-        sf = s.spectrum()
-        _, ppm_peak, peak_val, _, _, _ = s._analyze_peak_1d(peak_range)
-        if(magnitude_mode):
-            log.debug("measuring the MAGNITUDE intensity at %0.2fppm!" % ppm_peak)
-            snr_signal = np.abs(peak_val)
-            sf_noise = np.abs(sf)
-        else:
-            log.debug("measuring the REAL intensity at %0.2fppm!" % ppm_peak)
-            snr_signal = np.real(peak_val)
-            sf_noise = np.real(sf)
-
-        # estimate noise in user specified spectral region
-        ppm = s.frequency_axis_ppm()
-        log.debug("estimating noise from %0.2f to %0.2fppm region!" % (noise_range[0], noise_range[1]))
-        ippm_noise_range = (noise_range[0] < ppm) & (ppm < noise_range[1])
-        snr_noise = np.std(sf_noise[ippm_noise_range])
-
-        if(display):
-            axs[0].plot(ppm, np.real(sf), 'k-', linewidth=1)
-            axs[0].set_xlim(display_range[1], display_range[0])
-            axs[0].set_xlabel('chemical shift (ppm)')
-            axs[0].set_ylabel('real part')
-            axs[0].grid('on')
-
-            axs[1].plot(ppm, np.abs(sf), 'k-', linewidth=1)
-            axs[1].set_xlim(display_range[1], display_range[0])
-            axs[1].set_xlabel('chemical shift (ppm)')
-            axs[1].set_ylabel('magnitude mode')
-            axs[1].grid('on')
-
-            if(magnitude_mode):
-                ax = axs[1]
-            else:
-                ax = axs[0]
-
-            # show peak of interest
-            ax.plot(ppm_peak, snr_signal, 'ro')
-            ax.axvline(x=ppm_peak, color='r', linestyle='--')
-            # show noise region
-            ax.plot(ppm[ippm_noise_range], sf_noise[ippm_noise_range], 'bo')
-
-        # finish display
-        if(display):
-            fig.subplots_adjust()
-            fig.show()
-
-        # that's it
-        snr = snr_signal / snr_noise
-        log.info("results for [" + s.display_label + "] coming...")
-        log.info("S = %.2E, N = %.2E, SNR = %0.2f!" % (snr_signal, snr_noise, snr))
-
-        return(snr, snr_signal, snr_noise)
-
-    def analyze_linewidth_1d(self, POI_range_ppm, magnitude_mode=False, display=False, display_range=[1, 6]):
-        """
-        Estimate the linewidth of a peak in the spectrum ; chemical shift ranges for the peak and the noise regions are specified by the user.
-
-        * Works only with a 1D [timepoints] signal.
-
-        Parameters
-        ----------
-        POI_range_ppm : list [2]
-            Range in ppm used to find a peak of interest
-        magnitude_mode : boolean
-            analyze signal in magnitude mode (True) or the real part (False)
-        display : boolean
-            Display process (True) or not (False)
-        display_range : list [2]
-            Range in ppm used for display
-
-        Returns
-        -------
-        lw : float
-            Linewidth in Hz
-        """
-        log.debug("analyzing peak linewidth for [%s]..." % self.display_label)
-        # dimensions check
-        if(self.ndim != 1):
-            log.error("this method only works for 1D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
-
-        # init
-        s = self.copy()
-
-        # call 1D peak analysis
-        _, ppm_peak, _, lw, peak_seg_ppm, peak_seg_val = s._analyze_peak_1d(POI_range_ppm)
-        if(magnitude_mode):
-            log.debug("estimating the MAGNITUDE peak linewidth at %0.2fppm!" % ppm_peak)
-        else:
-            log.debug("estimating the REAL peak linewidth at %0.2fppm!" % ppm_peak)
-
-        log.info("results for [" + s.display_label + "] coming...")
-        log.info("LW = %0.2f Hz!" % lw)
-
-        if(display):
-            ppm = s.frequency_axis_ppm()
-            sf = s.spectrum()
-
-            fig = plt.figure(230)
-            fig.clf()
-            axs = fig.subplots(2, 1, sharex='all', sharey='all')
-            fig.canvas.set_window_title("analyze_linewidth_1d (mrs.reco.MRSData2)")
-            fig.suptitle("analyzing peak linewidth for [%s]" % self.display_label)
-
-            axs[0].plot(ppm, np.real(sf), 'k-', linewidth=1)
-            axs[0].set_xlim(display_range[1], display_range[0])
-            axs[0].set_xlabel('chemical shift (ppm)')
-            axs[0].set_ylabel('real part')
-            axs[0].grid('on')
-
-            axs[1].plot(ppm, np.abs(sf), 'k-', linewidth=1)
-            axs[1].set_xlim(display_range[1], display_range[0])
-            axs[1].set_xlabel('chemical shift (ppm)')
-            axs[1].set_ylabel('magnitude mode')
-            axs[1].grid('on')
-
-            if(magnitude_mode):
-                axs[1].plot(peak_seg_ppm, np.abs(peak_seg_val), 'r-')
-            else:
-                axs[0].plot(peak_seg_ppm, np.real(peak_seg_val), 'r-')
-
-            fig.subplots_adjust()
-            fig.show()
-
-        return(lw)
-
     def display_voi_anatomy_nd(self):
         """
         Display the VOI on a anatomical image of your choice. Experimental for now, just following tutorial here: https://suspect.readthedocs.io/en/latest/notebooks/tut06_mpl.html
@@ -2917,7 +3012,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                              [0,    -vx[1] / 20.0,   -vx[2] / 20.0]]
         corner_coords = np.array([t2w.from_scanner(*self.to_scanner(*coord)) for coord in corner_coords_pcg])
 
-        plt.figure(240).canvas.set_window_title("display_voi_anatomy_nd (mrs.reco.MRSData2)")
+        plt.figure(260).canvas.set_window_title("display_voi_anatomy_nd (mrs.reco.MRSData2)")
         plt.cla()
         plt.imshow(t2w[pcg_centre_index[2]], cmap=plt.cm.gray)
         plt.plot(corner_coords[:, 0], corner_coords[:, 1], 'red')
@@ -3233,6 +3328,16 @@ class pipeline:
         self.job["FID modulus"] = {0:
                                    {"func": MRSData2.correct_fidmodulus_nd, "name": "FID modulus"}
                                    }
+
+        # --- job: time-shifting ---
+        self.job["time-shifting"] = {0:
+                                     {"func": MRSData2.correct_time_shift_nd, "name": "time-shifting"},
+                                     # time shift in us
+                                     "time_shift_us": 375,
+                                     # display all this process to check what the hell is going on
+                                     "display": True,
+                                     "display_range_ppm": self.job["displaying"]["range_ppm"]
+                                     }
 
         # --- job: channel combination ---
         self.job["channel-combining"] = {0:
@@ -3643,6 +3748,7 @@ class pipeline:
         ind_dataset_ok = []
         for i, d in enumerate(self.dataset):
             legend_ok = (d["legend"] is not None)
+            rawdata_ok = (d["raw"]["data"] is not None)
             rawfiles_ok = (d["raw"]["files"][0] is not None)
             dicomfiles_ok = (d["dcm"]["files"][0] is not None)
             physiofile_ok = (d["physio-file"] is not None)
@@ -3656,7 +3762,7 @@ class pipeline:
                 if(not legend_ok):
                     log.error("dataset[%d] is missing a legend! :(" % i)
                 # checking datafiles
-                if(not rawfiles_ok and not dicomfiles_ok):
+                if(not rawdata_ok and not rawfiles_ok and not dicomfiles_ok):
                     log.error("dataset[%d] is missing data, no raw or dicom files were set! :(" % i)
                 # checking number of datafiles
                 if(rawfiles_ok and len(d["raw"]["files"]) > 2):
@@ -3800,8 +3906,10 @@ class pipeline:
 
         # remove display job if we don't want to display
         if(self.settings["display"] is False):
-            self.job_list.remove(self.job["displaying"])
-            self.job_list.remove(self.job["displaying anatomy"])
+            if(self.job["displaying"] in self.job_list):
+                self.job_list.remove(self.job["displaying"])
+            if(self.job["displaying anatomy"] in self.job_list):
+                self.job_list.remove(self.job["displaying anatomy"])
 
         # for each job
         for k, this_job in enumerate(self.job_list):
@@ -4397,3 +4505,94 @@ def reco_spatial_select_profile(dcm_folders_list, legends_list, analyze_selectiv
     fig.show()
 
     return(analyze_selectivity_list)
+
+
+def get_dw_reco_pipeline(data, template_name=None, legend=""):
+    """
+    Generate a reconstruction pipeline object to process this DW-MRS data. In short, it reshapes and split the current dataset into several datasets corresponding to different directions and bvalues, in order to process each of them in a pipeline. This method is quite weird and experimental for now. A lot of stuff missing. And that is why it is here, out of any class.
+
+    Parameters
+    ----------
+    data : MRSData2 object
+        DW data to process
+    template_name : string
+        Reco pipeline template file to use
+    legend : string
+        Some legend to use for this dataset
+
+    Returns
+    -------
+    p : reco.pipeline object
+        Ready to run reconstruction pipeline for DW-MRS data
+    """
+    log.debug("generating a reconstruction pipeline to process DW-MRS data...")
+
+    if(not hasattr(data.sequence, "directions") or not hasattr(data.sequence, "bvalues") or not hasattr(data.sequence, "n_b0")):
+        log.error("sorry but this dataset was not acquired with a DW-MRS sequence.")
+
+    # get the dw parameters from the sequence
+    n_averages = data.sequence.na
+    n_directions = len(data.sequence.directions)
+    n_bvalues = len(data.sequence.bvalues)
+    n_b0 = data.sequence.n_b0
+
+    # number of dw scans including b0
+    n_diff = (n_directions * n_bvalues) + n_b0
+    # number of channels
+    n_chan = data.shape[1]
+    # number of time points
+    n_pts = data.shape[2]
+
+    # 1st reshape
+    s4d = np.reshape(data, [n_averages, n_diff, n_chan, n_pts])
+
+    # extract b0 data temporarly
+    s4d_b0 = s4d[:, 0, :, :]
+    # and remove it from dataset (considering it was acquired first!)
+    s4d = s4d[:, 1:, :, :]
+
+    # 2nd reshape: separate bval from dir
+    # TODO: this 2nd reshape is a shot in the dark!!!
+    s5d = np.reshape(s4d, [n_averages, n_directions, n_bvalues, n_chan, n_pts])
+    s5d_b0 = np.reshape(s4d_b0, [n_averages, 1, 1, n_chan, n_pts])
+
+    # now prepape reco pipeline
+    p = pipeline(template_name)
+
+    # edit the dataset list
+    i_dataset = 0
+
+    # store b0
+    s = data.inherit(np.squeeze(s5d_b0))
+    # edit hash
+    s._data_file_hash = s._data_file_hash + "_b0"
+    # edit sequence parameters
+    s.sequence.directions = [0, 0, 0]
+    s.sequence.bvalues = 0
+    # edit label
+    s.set_display_label(legend + " b0")
+    p.dataset[i_dataset]["legend"] = legend + " b0"
+    # store
+    p.dataset[i_dataset]["raw"]["data"] = s
+
+    i_dataset = 1
+    for this_dir_index, this_dir in enumerate(data.sequence.directions):
+        for this_bval_index, this_bval in enumerate(data.sequence.bvalues):
+            # build MRSData2 object
+            s_extracted = s5d[:, this_dir_index, this_bval_index, :, :]
+            s = data.inherit(s_extracted)
+            # edit hash
+            s._data_file_hash = s._data_file_hash + "_d%db%d" % (this_dir_index + 1, this_bval_index + 1)
+            # edit sequence parameters
+            s.sequence.directions = this_dir
+            s.sequence.bvalues = this_bval
+            # edit label
+            p.dataset[i_dataset]["legend"] = legend + " d%d b%d" % (this_dir_index + 1, this_bval_index + 1)
+            s.set_display_label(legend + " d%d b%d" % (this_dir_index, this_bval_index + 1))
+            # store
+            p.dataset[i_dataset]["raw"]["data"] = s
+
+            # next
+            i_dataset = i_dataset + 1
+
+    return(p)

@@ -576,12 +576,16 @@ class SIEMENS_data_file_reader(data_file_reader):
             # TODO : create a sequence implementation for ISIS?
             sequence_obj = sim.mrs_seq_fid(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
 
+        elif(sequence_name == "svs_DW_slaser_b"):
+            # TODO : read DW parameters such as bvalues, directions and number b0 from file and input it when creating sequence object
+            sequence_obj = sim.mrs_seq_svs_DW_slaser_b(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
+
         elif(sequence_name is None):
             sequence_obj = None
 
         else:
             # unknown!
-            log.error("ouch unknown sequence!")
+            log.error("ouch unknown sequence (%s) !" % sequence_name)
 
         return(sequence_obj)
 
