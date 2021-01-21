@@ -23,7 +23,7 @@ log.setLevel(log.DEBUG)
 rdb = db.data_db("/home/tangir/crmbm/acq_db/sc.pkl")
 
 # display stuff?
-display_stuff = True
+display_stuff = False
 
 # standard spinal cord template
 p = reco.pipeline()

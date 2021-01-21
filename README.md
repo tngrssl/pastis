@@ -46,3 +46,4 @@ PASTIS can be used to process and quantify single-voxel Magnetic Resonance SPect
 	* Jacobian matrix information
 	* Cramér-Rao Bounds estimations
 * Dataframe-based storage in pkl files
+* Reconstruction and quantification of diffusion-weighted MRS data (experimental)
