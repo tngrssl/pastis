@@ -9,7 +9,6 @@ A user script used to store calls for the reconstruction of in vivo spinal cord 
 from IPython import get_ipython
 import matplotlib.pylab as plt
 import mrs.reco as reco
-import mrs.db as db
 import mrs.log as log
 get_ipython().magic("clear")
 plt.close("all")
@@ -20,8 +19,6 @@ plt.rcParams['figure.max_open_warning'] = 1000
 plt.rcParams['font.size'] = 9
 log.setLevel(log.DEBUG)
 
-rdb = db.data_db("/home/tangir/crmbm/acq_db/sc.pkl")
-
 # display stuff?
 display_stuff = False
 
@@ -30,56 +27,60 @@ p = reco.pipeline()
 p.job_list = [  p.job["phasing"],
                 p.job["scaling"],
                 # p.job["FID modulus"],
-                p.job["channel-combining"],
+                p.job["channel_combining"],
                 # p.job["concatenate"],
-                p.job["noise-estimation"],
-                p.job["zero-filling"],
-                # p.job["physio-analysis"],
-                p.job["apodizing"],
+                p.job["noise_estimation"],
+                p.job["zero_filling"],
+                # p.job["physio_analysis"],
+                # p.job["apodizing"],
                 p.job["realigning"],
-                p.job["data-rejecting"],
+                p.job["data_rejecting"],
                 p.job["averaging"],
                 p.job["calibrating"],
-                # p.job["water-removal"],
+                # p.job["water_removal"],
                 p.job["cropping"],
                 p.job["displaying"]
                 ]
 
-p.job["data-rejecting"]["auto_method_list"] = [reco.data_rejection_method.AUTO_AMPLITUDE,
+p.job["data_rejecting"]["auto_method_list"] = [reco.data_rejection_method.AUTO_AMPLITUDE,
                                                 reco.data_rejection_method.AUTO_LINEWIDTH,
                                                 reco.data_rejection_method.AUTO_FREQUENCY,
                                                 reco.data_rejection_method.AUTO_PHASE]
 
 p.settings["display"] = display_stuff
+p.job["calibrating"]["POI_shift_range_ppm"] = [1.8, 2.2]
+p.job["calibrating"]["POI_shift_true_ppm"] = 2.008
 p.save_template("sc_std_nows")
 
 # standard spinal cord template with VOI display (experimental)
 p = reco.pipeline()
-p.job_list = [  p.job["displaying anatomy"],
+p.job_list = [  p.job["displaying_anatomy"],
                 p.job["phasing"],
                 p.job["scaling"],
                 # p.job["FID modulus"],
-                p.job["channel-combining"],
+                p.job["channel_combining"],
                 # p.job["concatenate"],
-                p.job["noise-estimation"],
-                p.job["zero-filling"],
-                # p.job["physio-analysis"],
-                p.job["apodizing"],
+                p.job["noise_estimation"],
+                p.job["zero_filling"],
+                # p.job["physio_analysis"],
+                # p.job["apodizing"],
                 p.job["realigning"],
-                p.job["data-rejecting"],
+                p.job["data_rejecting"],
                 p.job["averaging"],
                 p.job["calibrating"],
-                # p.job["water-removal"],
+                # p.job["water_removal"],
                 p.job["cropping"],
                 p.job["displaying"]
                 ]
 
-p.job["data-rejecting"]["auto_method_list"] = [reco.data_rejection_method.AUTO_AMPLITUDE,
+p.job["data_rejecting"]["auto_method_list"] = [reco.data_rejection_method.AUTO_AMPLITUDE,
                                                 reco.data_rejection_method.AUTO_LINEWIDTH,
                                                 reco.data_rejection_method.AUTO_FREQUENCY,
                                                 reco.data_rejection_method.AUTO_PHASE]
 
 p.settings["display"] = display_stuff
+p.job["calibrating"]["POI_shift_range_ppm"] = [1.8, 2.2]
+p.job["calibrating"]["POI_shift_true_ppm"] = 2.008
 p.save_template("sc_std_nows_anat")
 
 # standard spinal cord template with concatenate feature (for the first 2 crappy datasets)
@@ -87,27 +88,29 @@ p = reco.pipeline("sc_std_nows")
 p.job_list = [  p.job["phasing"],
                 p.job["scaling"],
                 # p.job["FID modulus"],
-                p.job["channel-combining"],
+                p.job["channel_combining"],
                 # p.job["concatenate"],
-                p.job["noise-estimation"],
-                p.job["zero-filling"],
-                # p.job["physio-analysis"],
-                p.job["apodizing"],
+                p.job["noise_estimation"],
+                p.job["zero_filling"],
+                # p.job["physio_analysis"],
+                # p.job["apodizing"],
                 p.job["realigning"],
-                p.job["data-rejecting"],
+                p.job["data_rejecting"],
                 p.job["averaging"],
                 p.job["calibrating"],
-                # p.job["water-removal"],
+                # p.job["water_removal"],
                 p.job["cropping"],
                 p.job["displaying"]
                 ]
 
-p.job["data-rejecting"]["auto_method_list"] = [   reco.data_rejection_method.AUTO_AMPLITUDE,
+p.job["data_rejecting"]["auto_method_list"] = [   reco.data_rejection_method.AUTO_AMPLITUDE,
                                                         reco.data_rejection_method.AUTO_LINEWIDTH,
                                                         reco.data_rejection_method.AUTO_FREQUENCY,
                                                         reco.data_rejection_method.AUTO_PHASE]
 
 p.settings["display"] = display_stuff
+p.job["calibrating"]["POI_shift_range_ppm"] = [1.8, 2.2]
+p.job["calibrating"]["POI_shift_true_ppm"] = 2.008
 p.save_template("sc_std_nows_concatenate")
 
 # %% 15/03/2019 - 291-vs-moelle-spectro-p1 - concatenated STEAM #1 :(
@@ -135,7 +138,7 @@ p.dataset[3]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/291-vs-moelle-spect
 
 # p.run()
 # p.check_analyze_results()
-# p.save_datasets(rdb)
+# p.save_datasets()
 
 # %% 15/03/2019 - 291-vs-moelle-spectro-p1 - concatenated sLASER #1 :(
 # not included in group, the protocol was not ead, RFC pulses were too short...
@@ -162,7 +165,7 @@ p.dataset[3]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/291-vs-moelle-spect
 
 # p.run()
 # p.check_analyze_results()
-# p.save_datasets(rdb)
+# p.save_datasets()
 
 # %% 15/03/2019 - 291-vs-moelle-spectro-p1 - sLASER #2 :(
 # not included in group, the protocol was not ead, RFC pulses were too short...
@@ -179,7 +182,7 @@ p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/291-vs-moelle-spectro-p1
 
 # p.run()
 # p.check_analyze_results()
-# p.save_datasets(rdb)
+# p.save_datasets()
 
 # %% 26/06/2019 - 296_ym_p1_brainmoelle - Yasmin :)
 # STEAM is shit, sLASER is ok
@@ -200,10 +203,10 @@ p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/296_ym_p1_brainmoelle/29
 p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/296_ym_p1_brainmoelle/meas_MID157_slaser_R_N=20+_1_longTE_SNR++++_FID34191.dat",
                                 "/home/tangir/crmbm/acq_twix/296_ym_p1_brainmoelle/meas_MID155_slaser_R_N=20+_1_longTE_SNR++++_FID34189.dat"]
 
-p.job["data-rejecting"]["auto_method_list"] = None
+p.job["data_rejecting"]["auto_method_list"] = None
 p.run()
 p.check_analyze_results(True)
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% 16/07/2019 - 300-pm-p1-moelle - Pelayo :)
 # forgot to acquire the ref scans... replace them with non-ws data
@@ -227,10 +230,10 @@ p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/300-pm-p1-moelle/me
                                 "/home/tangir/crmbm/acq_twix/300-pm-p1-moelle/meas_MID63_slaser_R_N=20+_1_longTE_SNR++++_FID35516.dat"]
 
 p.job["phasing"]["using_ref_data"] = False
-p.job["channel-combining"]["using_ref_data"] = False
+p.job["channel_combining"]["using_ref_data"] = False
 p.run()
 p.check_analyze_results()
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% 14/08/2019 - 304-ka-p1-moelle - Karen :(
 get_ipython().magic("clear")
@@ -243,10 +246,10 @@ p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/304-ka-p1-moelle/2019081
                                 "/home/tangir/crmbm/acq/304-ka-p1-moelle/20190814/01_0013_slaser-r-n/original-primary_e09_0001.dcm"]
 
 p.job["phasing"]["using_ref_data"] = False
-p.job["channel-combining"]["using_ref_data"] = False
+p.job["channel_combining"]["using_ref_data"] = False
 p.run()
 p.check_analyze_results()
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% 21/08/2019 - 307-ap-p1-moelle - Ariane :)
 get_ipython().magic("clear")
@@ -287,10 +290,10 @@ p.dataset[3]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/307-AP-P1-MOELLE/me
                                 "/home/tangir/crmbm/acq_twix/307-AP-P1-MOELLE/meas_MID124_slaser_R_N=10_2_longTE_SNR+++_FID38645.dat"]
 
 p.job["realigning"]["moving_averages"] = 2
-p.job["data-rejecting"]["moving_averages"] = 2
+p.job["data_rejecting"]["moving_averages"] = 2
 p.run()
 p.check_analyze_results(True)
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% 27/08/2019 - 308-rs-p1-moelle - Ocha :)
 get_ipython().magic("clear")
@@ -308,13 +311,13 @@ p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/308-rs-p1-moelle/me
 
 p.settings["POI_range_ppm"] = [4.5, 4.8]
 p.job["realigning"]["moving_averages"] = 2
-p.job["data-rejecting"]["auto_method_list"] = [reco.data_rejection_method.AUTO_AMPLITUDE,
+p.job["data_rejecting"]["auto_method_list"] = [reco.data_rejection_method.AUTO_AMPLITUDE,
                                                reco.data_rejection_method.AUTO_LINEWIDTH,
                                                reco.data_rejection_method.AUTO_FREQUENCY]
 
 p.run()
 p.check_analyze_results()
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% 29/08/2019 - 310-mg-p1-moelle - Maxime :s
 get_ipython().magic("clear")
@@ -334,11 +337,11 @@ p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/310-mg-p1-moelle/me
 if(p.job["realigning"] in p.job_list):
     p.job_list.remove(p.job["realigning"])
 
-p.job["data-rejecting"]["moving_averages"] = 8
+p.job["data_rejecting"]["moving_averages"] = 8
 
 p.run()
 p.check_analyze_results(True)
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% 05/09/2019 - 311-sl-p1-moelle - Simon :))
 get_ipython().magic("clear")
@@ -356,7 +359,7 @@ p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/311-sl-p1-moelle/me
 
 p.run()
 p.check_analyze_results(True)
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% 23/09/2019 - 313-ft-p1-moelle - Fransiska :|
 get_ipython().magic("clear")
@@ -372,11 +375,11 @@ p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/313-ft-p1-moelle/me
                                 "/home/tangir/crmbm/acq_twix/313-ft-p1-moelle/meas_MID65_slaser_R_N=20+_1_longTE_SNR++++_FID41497.dat"]
 
 p.job["realigning"]["moving_averages"] = 2
-p.job["data-rejecting"]["moving_averages"] = 2
+p.job["data_rejecting"]["moving_averages"] = 2
 
 p.run()
 p.check_analyze_results(True)
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% 25/09/2019 - 314-yt-p1-moelle - Yolanda :)))
 # lw reduced, snr slight loss
@@ -403,11 +406,11 @@ p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/314-yt-p1-moelle/me
                                 "/home/tangir/crmbm/acq_twix/314-yt-p1-moelle/meas_MID86_slaser_R_N=5_5+_shortTE_SNR++_FID41684.dat"]
 
 p.job["realigning"]["moving_averages"] = 2
-p.job["data-rejecting"]["moving_averages"] = 2
+p.job["data_rejecting"]["moving_averages"] = 2
 
 p.run()
 p.check_analyze_results(True)
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% 03/10/2019 - 316-ap-p1-moelle - Anissa :)
 # ok for me
@@ -440,7 +443,7 @@ p.settings["POI_LW_range_ppm"] = [4.5, 4.8]
 
 p.run()
 p.check_analyze_results(True)
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% 17/10/2019 - 319-fc-p1-moelle - Fernando :)
 # passing ok, LWdcm = LWraw
@@ -467,7 +470,7 @@ p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/319-fc-p1-moelle/me
 
 p.run()
 p.check_analyze_results(True)
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% 05/11/2019 - 328-af-p1-moelle - Anne :)
 #
@@ -485,11 +488,11 @@ p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/328-af-p1-moelle/me
                                 "/home/tangir/crmbm/acq_twix/328-af-p1-moelle/meas_MID66_slaser_R_N=20+_1_longTE_SNR++++_FID45773.dat"]
 
 p.job["realigning"]["moving_averages"] = 4
-p.job["data-rejecting"]["moving_averages"] = 1
+p.job["data_rejecting"]["moving_averages"] = 1
 
 p.run()
 p.check_analyze_results(True)
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% 08/11/2019 - 329-pi-p1-moelle - Pujalina :)
 # dcm better than raw, but ok
@@ -513,11 +516,11 @@ p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/329-pi-p1-moelle/2019110
                                 "/home/tangir/crmbm/acq/329-pi-p1-moelle/20191108/01_0013_slaser-r-n/original-primary_e09_0001.dcm"]
 
 p.job["realigning"]["moving_averages"] = 2
-p.job["data-rejecting"]["moving_averages"] = 2
+p.job["data_rejecting"]["moving_averages"] = 2
 
 p.run()
 p.check_analyze_results(True)
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% 26/11/2019 - 333-sc-p1-moelle - Shirley :(
 # TWIX data is corrupted ! :(
@@ -550,7 +553,7 @@ p.job["phasing"]["offset"] = 3.1416
 p.settings["datasets_indexes"] = 0
 p.run()
 p.check_analyze_results()
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% 09/12/2019 - 336-nb-p1-moelle - Naouelle :s
 # looks ok
@@ -576,16 +579,16 @@ p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/336-nb-p1-moelle/me
                                 "/home/tangir/crmbm/acq_twix/336-nb-p1-moelle/meas_MID75_slaser_R_N=20+_1_longTE_SNR++++_FID48206.dat"]
 
 # probably bad ref scan: only NA=1, no phase cycling
-# p.job["channel-combining"]["using_ref_data"] = False
+# p.job["channel_combining"]["using_ref_data"] = False
 
 p.job["realigning"]["moving_averages"] = 4
 p.job["realigning"]["inter_corr_mode"] = True
-p.job["data-rejecting"]["moving_averages"] = 2
+p.job["data_rejecting"]["moving_averages"] = 2
 
 p.settings["datasets_indexes"] = 0
 p.run()
 p.check_analyze_results(True)
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% 10/12/2019 - 338-ro-p1-moelle - Rischa :)
 get_ipython().magic("clear")
@@ -616,7 +619,7 @@ p.dataset[2]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/338-ro-p1-moelle/me
 p.settings["datasets_indexes"] = 0
 p.run()
 p.check_analyze_results(True)
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% 28/01/2019 - 300-pm-p2-moelle - Pelayo P2 :)
 get_ipython().magic("clear")
@@ -650,7 +653,7 @@ p.dataset[2]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/300-pm-p2-moelle/me
 p.settings["datasets_indexes"] = 0
 p.run()
 p.check_analyze_results()
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% 06/02/2019 - 349-ap-p1-moelle - Ahmad Fajar :|
 # 3-5ppm region fucked  up
@@ -676,12 +679,12 @@ p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/349-ap-p1-moelle/2020020
                                 "/home/tangir/crmbm/acq/349-ap-p1-moelle/20200206/01_0008_slaser-r-n/original-primary_e09_0001.dcm"]
 
 p.job["realigning"]["moving_averages"] = 4
-p.job["data-rejecting"]["moving_averages"] = 2
+p.job["data_rejecting"]["moving_averages"] = 2
 
 p.settings["datasets_indexes"] = 0
 p.run()
 p.check_analyze_results(True)
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% 24/02/2019 - 355-st-p1-moelle - Steven :)
 # raw looks actually better than dcm, but not the estimated snr
@@ -699,11 +702,11 @@ p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/355-st-p1-moelle/2020022
                                 "/home/tangir/crmbm/acq/355-st-p1-moelle/20200224/01_0009_slaser-r-n/original-primary_e09_0001.dcm"]
 
 p.job["realigning"]["moving_averages"] = 7
-p.job["data-rejecting"]["moving_averages"] = 2
+p.job["data_rejecting"]["moving_averages"] = 2
 
 p.run()
 p.check_analyze_results()
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% 04/03/2020 - 304-ka-p2-moelle - Karen P2 :(
 # dataset #0 contains big water artefact, data quality is horrible, could not make it happen
@@ -743,13 +746,13 @@ p.job["realigning"]["moving_averages"] = 2
 p.job["realigning"]["inter_corr_mode"] = True
 
 # data rejection is confused with artefact!
-p.job["data-rejecting"]["moving_averages"] = 4
-p.job["data-rejecting"]["auto_method_list"] = [reco.data_rejection_method.AUTO_AMPLITUDE,
+p.job["data_rejecting"]["moving_averages"] = 4
+p.job["data_rejecting"]["auto_method_list"] = [reco.data_rejection_method.AUTO_AMPLITUDE,
                                                reco.data_rejection_method.AUTO_LINEWIDTH]
 
 p.run()
 p.check_analyze_results(True)
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% 30/05/2020 - 311-sl-p2-moelle - Simon P2 :)
 get_ipython().magic("clear")
@@ -774,10 +777,10 @@ p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/311-sl-p2-moelle/2020052
                                 "/home/tangir/crmbm/acq/311-sl-p2-moelle/20200529/01_0012_slaser-r-n/original-primary_e09_0001.dcm"]
 
 p.job["realigning"]["moving_averages"] = 2
-p.job["data-rejecting"]["moving_averages"] = 2
+p.job["data_rejecting"]["moving_averages"] = 2
 p.run()
 p.check_analyze_results(True)
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% 09/06/2020 - 336-nb-p2-moelle - Naouelle P2 :)
 # dataset #2 is bad, processed it differently for the 3 others
@@ -796,11 +799,11 @@ p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/336-nb-p2-moelle/2020060
 
 p.job["realigning"]["moving_averages"] = 2
 p.job["realigning"]["inter_corr_mode"] = True
-p.job["data-rejecting"]["moving_averages"] = 2
+p.job["data_rejecting"]["moving_averages"] = 2
 
 p.run()
 p.check_analyze_results(True)
-p.save_datasets(rdb)
+p.save_datasets()
 
 p = reco.pipeline("sc_std_nows")
 
@@ -830,11 +833,11 @@ p.dataset[2]["dcm"]["files"] = ["/home/tangir/crmbm/acq/336-nb-p2-moelle/2020060
 
 p.job["realigning"]["moving_averages"] = 2
 p.job["realigning"]["inter_corr_mode"] = False
-p.job["data-rejecting"]["moving_averages"] = 2
+p.job["data_rejecting"]["moving_averages"] = 2
 
 p.run()
 p.check_analyze_results(True)
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% 11/06/2020 - 319-fc-p2-moelle - Fernando P2 :)
 get_ipython().magic("clear")
@@ -852,7 +855,7 @@ p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/319-fc-p2-moelle/2020061
 
 p.run()
 p.check_analyze_results()
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% 15/06/2020 - 313-ft-p2-moelle - Fransiska P2 :|
 # did not pass quality check, raw data looks contaminated with some shit
@@ -870,10 +873,10 @@ p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/313-ft-p2-moelle/2020061
                                 "/home/tangir/crmbm/acq/313-ft-p2-moelle/20200615/01_0012_slaser-r-n/original-primary_e09_0001.dcm"]
 
 p.job["realigning"]["moving_averages"] = 2
-p.job["data-rejecting"]["moving_averages"] = 4
+p.job["data_rejecting"]["moving_averages"] = 4
 p.run()
 p.check_analyze_results(True)
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% 19/06/2020 - 333-sc-p2-moelle - Shirley P2 :|
 get_ipython().magic("clear")
@@ -892,11 +895,11 @@ p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/333-sc-p2-moelle/2020061
 # water peak very small and close to 5ppm artefact
 p.job["analyzing-lw"]["POI_range_ppm"] = [4.5, 4.8]
 p.job["phasing"]["POI_range_ppm"] = [4.5, 4.8]
-p.job["data-rejecting"]["POI_range_ppm"] = [4.5, 4.8]
+p.job["data_rejecting"]["POI_range_ppm"] = [4.5, 4.8]
 
 p.run()
 p.check_analyze_results(True)
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% 25/06/2020 - 314-yt-p2-moelle - Yolanda P2 :)))
 get_ipython().magic("clear")
@@ -914,7 +917,7 @@ p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/314-yt-p2-moelle/2020062
 
 p.run()
 p.check_analyze_results()
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% 25/09/2020 - 349-ap-p2-moelle - Admah Fajar P2 :)))
 get_ipython().magic("clear")
@@ -941,8 +944,8 @@ p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/349-ap-p2-moelle/2020092
 
 p.settings["datasets_indexes"] = 0
 p.job["realigning"]["moving_averages"] = 4
-p.job["data-rejecting"]["moving_averages"] = 4
+p.job["data_rejecting"]["moving_averages"] = 4
 
 p.run()
 p.check_analyze_results()
-p.save_datasets(rdb)
+p.save_datasets()

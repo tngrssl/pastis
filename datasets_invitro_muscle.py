@@ -10,7 +10,6 @@ from IPython import get_ipython
 import matplotlib.pylab as plt
 import mrs.reco as reco
 import mrs.log as log
-import mrs.db as db
 import numpy as np
 get_ipython().magic("clear")
 plt.close("all")
@@ -20,8 +19,6 @@ plt.rcParams['figure.dpi'] = 100
 plt.rcParams['figure.max_open_warning'] = 1000
 plt.rcParams['font.size'] = 9
 log.setLevel(log.DEBUG)
-
-rdb = db.data_db()
 
 # %% fat phantom ?
 get_ipython().magic("clear")
@@ -36,23 +33,23 @@ p.dataset[0]["raw"]["files"] = ["/crmbm/data_seq/users/JS/2020_1H_MRS/200514_1hm
 p.job_list = [  # p.job["phasing"],
                 p.job["scaling"],
                 # p.job["FID modulus"],
-                p.job["channel-combining"],
+                p.job["channel_combining"],
                 # p.job["concatenate"],
-                p.job["zero-filling"],
-                # p.job["physio-analysis"],
-                # p.job["data-rejecting"],
+                p.job["zero_filling"],
+                # p.job["physio_analysis"],
+                # p.job["data_rejecting"],
                 # p.job["realigning"],
                 p.job["averaging"],
-                p.job["noise-estimation"],
+                p.job["noise_estimation"],
                 # p.job["apodizing"],
                 # p.job["cropping"],
-                # p.job["water-removal"],
+                # p.job["water_removal"],
                 p.job["calibrating"],
                 p.job["displaying"]
                 ]
 
-p.analyze_job_list = [  p.job["channel-combining"],
-                        p.job["zero-filling"],
+p.analyze_job_list = [  p.job["channel_combining"],
+                        p.job["zero_filling"],
                         # p.job["realigning"],
                         p.job["averaging"],
                         p.job["calibrating"]]
@@ -102,23 +99,23 @@ for i, (d, te) in enumerate(zip(p.dataset, te_list)):
 p.job_list = [  # p.job["phasing"],
                 p.job["scaling"],
                 # p.job["FID modulus"],
-                p.job["channel-combining"],
+                p.job["channel_combining"],
                 # p.job["concatenate"],
-                p.job["zero-filling"],
-                # p.job["physio-analysis"],
-                # p.job["data-rejecting"],
+                p.job["zero_filling"],
+                # p.job["physio_analysis"],
+                # p.job["data_rejecting"],
                 # p.job["realigning"],
                 p.job["averaging"],
-                p.job["noise-estimation"],
+                p.job["noise_estimation"],
                 # p.job["apodizing"],
                 # p.job["cropping"],
-                # p.job["water-removal"],
+                # p.job["water_removal"],
                 p.job["calibrating"],
                 p.job["displaying"]
                 ]
 
-p.analyze_job_list = [  p.job["channel-combining"],
-                        p.job["zero-filling"],
+p.analyze_job_list = [  p.job["channel_combining"],
+                        p.job["zero_filling"],
                         # p.job["realigning"],
                         p.job["averaging"],
                         p.job["calibrating"]]
@@ -169,23 +166,23 @@ for i, (d, te) in enumerate(zip(p.dataset, te_list)):
 p.job_list = [  # p.job["phasing"],
                 p.job["scaling"],
                 # p.job["FID modulus"],
-                p.job["channel-combining"],
+                p.job["channel_combining"],
                 # p.job["concatenate"],
-                p.job["zero-filling"],
-                # p.job["physio-analysis"],
-                # p.job["data-rejecting"],
+                p.job["zero_filling"],
+                # p.job["physio_analysis"],
+                # p.job["data_rejecting"],
                 # p.job["realigning"],
                 p.job["averaging"],
-                p.job["noise-estimation"],
+                p.job["noise_estimation"],
                 # p.job["apodizing"],
                 # p.job["cropping"],
-                # p.job["water-removal"],
+                # p.job["water_removal"],
                 p.job["calibrating"],
                 p.job["displaying"]
                 ]
 
-p.analyze_job_list = [  p.job["channel-combining"],
-                        p.job["zero-filling"],
+p.analyze_job_list = [  p.job["channel_combining"],
+                        p.job["zero_filling"],
                         # p.job["realigning"],
                         p.job["averaging"],
                         p.job["calibrating"]]

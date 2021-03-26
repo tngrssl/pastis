@@ -24,6 +24,7 @@ import suspect
 import numpy as np
 import math as ma
 import matplotlib.pylab as plt
+import pandas as pd
 import pickle
 import warnings
 import pathlib
@@ -118,10 +119,10 @@ class params(np.ndarray):
         obj : params numpy array [n,4]
         """
         # to begin, I followed online help and wrote:
-        #self._meta_bs = getattr(obj, 'meta_bs', None)
-        #self._linklock = getattr(obj, 'linklock', None)
-        #self._errors = getattr(obj, 'errors', None)
-        #self._corr_mat = getattr(obj, 'corr_mat', None)
+        # self._meta_bs = getattr(obj, 'meta_bs', None)
+        # self._linklock = getattr(obj, 'linklock', None)
+        # self._errors = getattr(obj, 'errors', None)
+        # self._corr_mat = getattr(obj, 'corr_mat', None)
 
         # but that only works for some simple attribute types
         # if the attributes are nd arrays, only the pointers will be copied...
@@ -165,7 +166,7 @@ class params(np.ndarray):
         """Property method for corr_mat."""
         return(self._corr_mat)
 
-    def get_meta_names(self):
+    def get_meta_names(self, LCModel_names=False):
         """
         Return list of metabolite names controlled by this params object.
 
@@ -174,7 +175,14 @@ class params(np.ndarray):
         list(self._meta_bs.keys()) : list
             List of metabolite names
         """
-        return(list(self._meta_bs.keys()))
+        if(LCModel_names):
+            meta_names_lcmodel_list = []
+            for this_metagroup_key, this_metagroup_entry in self._meta_bs.items():
+                meta_names_lcmodel_list.append(this_metagroup_entry["LCModel"])
+
+            return(meta_names_lcmodel_list)
+        else:
+            return(list(self._meta_bs.keys()))
 
     def get_errors_prct(self):
         """
@@ -364,7 +372,7 @@ class params(np.ndarray):
         p.errors[:, xxx.p_cm] = p.errors[:, xxx.p_cm] * multiplication_factor
         return(p)
 
-    def get_relative_to_meta(self, mIndex=xxx.m_Water, m_concentration_mmolkg=55000.0, params_ref=None):
+    def get_absolutes(self, mIndex=xxx.m_Water, m_concentration_mmolkg=55000.0, params_ref=None):
         """
         Calculate the metabolic concentration values relative to a metabolite. The metabolite relative concentration can be taken from the current params vector or another params vector (params_ref), assuming the absolute metabolite concentration value. Usefull to get concentrations relative to water (called absolute concentrations).
 
@@ -473,7 +481,7 @@ class params(np.ndarray):
             rc_num_den_abs = np.abs(full_param_corr_vec)
 
             # calculate the final relCRB
-            rel_CRBs_ratio = np.sqrt( relCRBs_num**2 + relCRBs_den**2 - 2 * rc_num_den_abs * relCRBs_num * relCRBs_den )
+            rel_CRBs_ratio = np.sqrt(relCRBs_num**2 + relCRBs_den**2 - 2 * rc_num_den_abs * relCRBs_num * relCRBs_den)
             # back to absCRB
             abs_CRBs_ratio = p2[:, xxx.p_cm] * rel_CRBs_ratio / 100.0
             p2._errors[:, xxx.p_cm] = abs_CRBs_ratio
@@ -761,6 +769,37 @@ class params(np.ndarray):
         super().__setstate__(d[0:-1])
         return(self)
 
+    def to_dataframe(self, prefix_str="params_"):
+        """
+        Convert this params object to dataframe.
+
+        Parameters
+        ----------
+        prefix_str : string
+            Prefix string to add to column names
+
+        Returns
+        -------
+        df : Dataframe
+            Containing this param object as a vector
+        """
+        log.debug("converting to dataframe...")
+
+        df = pd.DataFrame.from_dict([vars(self)])
+        df = df.filter(regex=("^(?!_).*"))
+
+        meta_names = self.get_meta_names()
+        par_names = ["cm", "dd", "df", "dp"]
+
+        for im, m in enumerate(meta_names):
+            for ip, p in enumerate(par_names):
+                df[p + "_" + m + "_val"] = self[im, ip]
+                df[p + "_" + m + "_err"] = self._errors[im, ip]
+
+        # add prefix
+        df = df.add_prefix(prefix_str)
+        return(df)
+
 
 class mrs_sequence:
     """A class that stores a sequence and all its parameters used for simulation. This is a generic sequence class that you need to overload. By default, the simulated sequence is a simple pulse-acquire NMR experiment."""
@@ -876,7 +915,7 @@ class mrs_sequence:
         self._ready = False
 
     def copy(self):
-        """Copy method"""
+        """Copy method."""
         obj = copy.copy(self)
         if(self._meta_signals is not None):
             obj._meta_signals = self._meta_signals.copy()
@@ -1233,10 +1272,6 @@ class mrs_sequence:
         if(meta_bs is not None):
             self._meta_bs = meta_bs
 
-        # now let's initialize the metabolite db if needed
-        if(not self._meta_bs.ready):
-            self._meta_bs.initialize()
-
         # wait, was the GAMMA library imported ok?
         if(GAMMA_LIB_LOADED):
             log.info("initializing sequence using pyGAMMA...")
@@ -1382,6 +1417,35 @@ class mrs_sequence:
         s.analyze_noise_nd()
         s.set_display_label(lbl)
         return(s)
+
+    def to_dataframe(self, include_obj=False, prefix_str="sequence_"):
+        """
+        Convert the object's attributes to dataframe. Can include the object itself.
+
+        Parameters
+        ----------
+        include_obj : boolean
+            Include self to the dataframe row
+        prefix_str : string
+            Prefix string to add to column names
+
+        Returns
+        -------
+        df : Dataframe
+            Containing the attributes as columns (a single row)
+        """
+        log.debug("converting to dataframe...")
+
+        # get all attributes but remove the private ones
+        df = pd.DataFrame.from_dict([vars(self)])
+        df = df.filter(regex=("^(?!_).*"))
+
+        if(include_obj):
+            df["obj"] = self.copy()
+
+        df = df.add_prefix(prefix_str)
+
+        return(df)
 
 
 class mrs_seq_press(mrs_sequence):
@@ -1822,7 +1886,7 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
             d_x_prct = d_x_mm / voxel_size_mm_list[0] * 100.0
         else:
             log.debug("since its duration is not 2ms here, we do not know its bandwith. Therefore, no way to calculate the CS displacement for this axis, sorry ;)")
-            d_x_m = None
+            d_x_mm = None
 
         # Y selection done with 180°
         bw_y_Hz = self.pulse_laser_rfc_r / (self.pulse_laser_rfc_length / 1000000.0)
@@ -2658,13 +2722,22 @@ class metabolite_basis_set(dict):
             log.error_new_attribute(key)
         object.__setattr__(self, key, value)
 
-    def __init__(self):
-        """Construct a metabolite_basis_set object."""
+    def __init__(self, basis_set_name=default_paths.DEFAULT_META_BASIS_SET_NAME, database_xls_file=default_paths.DEFAULT_META_DB_FILE):
+        """
+        Construct a metabolite_basis_set object.
+
+        Parameters
+        ----------
+        basis_set_name : string
+            Metabolite basis set name corresponding the a "Template_BASISSETNAME" tab in the xls file
+        database_xls_file : string
+            Excel file containing metabolite chemical shifts, J-coupling, etc.
+        """
         super(metabolite_basis_set, self).__init__()
         # xls file that contains metabolites properties (you should not change that)
-        self._database_xls_file = default_paths.DEFAULT_META_DB_FILE
         # xls file that contains your metabolite basis set
-        self.basis_set_xls_file = default_paths.DEFAULT_META_BASIS_SET_FILE
+        self.basis_set_name = basis_set_name
+        self._xls_file = default_paths.DEFAULT_META_DB_FILE
         # include peaks only in this range of chemical shifts
         self.ppm_range = [0, 6]
         # include only non-coupled peaks
@@ -2672,8 +2745,18 @@ class metabolite_basis_set(dict):
         # set all metabolites to have only one peak (first chemical shift) and one proton
         # one proton only for each metabolite
         self.one_proton_mode = False
-        # to know if the object is initialized
-        self._ready = False
+
+        log.info("initializing metabolite database...")
+        self._read_xls_file()
+        self._write_header_file()
+
+        # single proton AMARES style?
+        if(self.one_proton_mode):
+            for m in list(self.keys()):
+                for sm in list(self[m]["metabolites"].keys()):
+                    self[m]["metabolites"][sm]["ppm"] = np.array([self[m]["metabolites"][sm]["ppm"][0]])
+                    self[m]["metabolites"][sm]["iso"] = np.array([self[m]["metabolites"][sm]["iso"][0]])
+                    self[m]["metabolites"][sm]["J"] = np.array([[self[m]["metabolites"][sm]["J"][0][0]]])
 
         # freeze
         self.__isfrozen = True
@@ -2728,139 +2811,109 @@ class metabolite_basis_set(dict):
         r = self.__eq_dict(self, other)
         return(r)
 
-    @property
-    def ready(self):
-        """
-        Property get function for _ready.
-
-        Returns
-        -------
-        self._ready : bool
-            to tell if the object if initialized or not
-        """
-        return(self._ready)
-
     def _read_xls_file(self):
-        """Read the xls file specified by "self.xls_file" and stores all the information (chemical shifts, nuclei, J couplings)."""
+        """Read the xls file specified by "self._xls_file" and stores all the information (chemical shifts, nuclei, J couplings)."""
         # TODO: need to work with gitable xls format, FODS!
         # remove annoying warning
         warnings.simplefilter(action='ignore', category=FutureWarning)
 
         # first, read xls metabolite basis set file and parse it
         log.info("reading metabolite basis set from XLS file...")
-        book_db = open_workbook(self._database_xls_file)
-        book = open_workbook(self.basis_set_xls_file)
-
+        book_db = open_workbook(self._xls_file)
         # get sheets from database file
         sheet_names = book_db.sheet_by_name('Metabolites')
         sheet_ppm = book_db.sheet_by_name('PPM')
         sheet_iso = book_db.sheet_by_name('Nuclei')
 
-        # get sheets from basis set file
-        sheet_groups = book.sheet_by_name('Metabolites')
-        sheet_ref = book.sheet_by_name('Reference_metabolite')
-        sheet_MMs = book.sheet_by_name('Macromolecules')
-        sheet_refMM = book.sheet_by_name('Reference_macromolecule')
-        sheet_cmin = book.sheet_by_name('Concentrations_min')
-        sheet_cmax = book.sheet_by_name('Concentrations_max')
-        sheet_T1s = book.sheet_by_name('T1s')
-        sheet_T2s = book.sheet_by_name('T2s')
+        # read basis set sheet
+        df = pd.read_excel(self._xls_file, sheet_name="Template_" + self.basis_set_name)
+        df = df.set_index("Metabolites")
 
-        # metabolite used as a reference, a robust peak
-        ref_meta_name = sheet_ref.col_values(0)[0]
+        # browse metabolite groups in template
+        for this_metagroup_name, this_row in df.iterrows():
+            if(type(this_row["Consisting of"]) != list):
+                # solo metabolite
+                this_metaname_list = [this_metagroup_name]
+            else:
+                # group
+                this_metaname_list = this_row["Consisting of"].split("+")
+                this_metaname_list = [m.strip() for m in this_metaname_list]
 
-        # MMs list and reference MM
-        MM_list = sheet_MMs.col_values(0)
-        if(len(sheet_refMM.col_values(0)) > 0):
-            ref_MM_name = sheet_refMM.col_values(0)[0]
-        else:
-            ref_MM_name = ""
+            # prepare group entry
+            this_metagroup_entry = {"metabolites": {}}
 
-        # other sheets
-        c_min = np.array(sheet_cmin.col_values(0))
-        c_max = np.array(sheet_cmax.col_values(0))
-        T1s = np.array(sheet_T1s.col_values(0))
-        T2s = np.array(sheet_T2s.col_values(0))
+            # look for the members of the group
+            for this_meta_name in this_metaname_list:
+                # is this metagroup name is a metabolite or not ?
+                if(this_meta_name in sheet_names.col_values(0)):
+                    # its index
+                    this_meta_ind = sheet_names.col_values(0).index(this_meta_name)
 
-        # browse metabolite groups and MMs
-        for this_sheet in [sheet_groups, sheet_MMs]:
-            # metagroup list
-            for this_metagroup_name in this_sheet.col_values(0):
-                # index
-                this_metagroup_ind = this_sheet.col_values(0).index(this_metagroup_name)
+                    # find info on this meta
+                    # ppm
+                    this_meta_ppm_line = np.array(sheet_ppm.row_values(this_meta_ind))
+                    this_meta_ppm_line[this_meta_ppm_line == ''] = np.nan
+                    this_ppm_list = this_meta_ppm_line.astype(np.float64)
+                    this_meta_mask = ~np.isnan(this_ppm_list)
+                    this_ppm_list = this_ppm_list[this_meta_mask]
 
-                # prepare group entry
-                this_metagroup_entry = {"metabolites": {}}
+                    # ppm filtering: hope that works
+                    this_ppm_list[(this_ppm_list < self.ppm_range[0]) | (this_ppm_list > self.ppm_range[1])] = 100.0
 
-                # look for the members of the group
-                for this_meta_name in this_sheet.row_values(this_metagroup_ind):
-                    # is this metagroup name is a metabolite or not ?
-                    if(this_meta_name in sheet_names.col_values(0)):
-                        # its index
-                        this_meta_ind = sheet_names.col_values(0).index(this_meta_name)
+                    # iso
+                    this_meta_iso_line = np.array(sheet_iso.row_values(this_meta_ind))
+                    this_meta_iso_line[this_meta_iso_line == ''] = np.nan
+                    this_iso_list = this_meta_iso_line.astype(np.float64)
+                    this_iso_list = this_iso_list[this_meta_mask]
 
-                        # find info on this meta
-                        # ppm
-                        this_meta_ppm_line = np.array(sheet_ppm.row_values(this_meta_ind))
-                        this_meta_ppm_line[this_meta_ppm_line == ''] = np.nan
-                        this_ppm_list = this_meta_ppm_line.astype(np.float64)
-                        this_meta_mask = ~np.isnan(this_ppm_list)
-                        this_ppm_list = this_ppm_list[this_meta_mask]
+                    # J couplings
+                    # check if there is a sheet for this metabolite
+                    if(this_meta_name in book_db.sheet_names()):
+                        this_sheet_Jcouplings = book_db.sheet_by_name(this_meta_name)
+                        this_j_list = np.full([len(this_ppm_list), len(this_ppm_list)], np.nan)
+                        for irowJ in range(len(this_ppm_list)):
+                            # ppm
+                            this_meta_j_line = np.array(this_sheet_Jcouplings.row_values(irowJ))
+                            this_meta_j_line[this_meta_j_line == ''] = np.nan
+                            this_meta_j_line = this_meta_j_line.astype(np.float64)
+                            this_meta_j_line = this_meta_j_line[this_meta_mask]
+                            this_j_list[irowJ][:] = this_meta_j_line
+                    else:
+                        # if no sheet, put all J-couplings to zeroes
+                        this_j_list = np.zeros([len(this_ppm_list), len(this_ppm_list)])
 
-                        # ppm filtering: hope that works
-                        this_ppm_list[(this_ppm_list < self.ppm_range[0]) | (this_ppm_list > self.ppm_range[1])] = 100.0
+                    # filter coupled and non-coupled peaks
+                    if(self.non_coupled_only):
+                        # sum up one axis
+                        this_j_list_summed = np.sum(np.abs(this_j_list), axis=0)
+                        this_j_list_summed_mask = (this_j_list_summed != 0.0)
+                        this_ppm_list[this_j_list_summed_mask] = 100.0
 
-                        # iso
-                        this_meta_iso_line = np.array(sheet_iso.row_values(this_meta_ind))
-                        this_meta_iso_line[this_meta_iso_line == ''] = np.nan
-                        this_iso_list = this_meta_iso_line.astype(np.float64)
-                        this_iso_list = this_iso_list[this_meta_mask]
+                    # append metabolite entry for this metabolite group
+                    this_metagroup_entry["metabolites"][this_meta_name] = {"ppm": this_ppm_list, "iso": this_iso_list, "J": this_j_list}
 
-                        # J couplings
-                        # check if there is a sheet for this metabolite
-                        if(this_meta_name in book_db.sheet_names()):
-                            this_sheet_Jcouplings = book_db.sheet_by_name(this_meta_name)
-                            this_j_list = np.full([len(this_ppm_list), len(this_ppm_list)], np.nan)
-                            for irowJ in range(len(this_ppm_list)):
-                                # ppm
-                                this_meta_j_line = np.array(this_sheet_Jcouplings.row_values(irowJ))
-                                this_meta_j_line[this_meta_j_line == ''] = np.nan
-                                this_meta_j_line = this_meta_j_line.astype(np.float64)
-                                this_meta_j_line = this_meta_j_line[this_meta_mask]
-                                this_j_list[irowJ][:] = this_meta_j_line
-                        else:
-                            # if no sheet, put all J-couplings to zeroes
-                            this_j_list = np.zeros([len(this_ppm_list), len(this_ppm_list)])
+            # add extra infos to metabolite group
+            # is it a MM?
+            this_metagroup_entry["Macromecule"] = (this_row["Type"] == "Macromolecule")
+            # omg, is it the reference MM?
+            this_metagroup_entry["Reference macromolecule"] = (this_row["Type"] == "Ref. Macromolecule")
 
-                        # filter coupled and non-coupled peaks
-                        if(self.non_coupled_only):
-                            # sum up one axis
-                            this_j_list_summed = np.sum(np.abs(this_j_list), axis=0)
-                            this_j_list_summed_mask = (this_j_list_summed != 0.0)
-                            this_ppm_list[this_j_list_summed_mask] = 100.0
+            # oh maybe, is it the reference metabolite?
+            this_metagroup_entry["Reference metabolite"] = (this_row["Type"] == "Ref. Metabolite")
+            # min/max concentration
+            this_metagroup_entry["Concentration min"] = this_row["Concentration min (mmol/kg)"]
+            this_metagroup_entry["Concentration max"] = this_row["Concentration max (mmol/kg)"]
+            # T1s/T2s
+            this_metagroup_entry["T1"] = this_row["T1 (ms)"]
+            this_metagroup_entry["T2"] = this_row["T2 (ms)"]
+            # LCModel name
+            if(type(this_row["LCModel name"]) != str):
+                this_metagroup_entry["LCModel"] = None
+            else:
+                this_metagroup_entry["LCModel"] = this_row["LCModel name"]
 
-                        # append metabolite entry for this metabolite group
-                        this_metagroup_entry["metabolites"][this_meta_name] = {"ppm": this_ppm_list, "iso": this_iso_list, "J": this_j_list}
-
-                # add extra infos to metabolite group
-                # is it a MM?
-                this_MM_bool = (this_metagroup_name in MM_list)
-                this_metagroup_entry["Macromecule"] = this_MM_bool
-                # omg, is it the reference MM?
-                this_ref_MM_bool = (this_metagroup_name == ref_MM_name)
-                this_metagroup_entry["Reference macromolecule"] = this_ref_MM_bool
-                # oh maybe, is it the reference metabolite?
-                this_ref_meta_bool = (this_metagroup_name == ref_meta_name)
-                this_metagroup_entry["Reference metabolite"] = this_ref_meta_bool
-                # min/max concentration
-                this_metagroup_entry["Concentration min"] = c_min[this_metagroup_ind]
-                this_metagroup_entry["Concentration max"] = c_max[this_metagroup_ind]
-                # T1s/T2s
-                this_metagroup_entry["T1"] = T1s[this_metagroup_ind]
-                this_metagroup_entry["T2"] = T2s[this_metagroup_ind]
-
-                # and add the group to the dict
-                self[this_metagroup_name] = this_metagroup_entry
+            # and add the group to the dict
+            self[this_metagroup_name] = this_metagroup_entry
 
     def _write_header_file(self):
         """Interesting method here... It generates a python .py and writes very usefull aliases to access quickly to a specific metabolite or parameter. Since metabolite indexes depend on the metabolite database, this python header file is regenerated each time the metabolite basis set is initialized."""
@@ -2970,19 +3023,31 @@ class metabolite_basis_set(dict):
                         print(("%.1f" % this_meta_entry["J"][irowJ][icolJ]).ljust(cell_nchar), end="")
                     print("", flush=True)
 
-    def initialize(self):
-        """Initialize metabolite database: run the two previous methods."""
-        log.info("initializing metabolite database...")
-        self.clear()
-        self._read_xls_file()
-        self._write_header_file()
+    def to_dataframe(self, include_obj=False, prefix_str="metabolite_basisset_"):
+        """
+        Convert the object's attributes to dataframe. Can include the object itself.
 
-        # single proton AMARES style?
-        if(self.one_proton_mode):
-            for m in list(self.keys()):
-                for sm in list(self[m]["metabolites"].keys()):
-                    self[m]["metabolites"][sm]["ppm"] = np.array([self[m]["metabolites"][sm]["ppm"][0]])
-                    self[m]["metabolites"][sm]["iso"] = np.array([self[m]["metabolites"][sm]["iso"][0]])
-                    self[m]["metabolites"][sm]["J"] = np.array([[self[m]["metabolites"][sm]["J"][0][0]]])
+        Parameters
+        ----------
+        include_obj : boolean
+            Include self to the dataframe row
+        prefix_str : string
+            Prefix string to add to column names
 
-        self._ready = True
+        Returns
+        -------
+        df : Dataframe
+            Containing the attributes as columns (a single row)
+        """
+        log.debug("converting to dataframe...")
+
+        # get all attributes but remove the private ones
+        df = pd.DataFrame.from_dict([vars(self)])
+        df = df.filter(regex=("^(?!_).*"))
+
+        if(include_obj):
+            df["obj"] = self.copy()
+
+        df = df.add_prefix(prefix_str)
+
+        return(df)

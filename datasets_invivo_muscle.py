@@ -8,7 +8,6 @@ A user script used to store calls for the reconstruction of in vivo data.
 # %% init
 from IPython import get_ipython
 import matplotlib.pylab as plt
-import mrs.aliases as xxx
 import mrs.reco as reco
 import mrs.db as db
 import mrs.log as log
@@ -771,24 +770,24 @@ index_to_process = 178
 
 p.job_list = [  p.job["phasing"],
                 p.job["scaling"],
-                p.job["channel-combining"],
-                p.job["noise-estimation"],
-                p.job["zero-filling"],
+                p.job["channel_combining"],
+                p.job["noise_estimation"],
+                p.job["zero_filling"],
                 p.job["apodizing"],
-                #p.job["data-rejecting"],
-                #p.job["data-rejecting"],
+                #p.job["data_rejecting"],
+                #p.job["data_rejecting"],
                 #p.job["realigning"],
                 p.job["averaging"],
                 p.job["cropping"],
-                #p.job["water-removal"],
+                #p.job["water_removal"],
                 p.job["calibrating"],
                 #p.job["phasing (suspect)"],
                 p.job["displaying"]
                 ]
 
 p.analyze_enable = True
-p.analyze_job_list = [  p.job["channel-combining"],
-                        p.job["zero-filling"],
+p.analyze_job_list = [  p.job["channel_combining"],
+                        p.job["zero_filling"],
                         #p.job["realigning"],
                         p.job["averaging"],
                         p.job["calibrating"]
@@ -802,21 +801,21 @@ p.job["phasing"]["first_point_fid_mode"] = False
 p.job["phasing"]["using_ref_data"] = False
 p.job["phasing"]["display"] = False
 
-p.job["channel-combining"]["phasing"] = True
-p.job["channel-combining"]["using_ref_data"] = True
+p.job["channel_combining"]["phasing"] = True
+p.job["channel_combining"]["using_ref_data"] = True
 
 # reject bad data
-p.job["data-rejecting"]["moving_averages"] = 1
-p.job["data-rejecting"]["POI_range_ppm"] = [4, 5.2]
+p.job["data_rejecting"]["moving_averages"] = 1
+p.job["data_rejecting"]["POI_range_ppm"] = [4, 5.2]
 # rejection ranges
-#p.job["data-rejecting"]["ranges"]["amplitude (%)"] = 50  # do not reject on amplitude changes
-p.job["data-rejecting"]["ranges"]["linewidth (Hz)"] = [-1, 80]  # max linewidth acceptable
-p.job["data-rejecting"]["ranges"]["chemical shift (ppm)"] = 0.5  # +/- ppm
-#p.job["data-rejecting"]["ranges"]["phase std. factor (%)"] = 60.0  # stan's phase +/- 60% of std criteria (see doi:10.1002/jmri.26802)
+#p.job["data_rejecting"]["ranges"]["amplitude (%)"] = 50  # do not reject on amplitude changes
+p.job["data_rejecting"]["ranges"]["linewidth (Hz)"] = [-1, 80]  # max linewidth acceptable
+p.job["data_rejecting"]["ranges"]["chemical shift (ppm)"] = 0.5  # +/- ppm
+#p.job["data_rejecting"]["ranges"]["phase std. factor (%)"] = 60.0  # stan's phase +/- 60% of std criteria (see doi:10.1002/jmri.26802)
 # auto rejection based on linewidth?
-p.job["data-rejecting"]["auto_method_list"] = [reco.data_rejection_method.AUTO_AMPLITUDE, reco.data_rejection_method.AUTO_LINEWIDTH, reco.data_rejection_method.AUTO_FREQUENCY, reco.data_rejection_method.AUTO_PHASE]
+p.job["data_rejecting"]["auto_method_list"] = [reco.data_rejection_method.AUTO_AMPLITUDE, reco.data_rejection_method.AUTO_LINEWIDTH, reco.data_rejection_method.AUTO_FREQUENCY, reco.data_rejection_method.AUTO_PHASE]
 # minimum allowed SNR change (%) when adjusting the linewidth criteria
-p.job["data-rejecting"]["auto_allowed_snr_change"] = 0.0
+p.job["data_rejecting"]["auto_allowed_snr_change"] = 0.0
 
 # frequency realignement
 p.job["realigning"]["POI_range_ppm"] = [4, 5.2]

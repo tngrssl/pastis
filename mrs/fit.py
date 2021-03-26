@@ -7,6 +7,8 @@ A fit_tool class that deals with the quantification of MRS data based on the sci
 """
 
 import numpy as np
+import pandas as pd
+import suspect
 from mrs import sim
 from mrs import log
 from mrs import aliases as xxx
@@ -14,8 +16,11 @@ import matplotlib.pylab as plt
 import scipy.optimize as optimize
 import matplotlib._color_data as mcd
 from enum import Enum
+import os
 import time
 import hashlib
+import copy
+from parse import parse
 
 import pdb
 
@@ -35,8 +40,8 @@ class fit_plot_type(Enum):
     TIME_DOMAIN = 7
 
 
-class fit_stategy():
-    """The fit_stategy class is to store a fitting stategy."""
+class fit_tool():
+    """The fit_tool class is a virtual class, mother of other classes used for fitting."""
 
     # frozen stuff: a technique to prevent creating new attributes
     # (https://stackoverflow.com/questions/3603502/prevent-creating-new-attributes-outside-init)
@@ -48,162 +53,455 @@ class fit_stategy():
             log.error_new_attribute(key)
         object.__setattr__(self, key, value)
 
-    def __init__(self, name, metabolites_list, params_linklock, seq):
-        """Construct a fit_stategy object.
+    def __init__(self, data=None):
+        """Construct a fit_tool object.
 
         Parameters
         ----------
-        name : dict
-            The fit strategy name
-        metabolites_list : dict
-            A list of metabolite indexes to include in this fit
-        params_linklock : sim.params
-            The linklock params vector to use for this fit
-        seq : sim.mrs_sequence class
-            The sequence class name to use for the metabolite basis set signals
+        data : MRSData2 objet
+            Data to fit
         """
-        # a few attributes
-        self.name = name
-        self.metabolites = metabolites_list
-        self.linklock = params_linklock
-        self.sequence = seq
+        # name of the fit (fit approach for example)
+        self.name = "fit"
+        # data signal to process
+        self.data = data
+
+    def copy(self):
+        """Copy method."""
+        obj = copy.copy(self)
+        if(self.data is not None):
+            obj.data = self.data.copy()
+
+        return(obj)
+
+
+class fit_lcmodel(fit_tool):
+    """The fit_lcmodel class is used to fit acquired MRS data using the blackbox now opensource old FORTRAN LCModel reference algorithm which has been used for the past 30 years."""
+
+    def __init__(self, data=None, meta_bs=None):
+        """
+        Construct a fit_lcmodel object.
+
+        Parameters
+        ----------
+        data : MRSData2 objet
+            Data to fit
+        meta_bs : sim.metabolite_basis_set object
+            Metabolite db to use to fit. If None, use meta_bs from sequence. If sequence is None, use default meta_bs.
+        """
+        super().__init__(data)
+
+        # some LCModel parameters
+        self.lcmodel_executable_fullpath = "/home/tangir/crmbm/soft/lcmodel/lcm-64/bin/lcmodel"
+        self.lcmodel_rawfile_fullpath = "/home/tangir/crmbm/soft/lcmodel/data/data.raw"
+        self.lcmodel_filbas = "/home/tangir/crmbm/soft/lcmodel/metabolite_basis_sets/7t/gamma_press_te{}_7t_v1.basis"
+        self.lcmodel_lcsv = True
+
+        # data
+        self.data = data
+
+        # default metabolite basis set used for simulation
+        if(meta_bs is not None):
+            self.meta_bs = meta_bs
+        else:
+            self.meta_bs = sim.metabolite_basis_set()
+
+        # display stuff
+        self.display_enable = True
+        self.display_pdf_software = "evince"
+
+        # final results parameters
+        self.params_fit = None
 
         # freeze
         self.__isfrozen = True
 
-    def hashit(self, scan_hash=None):
-        """
-        Generate a hash of this strategy.
+    def copy(self):
+        """Copy method."""
+        obj = super().copy()
 
-        Parameters
-        ----------
-        data_hash : string
-            A scan md5 hash
+        return(obj)
+
+    def _adjust_filbas(self):
+        """Adjust the metabolite basis set according to te."""
+        log.info("adjusting metabolite basis set TE...")
+
+        # hold debugs logs during parse
+        old_log_level = log.getLevel()
+        log.setLevel(log.INFO)
+
+        # scan basis set files
+        metabs_folder = "/".join(self.lcmodel_filbas.split("/")[0:-1])
+        metabs_filename_mask = self.lcmodel_filbas.split("/")[-1]
+        metabs_files_dict = {}
+        for _, _, metabs_files in os.walk(metabs_folder):
+            for this_metabs_filename in metabs_files:
+                parse_res = parse(metabs_filename_mask, this_metabs_filename)
+                if(parse_res is not None):
+                    this_metabs_te = parse_res[0]
+                    metabs_files_dict[this_metabs_te] = metabs_folder + "/" + this_metabs_filename
+
+        # put back log
+        log.setLevel(old_log_level)
+
+        # find metabs with a TE close to the data's TE
+        metabs_te_arr = np.array(list(metabs_files_dict.keys())).astype(float)
+        te_diff = np.abs(metabs_te_arr - self.data.te)
+        ite_mindiff = np.argmin(te_diff)
+        optim_te = list(metabs_files_dict.keys())[ite_mindiff]
+
+        # change metabolite basis set file
+        self.lcmodel_filbas = metabs_files_dict[optim_te]
+        log.debug("found that it is better to use the TE=%sms metabolite basis set file!" % optim_te)
+
+    def run(self):
+        """Call LCModel using suspect (https://suspect.readthedocs.io/en/latest/notebooks/tut04_quant.html)."""
+        log.info("running LCModel fit...")
+
+        # check that we have everything we need
+        if(self.data is None):
+            log.error("canceling fit, no data was given to this fit object!")
+
+        # adjust metabolite basis set file
+        self._adjust_filbas()
+
+        # create a parameters dictionary to set the basis set to use
+        params = {
+            "FILBAS": self.lcmodel_filbas,
+            "LCSV": self.lcmodel_lcsv
+        }
+        # call suspect to prepare LCModel files
+        suspect.io.lcmodel.write_all_files(self.lcmodel_rawfile_fullpath, self.data, params=params)
+
+        # guess CONTROL file name
+        fullpath_noext, ext = os.path.splitext(self.lcmodel_rawfile_fullpath)
+        controlfile_fullpath = fullpath_noext + "_sl0.CONTROL"
+
+        # LCModel is now free, replace KEY by 210387309
+        with open(controlfile_fullpath) as f:
+            controlfile_data = f.read().replace('KEY = 123456789', 'KEY = 210387309')
+
+        with open(controlfile_fullpath, "w") as f:
+            f.write(controlfile_data)
+
+        # make system call to LCModel
+        system_res = os.system(self.lcmodel_executable_fullpath + "<" + controlfile_fullpath)
+        log.debug("LCmodel binary system call returned " + str(system_res))
+
+        log.debug("extracting LCmodel results from CSV...")
+        csvfile_fullpath = fullpath_noext + ".CSV"
+        df = pd.read_csv(csvfile_fullpath)
+
+        # build params vector from this dataframe
+        self.params_fit = sim.params(self.meta_bs)
+        meta_names = self.params_fit.get_meta_names()
+        meta_names_lcmodel = self.params_fit.get_meta_names(True)
+
+        # make everything lowercase
+        meta_names = [m.lower() for m in meta_names]
+        meta_names_lcmodel = [m.lower() if (m is not None) else None for m in meta_names_lcmodel]
+        df.columns = df.columns.str.strip()
+        df.columns = df.columns.str.lower()
+
+        for im, (m, mlc) in enumerate(zip(meta_names, meta_names_lcmodel)):
+            if(mlc is None):
+                # concentration
+                self.params_fit[im, xxx.p_cm] = 0.0
+            else:
+                # concentration
+                self.params_fit[im, xxx.p_cm] = df[mlc].iloc[0]
+                # abs CRB error
+                self.params_fit._errors[im, xxx.p_cm] = df[mlc].iloc[0] * df[mlc + " %sd"].iloc[0] / 100
+
+        # display if needed
+        if(self.display_enable):
+            log.debug("displaying LCModel results...")
+            psfile_fullpath = fullpath_noext + ".PS"
+            pdffile_fullpath = fullpath_noext + ".pdf"
+            os.system("ps2pdf " + psfile_fullpath + " " + pdffile_fullpath)
+            os.system(self.display_pdf_software + " " + pdffile_fullpath + " &")
+
+    def get_hash(self):
+        """
+        Generate a hash of this fit object.
 
         Returns
         -------
         h : string
             Hash code of this strategy. Usefull later when dealing with databases...
         """
-        if(scan_hash is None):
-            h = hashlib.md5(self.metabolites.tobytes() + self.linklock.tobytes() + str(self.sequence).encode())
-        else:
-            h = hashlib.md5(scan_hash.encode() + self.metabolites.tobytes() + self.linklock.tobytes() + str(self.sequence).encode())
+        bytes_to_hash = "lcmodel".encode()
+
+        h = hashlib.md5(bytes_to_hash)
 
         return(h.hexdigest())
 
-
-class prefit_tool:
-    """The prefit_tool class is used to perfom area integration of peaks in the spectrum."""
-
-    # frozen stuff: a technique to prevent creating new attributes
-    # (https://stackoverflow.com/questions/3603502/prevent-creating-new-attributes-outside-init)
-    __isfrozen = False
-
-    def __setattr__(self, key, value):
-        """Overload of __setattr__ method to check that we are not creating a new attribute."""
-        if self.__isfrozen and not hasattr(self, key):
-            log.error_new_attribute(key)
-        object.__setattr__(self, key, value)
-
-    def __init__(self, data, seq=None):
+    def to_dataframe(self, prefix_str="fit_"):
         """
-        Construct a prefit_tool object.
+        Convert the object's attributes to dataframe. Can include the object itself.
 
         Parameters
         ----------
-        data : MRSData2 numpy array [timepoints]
-            MRS data to fit stored in a MRSData2 object
-        seq : mrs_sequence object
-            Sequence used for the acquisition of the data. By default, the sequence used to acquire the data.
+        prefix_str : string
+            Prefix string to add to column names
+
+        Returns
+        -------
+        df : Dataframe
+            With all the datasets and parameters from this fit object
         """
-        # data signal to process
-        self.data = data
+        log.debug("converting to dataframe...")
 
-        # sequence used to acquire and therefore to modelize the signal
-        if(seq is None):
-            self._seq = self.data.sequence
+        # use pandas json_normalize function to flatten all nested stuff (magic!)
+        # this takes care of the job attribute too
+        df_attr = pd.json_normalize(vars(self), sep='_')
+
+        # and need a specific call for the MRSData2 data
+        df_data = self.data.to_dataframe(True, "data_")
+        del df_attr["data"]
+
+        # append columns
+        df = pd.concat([df_attr.reset_index(),
+                        df_data.reset_index()], axis=1)
+
+        # add fit hash
+        df["fit_hash"] = self.get_hash()
+
+        # remove index column
+        df = df.reset_index()
+        del df["index"]
+
+        # add prefix
+        df = df.add_prefix(prefix_str)
+
+        return(df)
+
+
+class fit_pastis(fit_tool):
+    """The fit_pastis class is used to fit acquired MRS data using a linear combination algorithm based on QUEST, see Ratiney et al. NMR Biomed, 2005."""
+
+    def __init__(self, data=None, sequence=None, meta_bs=None):
+        """
+        Construct a fit_pastis object.
+
+        Parameters
+        ----------
+        data : MRSData2 objet
+            Data to fit
+        sequence : sim.mrs_sequence object
+            Sequence to use to fit. If None, use sequence from data
+        meta_bs : sim.metabolite_basis_set object
+            Metabolite db to use to fit. If None, use meta_bs from sequence. If sequence is None, use default meta_bs.
+        """
+        super().__init__(data)
+
+        # default sequence used for simulation (if none, will take sequence from data)
+        self.sequence = sequence
+
+        # default metabolite basis set used for simulation (if none, will take sequence from data)
+        if(meta_bs is not None):
+            self.meta_bs = meta_bs
         else:
-            self._seq = seq
+            if(self.sequence is not None):
+                if(self.sequence.meta_bs is not None):
+                    self.meta_bs = self.sequence.meta_bs
+                else:
+                    # default meta_bs
+                    self.meta_bs = sim.metabolite_basis_set()
+            else:
+                # default meta_bs
+                self.meta_bs = sim.metabolite_basis_set()
 
-        # initialize the sequence now if needed
-        if(not self.seq.ready):
-            self.seq.initialize()
+        # list of metabolites to fit
+        self.metabolites = None
+        # list of metabolites to integrate
+        self.metabolites_area_integration = [xxx.m_Water]
 
-        # metabolite db
-        self._meta_bs = self.seq.meta_bs
+        # --- defaut lower bound parameters ---
+        self.params_min = sim.params(self.meta_bs)
+        self.params_min.set_default_min()
+        self.params_min[xxx.m_All_MBs, xxx.p_dd] = 5.0
+        self.params_min[xxx.m_All_MBs, xxx.p_df] = -10.0
+        self.params_min[xxx.m_All_MBs, xxx.p_dp] = -np.pi / 4.0
 
-        # metabolites to integrate
-        self.area_integration_peaks = [xxx.m_Water]
+        # --- default upper boud parameters ---
+        self.params_max = sim.params(self.meta_bs)
+        self.params_max.set_default_max()
+        self.params_max[xxx.m_All_MBs, xxx.p_dd] = 50.0
+        self.params_max[xxx.m_All_MBs, xxx.p_df] = +10.0
+        self.params_max[xxx.m_All_MBs, xxx.p_dp] = +np.pi / 4.0
+
+        # --- default initial parameters ---
+        self.params_init = (self.params_min + self.params_max) / 2.0
+        # with early minimal concentrations
+        self.params_init[xxx.m_All_MBs, xxx.p_cm] = self.params_min[xxx.m_All_MBs, xxx.p_cm] * 1.1
+        # with early minimal damping
+        self.params_init[xxx.m_All_MBs, xxx.p_dd] = self.params_min[xxx.m_All_MBs, xxx.p_dd] * 1.1
+
+        # linklock array
+        self.params_linklock = self.params_init._linklock.copy()
+        self._set_unique_linklock()
+
+        # --- final results parameters ---
+        self.params_fit = None
+        self.params_area = None
+        self.params_area_pnorm = None
+        self.optim_results = None
+
+        # private option to know if we are dealing with a water fit
+        self._water_only = False
+
+        # --- optimization options ---
+        # should we use jacobin information during the fit or not?
+        self.optim_jacobian = True
+        # ppm range (By default, use metabolite_basis_set ppm range)
+        self.optim_ppm_range = self.meta_bs.ppm_range
+        # stop fit if parameter changes go below this tolerance
+        self.optim_xtol = 1e-9
+        # stop fit if (error?) function changes go below this tolerance
+        self.optim_ftol = 1e-9
+        # stop fit if gradient (?) changes go below this tolerance
+        self.optim_gtol = 1e-9
+        # least squares optimization method (check spicy.optimize.least_squares doc)
+        self.optim_method = 'trf'
+        # count number of calls to error function
+        self._model_call_count = 0
+        # record cost function
+        self._cost_function = []
+        # time
+        self._fit_time = None
+        # FQN noise region
+        self.fqn_noise_range = [-2, -1]
+
+        # --- display options ---
+        self.display_enable = True
+        # figure index
+        self.display_fig_index = 2000
+        # ppm range
+        self.display_range_ppm = [1, 6]  # ppm
+        # display every n calls to error function
+        self.display_frequency = 20
+        # describes the type of plots showed in the 4 subplots during the fit
+        self.display_subplots_types = [fit_plot_type.BARGRAPH_CM, fit_plot_type.BARGRAPH_DD, fit_plot_type.BARGRAPH_DF, fit_plot_type.CORR_MATRIX]
+
+        # --- display options ---
+        # should we show the CRBs error bars during the fit?
+        self.display_CRBs = True
+
+        # --- peak area integration options ---
         # ppm range to look for peak maximum
         self.area_integration_peak_ranges = [0.4]  # ppm
-        # internal parameters
-        self._peak_names = []
-        self._peak_ppms = []
-        self._peak_nprots = []
-        self._peak_base_width = []
-        self._peak_areas = []
-        self._peak_areas_norm = []
-
-        # display options
-        self.display_enable = True
-        self.display_fig_index = 1000
-        self.display_range_ppm = [0, 6]  # ppm
-
-        # to know if the object is initialized
-        self._ready = False
 
         # freeze
         self.__isfrozen = True
 
-    @property
-    def ready(self):
-        """
-        Property get function for _ready.
+    def copy(self):
+        """Copy method."""
+        obj = super().copy()
 
-        Returns
-        -------
-        self._ready : bool
-            to tell if the object if initialized or not
-        """
-        return(self._ready)
+        if(self.sequence is not None):
+            if(isinstance(self.sequence, sim.mrs_sequence)):
+                obj.sequence = self.sequence.copy()
+            else:
+                obj.sequence = self.sequence
 
-    @property
-    def seq(self):
-        """
-        Property get function for _seq.
+        if(self.metabolites is not None):
+            obj.metabolites = self.metabolites.copy()
 
-        Returns
-        -------
-        self._seq : mrs_sequence object
-            Sequence used for the acquisition of the data
-        """
-        return(self._seq)
+        if(self.params_linklock is not None):
+            obj.linklock = self.params_linklock.copy()
 
-    @property
-    def meta_bs(self):
-        """
-        Property get function for meta_bs.
+        # --- fit init/min/max vectors ---
+        if(self.params_min is not None):
+            obj.params_min = self.params_min.copy()
 
-        Returns
-        -------
-        self._meta_bs : metabolite_basis_set() object
-            Metabolite database to use for simulation
-        """
-        return(self._meta_bs)
+        if(self.params_max is not None):
+            obj.params_max = self.params_max.copy()
 
-    def initialize(self):
-        """Initialize the prefit procedure."""
-        log.info("initializing...")
+        if(self.params_init is not None):
+            obj.params_init = self.params_init.copy()
 
-        # clear all
+        # --- fit results vectors ---
+        if(self.params_fit is not None):
+            obj.params_fit = self.params_fit.copy()
+
+        if(self.params_area is not None):
+            obj.params_area = self.params_area.copy()
+
+        if(self.params_area_pnorm is not None):
+            obj.params_area_pnorm = self.params_area_pnorm.copy()
+
+        # --- optimization options vectors ---
+        if(self.optim_results is not None):
+            obj.optim_results = self.optim_results.copy()
+
+        if(self.optim_ppm_range is not None):
+            obj.optim_ppm_range = self.optim_ppm_range.copy()
+
+        # --- reinit internal paramters for fit ---
+        # count number of calls to error function
+        obj._model_call_count = 0
+        # record cost function
+        obj._cost_function = []
+        # time
+        obj._fit_time = None
+
+        # --- fqn and display options ---
+        if(self.fqn_noise_range is not None):
+            obj.fqn_noise_range = self.fqn_noise_range.copy()
+
+        if(self.display_range_ppm is not None):
+            obj.display_range_ppm = self.display_range_ppm.copy()
+
+        if(self.display_subplots_types is not None):
+            obj.display_subplots_types = self.display_subplots_types.copy()
+
+        # --- peak area integration stuff ---
+        if(self.metabolites_area_integration is not None):
+            obj.metabolites_area_integration = self.metabolites_area_integration.copy()
+
+        if(self.area_integration_peak_ranges is not None):
+            obj.area_integration_peak_ranges = self.area_integration_peak_ranges.copy()
+
+        # reinit internal parameters for peak area integration
         self._peak_names = []
         self._peak_ppms = []
         self._peak_nprots = []
+        self._peak_areas = []
+        self._peak_areas_norm = []
+
+        return(obj)
+
+    def _set_unique_linklock(self):
+        """Link the params_min, _max and _init linlock vectors using a reference/pointer."""
+        # link-lock vectors should be the same for initial, minimum and maximum parameter sets: link them here
+        self.params_init._linklock = self.params_linklock
+        self.params_min._linklock = self.params_linklock
+        self.params_max._linklock = self.params_linklock
+
+    def _run_area_integration(self):
+        """
+        Run the area integration pipeline.
+
+        Returns
+        -------
+        pars : params object
+            Estimated relative metabolic concentration using area integration
+        pars_norm : params object
+            Estimated relative metabolic concentration using area integration, normalized by proton number
+        """
+        log.info("initializing peak area integration...")
+
+        # clear internal parameters
+        self._peak_names = []
+        self._peak_ppms = []
+        self._peak_nprots = []
+        self._peak_areas = []
+        self._peak_areas_norm = []
 
         # first find chemical shifts for those peaks
         meta_keys = list(self.meta_bs.keys())
-        integration_metagroup_keys = [meta_keys[ind] for ind in self.area_integration_peaks]
+        integration_metagroup_keys = [meta_keys[ind] for ind in self.metabolites_area_integration]
         for this_metagroup_key in integration_metagroup_keys:
             meta_found_singulet = None
             for this_meta in list(self.meta_bs[this_metagroup_key]["metabolites"].items()):
@@ -225,27 +523,7 @@ class prefit_tool:
                 self._peak_ppms.append(this_meta_ppm)
                 self._peak_nprots.append(this_meta_nprots)
 
-        # I am ready now
-        self._ready = True
-
-    def run(self):
-        """
-        Run the area integration pipeline.
-
-        Returns
-        -------
-        pars : params object
-            Estimated relative metabolic concentration using area integration
-        pars_norm : params object
-            Estimated relative metabolic concentration using area integration, normalized by proton number
-        """
-        log.info_line________________________()
-        log.info("running peak integration...")
-        log.info_line________________________()
-
-        # ready or not, here I come
-        if(not self.ready):
-            log.error("this prefit_tool object was not initialized!")
+        log.info("running peak area integration...")
 
         # init
         s = self.data.copy()
@@ -274,7 +552,7 @@ class prefit_tool:
 
         log.info("integrating peak for...")
         log.info_line________________________()
-        for (this_peak_index, this_peak_range, this_peak_name, this_peak_ppm, this_peak_np) in zip(self.area_integration_peaks, self.area_integration_peak_ranges, self._peak_names, self._peak_ppms, self._peak_nprots):
+        for (this_peak_index, this_peak_range, this_peak_name, this_peak_ppm, this_peak_np) in zip(self.metabolites_area_integration, self.area_integration_peak_ranges, self._peak_names, self._peak_ppms, self._peak_nprots):
             log.info("[%s] theoretically at %.2fppm in theory" % (this_peak_name, this_peak_ppm))
 
             # first find closest peak in range
@@ -325,155 +603,137 @@ class prefit_tool:
         # return a param vectors
         return(pars, pars_pnorm)
 
-
-class fit_tool:
-    """The fit_tool class is used to adjust the MRS model implemented in the mrs.sim.metabolite_database class on some experimentally acquired data."""
-
-    # frozen stuff: a technique to prevent creating new attributes
-    # (https://stackoverflow.com/questions/3603502/prevent-creating-new-attributes-outside-init)
-    __isfrozen = False
-
-    def __setattr__(self, key, value):
-        """Overload of __setattr__ method to check that we are not creating a new attribute."""
-        if self.__isfrozen and not hasattr(self, key):
-            log.error_new_attribute(key)
-        object.__setattr__(self, key, value)
-
-    def __init__(self, data, seq=None):
+    def _run_linear_combination(self):
         """
-        Construct a prefit_tool object.
+        Run the linear combination fit.
 
-        Parameters
-        ----------
-        data : MRSData2 numpy array [timepoints]
-            MRS data to fit stored in a MRSData2 object
-        seq : mrs_sequence object
-            Sequence used for the acquisition of the data. By default, the sequence used to acquire the data.
+        Returns
+        -------
+        params_fit : params object
+            Estimated metabolic parameters using the fitting algorithm
+        optim_result : 'OptimizeResult' object returned by scipy.optimize.least_squares
+            Numerical optimization parameters, includes the R^2 coefficients [rsq_t and rsq_f] and the FQN coefficient [fqn]
         """
-        # data signal to process
-        self.data = data
+        # ckeck consistency lower<>init<>upper bounds
+        log.info("checking consistency with parameter bounds...")
+        for ll in range(self.params_init.shape[0]):
+            for c in range(self.params_init.shape[1]):
+                # min vs max
+                if(self.params_min[ll, c] >= self.params_max[ll, c] and self.params_init.linklock[ll, c] != 1):
+                    log.error(" One lower bound (%f) is equal/greater than a upper bound (%f) for [%s] at index (%d,%d)!" % (self.params_min[ll, c], self.params_max[ll, c], self.params_init.get_meta_names()[ll], ll, c))
+                # min vs init
+                if(self.params_min[ll, c] >= self.params_init[ll, c] and self.params_init.linklock[ll, c] != 1):
+                    log.error(" One initial value (%f) is equal/lower than the lower bound value (%f) for [%s] at index (%d,%d)!" % (self.params_init[ll, c], self.params_min[ll, c], self.params_init.get_meta_names()[ll], ll, c))
+                # max vs init
+                if(self.params_max[ll, c] <= self.params_init[ll, c] and self.params_init.linklock[ll, c] != 1):
+                    log.error(" One initial value (%f) is equal/greater than the upper bound value (%f) for [%s] at index (%d,%d)!" % (self.params_init[ll, c], self.params_max[ll, c], self.params_init.get_meta_names()[ll], ll, c))
 
-        # sequence used to acquire and therefore to modelize the signal
-        if(seq is None):
-            self._seq = self.data.sequence
+        # checking if LL is not broken
+        if(not self.params_init.check()):
+            log.error("the link-lock vector looks broken!")
+
+        # checking if we are dealing with a reference scan fit (water only)
+        where_LL = np.where(self.params_init.linklock[:, 0] == 0)
+        self._water_only = (len(where_LL[0]) == 1 and where_LL[0][0] == xxx.m_Water)
+        if(self._water_only):
+            log.info("mmmh, looks like you are fitting a water reference scan!")
+
+        log.info("running fit...")
+        # dummy full>free>full>free conversion to apply master/slave rules
+        params_free = self.params_init.toFreeParams()
+        params_full = self.params_init.toFullParams(params_free)
+        params_free = params_full.toFreeParams()
+
+        params_free = self.params_init.toFreeParams()
+        params_min_free = self.params_min.toFreeParams()
+        params_max_free = self.params_max.toFreeParams()
+        self._model_call_count = 0
+
+        # 3, 2, 1
+        self._fit_time = time.time()
+        self._model_call_count = 0
+        self._cost_function = []
+
+        # run it
+        log.info("calling least-square optimizer...")
+        if(self.optim_jacobian):
+            optim_result = optimize.least_squares(self._minimizeThis, params_free, bounds=(params_min_free, params_max_free), jac=self._jac, xtol=self.optim_xtol, gtol=self.optim_gtol, ftol=self.optim_ftol, method=self.optim_method)
         else:
-            self._seq = seq
+            optim_result = optimize.least_squares(self._minimizeThis, params_free, bounds=(params_min_free, params_max_free), xtol=self.optim_xtol, gtol=self.optim_gtol, ftol=self.optim_ftol)
 
-        # initialize the sequence now if needed
-        if(not self.seq.ready):
-            self.seq.initialize()
+        # nth final display
+        self._minimizeThis(optim_result.x, True)
+        self._fit_time = time.time() - self._fit_time
 
-        # metabolite db
-        self._meta_bs = self.seq.meta_bs
+        # results
+        log.info("optimization terminated!")
+        # final pars
+        params_fit = self.params_init.copy()
+        params_fit = params_fit.toFullParams(optim_result.x)
+        # final CRBs
+        params_CRBs_abs = self.get_CRBs(params_fit)
+        params_fit._errors = params_CRBs_abs
+        # final corr mat
+        corr_mat, _ = self.get_corr_mat(params_fit)
+        params_fit._corr_mat = corr_mat
 
-        # --- defaut lower bound parameters ---
-        self.params_min = sim.params(self.meta_bs)
-        self.params_min.set_default_min()
-        self.params_min[xxx.m_All_MBs, xxx.p_dd] = 5.0
-        self.params_min[xxx.m_All_MBs, xxx.p_df] = -10.0
-        self.params_min[xxx.m_All_MBs, xxx.p_dp] = -np.pi / 4.0
+        # add fit criteria to optim_result
+        rsq_t, rsq_f = self.get_Rsq(params_fit)
+        optim_result.rsq_t = rsq_t
+        optim_result.rsq_f = rsq_f
+        optim_result.fqn = self.get_FQN(params_fit)
 
-        # --- default upper boud parameters ---
-        self.params_max = sim.params(self.meta_bs)
-        self.params_max.set_default_max()
-        self.params_max[xxx.m_All_MBs, xxx.p_dd] = 50.0
-        self.params_max[xxx.m_All_MBs, xxx.p_df] = +10.0
-        self.params_max[xxx.m_All_MBs, xxx.p_dp] = +np.pi / 4.0
+        return(params_fit, optim_result)
 
-        # --- default initial parameters ---
-        self.params_init = (self.params_min + self.params_max) / 2.0
-        # with early minimal concentrations
-        self.params_init[xxx.m_All_MBs, xxx.p_cm] = self.params_min[xxx.m_All_MBs, xxx.p_cm] * 1.1
-        # with early minimal damping
-        self.params_init[xxx.m_All_MBs, xxx.p_dd] = self.params_min[xxx.m_All_MBs, xxx.p_dd] * 1.1
+    def run(self):
+        """Run the peak area integration followed by the linear combination fit."""
+        log.info("initializing...")
 
+        # check that we have everything we need
+        if(self.data is None):
+            log.error("canceling fit, no data was given to this fit object!")
+
+        if(self.metabolites is None):
+            log.error("canceling fit, the list of metabolites to fit was not specified!")
+
+        # sequence
+        if(self.sequence is None):
+            self.sequence = self.data.sequence
+        else:
+            self.sequence = self.sequence(self.data.sequence.te,
+                                          self.data.sequence.tr,
+                                          self.data.sequence.na,
+                                          self.data.sequence.ds,
+                                          self.data.sequence.nuclei,
+                                          self.data.sequence.npts,
+                                          self.data.sequence.voxel_size,
+                                          self.data.sequence.fs,
+                                          self.data.sequence.f0)
+
+        # do we need to adapt our ppm range?
+        if(self.optim_ppm_range != self.meta_bs.ppm_range):
+            # we need to reinitialize the metabolite basis set
+            self.meta_bs.ppm_range = self.optim_ppm_range
+            # force reinit of sequence
+            self.sequence._ready = False
+
+        # initialize sequence if needed
+        if(not self.sequence.ready):
+            self.sequence.initialize(self.meta_bs)
+
+        # reset linklock
         self._set_unique_linklock()
 
-        # private option to know if we are dealing with a water fit
-        self._water_only = False
+        # run
+        pars_area, pars_area_pnorm = self._run_area_integration()
+        params_fit, optim_result = self._run_linear_combination()
 
-        # --- optimization options ---
-        # should we use jacobin information during the fit or not?
-        self.optim_jacobian = True
-        # ppm range (By default, use metabolite_basis_set ppm range)
-        self.optim_ppm_range = self.seq.meta_bs.ppm_range
-        # stop fit if parameter changes go below this tolerance
-        self.optim_xtol = 1e-9
-        # stop fit if (error?) function changes go below this tolerance
-        self.optim_ftol = 1e-9
-        # stop fit if gradient (?) changes go below this tolerance
-        self.optim_gtol = 1e-9
-        # count number of calls to error function
-        self._model_call_count = 0
-        # record cost function
-        self._cost_function = []
-        # time
-        self._fit_time = None
-        # FQN noise region
-        self.fqn_noise_range = [-2, -1]
-
-        # --- display options ---
-        self.display_enable = True
-        # figure index
-        self.display_fig_index = 2000
-        # ppm range
-        self.display_range_ppm = [1, 6]  # ppm
-        # display every n calls to error function
-        self.display_frequency = 20
-        # describes the type of plots showed in the 4 subplots during the fit
-        self.display_subplots_types = [fit_plot_type.BARGRAPH_CM, fit_plot_type.BARGRAPH_DD, fit_plot_type.BARGRAPH_DF, fit_plot_type.CORR_MATRIX]
-
-        # --- display options ---
-        # should we show the CRBs error bars during the fit?
-        self.display_CRBs = True
-
-        # to know if the object is initialized
-        self._ready = False
-
-        # freeze
-        self.__isfrozen = True
-
-    def _set_unique_linklock(self):
-        """Link the params_min, _max and _init linlock vectors using a reference/pointer."""
-        # link-lock vectors should be the same for initial, minimum and maximum parameter sets: link them here
-        self.params_min._linklock = self.params_init.linklock
-        self.params_max._linklock = self.params_init.linklock
-
-    @property
-    def ready(self):
-        """
-        Property get function for _ready.
-
-        Returns
-        -------
-        self._ready : bool
-            to tell if the object if initialized or not
-        """
-        return(self._ready)
-
-    @property
-    def seq(self):
-        """
-        Property get function for _seq.
-
-        Returns
-        -------
-        self._seq : mrs_sequence object
-            Sequence used for the acquisition of the data
-        """
-        return(self._seq)
-
-    @property
-    def meta_bs(self):
-        """
-        Property get function for meta_bs.
-
-        Returns
-        -------
-        self._meta_bs : metabolite_basis_set() object
-            Metabolite database to use for simulation
-        """
-        return(self._meta_bs)
+        # store
+        log.info("saving fit results...")
+        self.params_fit = params_fit.copy()
+        self.params_area = pars_area.copy()
+        self.params_area_pnorm = pars_area_pnorm.copy()
+        self.optim_results = optim_result
 
     def _jac(self, params_free):
         """
@@ -494,7 +754,7 @@ class fit_tool:
         params = params.toFullParams(params_free)
 
         # calling jacobian model
-        j_full = self.seq._jac(params)
+        j_full = self.sequence._jac(params)
 
         # reducing it to free params
         j_free = j_full[params.linklock <= 0, :]
@@ -530,7 +790,7 @@ class fit_tool:
         params = params.toFullParams(params_free)
 
         # and boum the model
-        mod = self.seq._model(params)
+        mod = self.sequence._model(params)
         # and the difference with the data
         diff = mod - self.data
 
@@ -587,7 +847,7 @@ class fit_tool:
                     ax.grid('on')
 
             ax = plt.subplot(1, 2, 1)
-            disp_fit(ax, self.data, params, self.seq, True, True, None, self._water_only, self.display_range_ppm)
+            disp_fit(ax, self.data, params, self.sequence, True, True, None, self._water_only, self.display_range_ppm)
             current_fit_time = time.time() - self._fit_time
             if(fit_terminated):
                 ax.set_title("Fit terminated! %ds elapsed \n iteration #%d | residue = %.2E | R2 = %.2f/%.2f | FQN = %.2f" % (current_fit_time, self._model_call_count, current_err, rsq_t, rsq_f, fqn))
@@ -609,115 +869,20 @@ class fit_tool:
 
         return(diff_cmplx_odd_even)
 
-    def initialize(self):
-        """Initialize the fit procedure."""
-        log.info("initializing...")
-
-        # do we need to adapt our ppm range?
-        if(self.optim_ppm_range != self.seq.meta_bs.ppm_range):
-            # we need to reinitialize the metabolite basis set
-            self.seq.meta_bs.ppm_range = self.optim_ppm_range
-            self.seq.meta_bs.initialize()
-            # and rerun sequence !
-            self.seq.initialize()
-
-        # reset linklock
-        self._set_unique_linklock()
-
-        # ckeck consistency lower<>init<>upper bounds
-        log.info("checking consistency with parameter bounds...")
-        for l in range(self.params_init.shape[0]):
-            for c in range(self.params_init.shape[1]):
-                # min vs max
-                if(self.params_min[l, c] >= self.params_max[l, c] and self.params_init.linklock[l, c] != 1):
-                    log.error(" One lower bound (%f) is equal/greater than a upper bound (%f) for [%s] at index (%d,%d)!" % (self.params_min[l, c], self.params_max[l, c], self.params_init.get_meta_names()[l], l, c))
-                # min vs init
-                if(self.params_min[l, c] >= self.params_init[l, c] and self.params_init.linklock[l, c] != 1):
-                    log.error(" One initial value (%f) is equal/lower than the lower bound value (%f) for [%s] at index (%d,%d)!" % (self.params_init[l, c], self.params_min[l, c], self.params_init.get_meta_names()[l], l, c))
-                # max vs init
-                if(self.params_max[l, c] <= self.params_init[l, c] and self.params_init.linklock[l, c] != 1):
-                    log.error(" One initial value (%f) is equal/greater than the upper bound value (%f) for [%s] at index (%d,%d)!" % (self.params_init[l, c], self.params_max[l, c], self.params_init.get_meta_names()[l], l, c))
-
-        # checking if LL is not broken
-        if(not self.params_init.check()):
-            log.error("> the link-lock vector looks broken!")
-
-        # checking if we are dealing with a reference scan fit (water only)
-        where_LL = np.where(self.params_init.linklock[:, 0] == 0)
-        self._water_only = (len(where_LL[0]) == 1 and where_LL[0][0] == xxx.m_Water)
-        if(self._water_only):
-            log.info("mmmh, looks like you are fitting a water reference scan!")
-
-        # I am ready now
-        self._ready = True
-
-    def run(self):
+    def get_hash(self):
         """
-        Run the fit.
+        Generate a hash of this strategy.
 
         Returns
         -------
-        params_fit : params object
-            Estimated metabolic parameters using the fitting algorithm
-        optim_result : 'OptimizeResult' object returned by scipy.optimize.least_squares
-            Numerical optimization parameters, includes the R^2 coefficients [rsq_t and rsq_f] and the FQN coefficient [fqn]
+        h : string
+            Hash code of this strategy. Usefull later when dealing with databases...
         """
-        log.info_line________________________()
-        log.info("running fit...")
-        log.info_line________________________()
+        bytes_to_hash = self.metabolites.tobytes() + self.params_linklock.tobytes() + str(self.sequence).encode()
 
-        # ready or not, here I come
-        if(not self.ready):
-            log.error("> This fit_tool object was not initialized!")
+        h = hashlib.md5(bytes_to_hash)
 
-        # dummy full>free>full>free conversion to apply master/slave rules
-        params_free = self.params_init.toFreeParams()
-        params_full = self.params_init.toFullParams(params_free)
-        params_free = params_full.toFreeParams()
-
-        params_free = self.params_init.toFreeParams()
-        params_min_free = self.params_min.toFreeParams()
-        params_max_free = self.params_max.toFreeParams()
-        self._model_call_count = 0
-
-        # 3, 2, 1
-        self._fit_time = time.time()
-        self._model_call_count = 0
-        self._cost_function = []
-
-        # run it
-        log.info("calling least-square optimizer...")
-        if(self.optim_jacobian):
-            optim_result = optimize.least_squares(self._minimizeThis, params_free, bounds=(params_min_free, params_max_free), jac=self._jac, xtol=self.optim_xtol, gtol=self.optim_gtol, ftol=self.optim_ftol)
-        else:
-            optim_result = optimize.least_squares(self._minimizeThis, params_free, bounds=(params_min_free, params_max_free), xtol=self.optim_xtol, gtol=self.optim_gtol, ftol=self.optim_ftol)
-
-        # nth final display
-        self._minimizeThis(optim_result.x, True)
-        self._fit_time = time.time() - self._fit_time
-
-        # results
-        log.info("optimization terminated!")
-        # final pars
-        params_fit = self.params_init.copy()
-        params_fit = params_fit.toFullParams(optim_result.x)
-        # final CRBs
-        params_CRBs_abs = self.get_CRBs(params_fit)
-        params_fit._errors = params_CRBs_abs
-        # final corr mat
-        corr_mat, _ = self.get_corr_mat(params_fit)
-        params_fit._corr_mat = corr_mat
-
-        # add fit criteria to optim_result
-        rsq_t, rsq_f = self.get_Rsq(params_fit)
-        optim_result.rsq_t = rsq_t
-        optim_result.rsq_f = rsq_f
-        optim_result.fqn = self.get_FQN(params_fit)
-
-        # switch back to not ready
-        self._ready = False
-
-        return(params_fit, optim_result)
+        return(h.hexdigest())
 
     def get_CRBs(self, params):
         """
@@ -734,7 +899,7 @@ class fit_tool:
             Array of simulation parameters, absolute CRBs
         """
         # calling jacobian model
-        j_full = self.seq._jac(params)
+        j_full = self.sequence._jac(params)
 
         # reducing it to free params
         j_free = j_full[params.linklock <= 0, :]
@@ -788,7 +953,7 @@ class fit_tool:
             R^2 correlation coefficient between data and fit in FREQUENCY DOMAIN
         """
         # the model
-        mod = self.seq._model(params)
+        mod = self.sequence._model(params)
 
         # and the R coeff in TIME DOMAIN
         c = np.corrcoef(self.data, mod)
@@ -817,7 +982,7 @@ class fit_tool:
             FQN coefficient of the fit
         """
         # residue
-        mod = self.seq._model(params)
+        mod = self.sequence._model(params)
         diff = mod - self.data
 
         # our model is in TIME DOMAIN
@@ -860,7 +1025,7 @@ class fit_tool:
             Correlation matrix labels for plot output
         """
         # calling jacobian model
-        j_full = self.seq._jac(params)
+        j_full = self.sequence._jac(params)
 
         # probably do not want to look at the full matrix but only some metabolites/parameters
         mat_linklock_mIndex = np.full(params.linklock.shape, False, dtype=bool)
@@ -922,6 +1087,57 @@ class fit_tool:
         ax.set_yticklabels(corr_mat_lbls, fontsize=6)
         if(disp_color_bar):
             plt.colorbar(im)
+
+    def to_dataframe(self, prefix_str="fit_"):
+        """
+        Convert the object's attributes to dataframe. Can include the object itself.
+
+        Parameters
+        ----------
+        prefix_str : string
+            Prefix string to add to column names
+
+        Returns
+        -------
+        df : Dataframe
+            With all the datasets and parameters from this fit object
+        """
+        log.debug("converting to dataframe...")
+
+        # use pandas json_normalize function to flatten all nested stuff (magic!)
+        # this takes care of the job attribute too
+        df_attr = pd.json_normalize(vars(self), sep='_')
+
+        # and need a specific call for the MRSData2 data
+        df_data = self.data.to_dataframe(True, "data_")
+        del df_attr["data"]
+
+        # params objects
+        df_params_min = self.params_min.to_dataframe("params_min_")
+        df_params_max = self.params_max.to_dataframe("params_max_")
+        df_params_init = self.params_init.to_dataframe("params_init_")
+        del df_attr["params_min"]
+        del df_attr["params_max"]
+        del df_attr["params_init"]
+
+        # append columns
+        df = pd.concat([df_attr.reset_index(),
+                        df_data.reset_index(),
+                        df_params_min.reset_index(),
+                        df_params_max.reset_index(),
+                        df_params_init.reset_index()], axis=1)
+
+        # add fit hash
+        df["fit_hash"] = self.get_hash()
+
+        # remove index column
+        df = df.reset_index()
+        del df["index"]
+
+        # add prefix
+        df = df.add_prefix(prefix_str)
+
+        return(df)
 
 
 def disp_bargraph(ax, params_val_list, params_leg_list, colored_LLs=True, bMM=False, bWater=False, bFitMode=False, pIndex=xxx.p_cm, mIndex_list=None, width=0.3):

@@ -9,9 +9,7 @@ A user script used to store calls for the reconstruction of in vivo data.
 from IPython import get_ipython
 import matplotlib.pylab as plt
 import mrs.reco as reco
-import mrs.db as db
 import mrs.log as log
-import numpy as np
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -20,39 +18,44 @@ plt.rcParams['figure.dpi'] = 100
 plt.rcParams['figure.max_open_warning'] = 1000
 log.setLevel(log.DEBUG)
 
-rdb = db.data_db("/home/tangir/crmbm/acq_db/brain.pkl")
-
 # display stuff?
-display_stuff = False
+display_stuff = True
 
-# standard brain template
+# %% create standard brain template used here
 p = reco.pipeline()
 
 p.settings["POI_range_ppm"] = [1.8, 2.2]
-p.settings["POI_SNR_range_ppm"] = [1.8, 2.1]
-p.settings["POI_LW_range_ppm"] = [1.8, 2.2]
+p.settings["POI_shift_range_ppm"] = [1.8, 2.2]
+p.settings["POI_shift_true_ppm"] = 2.008
 p.settings["display"] = display_stuff
+p.settings["pkl_filepath"] = "/home/tangir/crmbm/acq_db/brain.pkl"
 
 p.job_list = [  p.job["phasing"],
                 p.job["scaling"],
                 # p.job["FID modulus"],
-                p.job["channel-combining"],
+                p.job["channel_combining"],
                 # p.job["concatenate"],
-                p.job["noise-estimation"],
-                p.job["zero-filling"],
-                # p.job["physio-analysis"],
-                p.job["apodizing"],
+                p.job["noise_estimation"],
+                p.job["zero_filling"],
+                # p.job["physio_analysis"],
+                # p.job["apodizing"],
                 p.job["realigning"],
-                p.job["data-rejecting"],
+                p.job["data_rejecting"],
                 p.job["averaging"],
                 p.job["calibrating"],
-                # p.job["water-removal"],
+                # p.job["water_removal"],
                 p.job["cropping"],
                 p.job["displaying"]
                 ]
 
 p.job["realigning"]["moving_averages"] = 2
-p.job["data-rejecting"]["moving_averages"] = 2
+p.job["data_rejecting"]["moving_averages"] = 2
+
+p.job["cropping"]["final_npts"] = 2048
+
+# SNR like LCModel...
+p.job["analyzing_snr"]["half_factor"] = True
+p.job["ref_data_analyzing_snr"]["half_factor"] = True
 
 p.save_template("brain_std_nows")
 
@@ -84,7 +87,7 @@ p.dataset[2]["dcm"]["files"] = ["/home/tangir/crmbm/acq/296_ym_p1_brainmoelle/29
 p.settings["datasets_indexes"] = [0, 1]
 p.run()
 p.check_analyze_results(True)
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% 25/06/2019 - 296_ym_p1_brainmoelle - FID modulus tests
 get_ipython().magic("clear")
@@ -94,8 +97,8 @@ p = reco.pipeline("brain_std_nows")
 p.dataset[0]["legend"] = "brain - sLASER no VAPOR + conventionnal process"
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/296_ym_p1_brainmoelle/meas_MID73_slaser_R_N=20+_1_longTE_SNR++++_FID33872.dat"]
 
-p.job_list.insert(11, p.job["water-removal"])
-p.job_list.remove(p.job["data-rejecting"])
+p.job_list.insert(11, p.job["water_removal"])
+p.job_list.remove(p.job["data_rejecting"])
 p.settings["POI_range_ppm"] = [4.5, 5.2]
 p.run()
 
@@ -105,8 +108,8 @@ p.dataset[0]["legend"] = "brain - sLASER no VAPOR + FID process"
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/296_ym_p1_brainmoelle/meas_MID73_slaser_R_N=20+_1_longTE_SNR++++_FID33872.dat"]
 
 p.job_list.insert(2, p.job["FID modulus"])
-p.job_list.insert(12, p.job["water-removal"])
-p.job_list.remove(p.job["data-rejecting"])
+p.job_list.insert(12, p.job["water_removal"])
+p.job_list.remove(p.job["data_rejecting"])
 p.settings["POI_range_ppm"] = [4.5, 5.2]
 p.run()
 
@@ -122,9 +125,9 @@ p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/308-rs-p1-moelle/me
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/308-rs-p1-moelle/20190827/01_0024_slaser-r-n/original-primary_e09_0001.dcm",
                                 "/home/tangir/crmbm/acq/308-rs-p1-moelle/20190827/01_0025_slaser-r-n/original-primary_e09_0001.dcm"]
 
-test=p.run()
+p.run()
 p.check_analyze_results(True)
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% 23/01/2019 - 347-re-p1-moelle - Renaud
 get_ipython().magic("clear")
@@ -153,4 +156,4 @@ p.dataset[3]["dcm"]["files"] = ["/home/tangir/crmbm/acq/347-re-p1-moelle/2020012
 p.settings["datasets_indexes"] = 3
 p.run()
 p.check_analyze_results()
-p.save_datasets(rdb)
+p.save_datasets()
