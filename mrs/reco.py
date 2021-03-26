@@ -12,6 +12,7 @@ Three classes' definition in here.
 
 import suspect
 import numpy as np
+import pandas as pd
 from scipy import signal
 import scipy.io as sio
 import matplotlib.pylab as plt
@@ -21,7 +22,6 @@ import pickle
 import os
 from enum import Enum
 from mrs import io
-from mrs import sim
 from mrs import log
 from mrs import paths as default_paths
 
@@ -609,7 +609,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         # init
         log.debug("estimating noise level in FID using last %d points..." % n_pts)
         # noise is the std of the last real points, but that is not so simple
-        # we really want real noise, not zeros from zero-filling
+        # we really want real noise, not zeros from zero_filling
         s_nonzero_mask = (s_real != 0.0)
         s_analyze = s_real[s_nonzero_mask]
         # now take the last 100 points
@@ -884,7 +884,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         # done
 
-    def analyze_snr_1d(self, peak_range, noise_range=[-2, -1], magnitude_mode=False, display=False, display_range=[1, 6]):
+    def analyze_snr_1d(self, peak_range, noise_range=[-2, -1], half_factor=False, magnitude_mode=False, display=False, display_range=[1, 6]):
         """
         Estimate the SNR of a peak in the spectrum ; chemical shift ranges for the peak and the noise regions are specified by the user. Can also look at time-domain SNR. Works only for a 1D MRSData2 objects.
 
@@ -896,6 +896,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
             Range in ppm used to find a peak of interest
         noise_range : list [2]
             Range in ppm used to estimate noise
+        half_factor : float
+            If (True), will divide the SNR by 2 folowing an old definition of the SNR where the std of noise is multiplied by two. Btw, this outdated definition is used by LCModel.
         magnitude_mode : boolean
             analyze signal in magnitude mode (True) or the real part (False)
         display : boolean
@@ -944,6 +946,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
         log.debug("estimating noise from %0.2f to %0.2fppm region!" % (noise_range[0], noise_range[1]))
         ippm_noise_range = (noise_range[0] < ppm) & (ppm < noise_range[1])
         snr_noise = np.std(sf_noise[ippm_noise_range])
+        if(half_factor):
+            snr_noise = 2 * snr_noise
 
         if(display):
             axs[0].plot(ppm, np.real(sf), 'k-', linewidth=1)
@@ -1133,7 +1137,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             Resulting zero-filled data stored in a MRSData2 object
         """
         # init
-        log.debug("zero-filling [%s]..." % self.display_label)
+        log.debug("zero_filling [%s]..." % self.display_label)
         s = self.copy()
         nZeros = nPoints_final - s.np
         s_new_shape = list(s.shape)
@@ -1158,7 +1162,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig.clf()
             axs = fig.subplots(2, 2, sharex='row', sharey='row')
             fig.canvas.set_window_title("correct_zerofill_nd (mrs.reco.MRSData2)")
-            fig.suptitle("zero-filling [%s]" % self.display_label)
+            fig.suptitle("zero_filling [%s]" % self.display_label)
 
             # no time axis, we want to see the number of points
             axs[0, 0].plot(np.real(s_disp), 'k-', linewidth=1)
@@ -1213,7 +1217,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         s_shifted : MRSData2 numpy array [averages,channels,timepoints]
             Resulting shifted data stored in a MRSData2 object
         """
-        log.debug("time-shifting [%s]..." % self.display_label)
+        log.debug("time_shifting [%s]..." % self.display_label)
 
         # init
         s = self.copy()
@@ -1249,7 +1253,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig.clf()
             axs = fig.subplots(2, 2, sharex='row', sharey='row')
             fig.canvas.set_window_title("correct_time_shift_nd (mrs.reco.MRSData2)")
-            fig.suptitle("time-shifting [%s]" % self.display_label)
+            fig.suptitle("time_shifting [%s]" % self.display_label)
 
             axs[0, 0].plot(t, np.real(s_disp), 'k-', linewidth=1)
             axs[0, 0].set_xlabel('time (us)')
@@ -3220,6 +3224,44 @@ class MRSData2(suspect.mrsobjects.MRSData):
         super().__setstate__(d[0:-1])
         return(self)
 
+    def to_dataframe(self, include_obj=True, prefix_str="data_"):
+        """
+        Convert the object's attributes to dataframe. Can include the object itself.
+
+        Parameters
+        ----------
+        include_obj : boolean
+            Include self to the dataframe row
+        prefix_str : string
+            Prefix string to add to column names
+
+        Returns
+        -------
+        df : Dataframe
+            Containing the attributes as columns (a single row)
+        """
+        log.debug("converting to dataframe...")
+
+        # get all attributes but remove the private ones
+        df = pd.DataFrame.from_dict([vars(self)])
+        df = df.filter(regex=("^(?!_).*"))
+
+        # add some specific private attributes I need
+        df["display_label"] = self.display_label
+        df["noise_level"] = self.noise_level
+        df["rejection"] = self.data_rejection
+        df["file_hash"] = self.data_file_hash
+        df["is_rawdata"] = self.is_rawdata
+        df = pd.concat([df, pd.DataFrame.from_dict([self.patient])], axis=1)
+        df = pd.concat([df, self.sequence.to_dataframe()], axis=1)
+
+        if(include_obj):
+            df["obj"] = [self]
+
+        df = df.add_prefix(prefix_str)
+
+        return(df)
+
 
 class pipeline:
     """The pipeline class is used to store all the reconstruction parameters needed for a specific bunch of acquired signals. Once the parameters are set, the pipeline can be run using one of the methods."""
@@ -3243,15 +3285,14 @@ class pipeline:
         template_name: string
             Reco pipeline template file
         """
-
         # --- initializing dataset dict ---
         self.dataset = [{}] * MAX_NUM_DATASETS
         for i in range(MAX_NUM_DATASETS):
             self.dataset[i] = {"legend": None,
-                               "raw": {"files": [None, None], "data": None, "analysis-results": None, "ref-data-analysis-results": None},
-                               "dcm": {"files": [None, None], "data": None, "analysis-results": None, "ref-data-analysis-results": None},
-                               "physio-file": None,
-                               "imaging-file": None,
+                               "raw": {"files": [None, None], "data": None, "analysis_results": None, "ref_data_analysis_results": None},
+                               "dcm": {"files": [None, None], "data": None, "analysis_results": None, "ref_data_analysis_results": None},
+                               "physio_file": None,
+                               "imaging_file": None,
                                "resp_bpm": None,
                                "heart_bpm": None,
                                "comment": None}
@@ -3268,11 +3309,13 @@ class pipeline:
                             # real ppm value the above peak
                             "POI_shift_true_ppm": 4.7,
                             # ppm range to search for peak for SNR estimation
-                            "POI_SNR_range_ppm": [1.8, 2.1],
+                            "POI_SNR_range_ppm": [1.8, 2.2],
                             # ppm range to search for peak for FWHM estimation
                             "POI_LW_range_ppm": [4.5, 5.2],
                             # ppm range to for SNR/LW estimation in ref. data
                             "POI_ref_range_ppm" : [4.5, 5.2],
+                            # path to pkl file to store processed data
+                            "pkl_filepath" : None,
                             # force display off if needed
                             "display": None,
                             # ppm range used for display
@@ -3283,8 +3326,7 @@ class pipeline:
         # --- available jobs and their parameters ---
         self.job = {}
         # --- job: spectrum final display ---
-        self.job["displaying"] = {0:
-                                  {"func": MRSData2.display_spectrum_1d, "name": "displaying"},
+        self.job["displaying"] = {"job_func": MRSData2.display_spectrum_1d, "job_name": "displaying",
                                   # figure index
                                   "fig_index": 1,
                                   # ppm range used for display
@@ -3293,13 +3335,11 @@ class pipeline:
                                   "magnitude_mode": False
                                   }
         # --- job: VOI display on anatomical images ---
-        self.job["displaying anatomy"] = {0:
-                                  {"func": MRSData2.display_voi_anatomy_nd, "name": "overlaying VOI on anatomical image"}
+        self.job["displaying_anatomy"] = {"job_func": MRSData2.display_voi_anatomy_nd, "job_name": "overlaying VOI on anatomical image"
                                   }
 
         # --- job: automatic rephasing ---
-        self.job["phasing"] = {0:
-                               {"func": MRSData2.correct_phase_3d, "name": "phasing"},
+        self.job["phasing"] = {"job_func": MRSData2.correct_phase_3d, "job_name": "phasing",
                                # use reference data is available?
                                "using_ref_data": True,
                                # ppm range to look fo peak used to estimate phase
@@ -3318,20 +3358,17 @@ class pipeline:
                                }
 
         # --- job: amplification ---
-        self.job["scaling"] = {0:
-                               {"func": MRSData2.correct_intensity_scaling_nd, "name": "scaling intensity"},
+        self.job["scaling"] = {"job_func": MRSData2.correct_intensity_scaling_nd, "job_name": "scaling intensity",
                                "scaling_factor_rawdata": 1e8,
                                "scaling_factor_dcm": 1.0
                                }
 
         # --- job: FID modulus ---
-        self.job["FID modulus"] = {0:
-                                   {"func": MRSData2.correct_fidmodulus_nd, "name": "FID modulus"}
+        self.job["FID modulus"] = {"job_func": MRSData2.correct_fidmodulus_nd, "job_name": "FID modulus"
                                    }
 
-        # --- job: time-shifting ---
-        self.job["time-shifting"] = {0:
-                                     {"func": MRSData2.correct_time_shift_nd, "name": "time-shifting"},
+        # --- job: time_shifting ---
+        self.job["time_shifting"] = {"job_func": MRSData2.correct_time_shift_nd, "job_name": "time_shifting",
                                      # time shift in us
                                      "time_shift_us": 375,
                                      # display all this process to check what the hell is going on
@@ -3340,8 +3377,7 @@ class pipeline:
                                      }
 
         # --- job: channel combination ---
-        self.job["channel-combining"] = {0:
-                                         {"func": MRSData2.correct_combine_channels_3d, "name": "channel-combining"},
+        self.job["channel_combining"] = {"job_func": MRSData2.correct_combine_channels_3d, "job_name": "channel_combining",
                                          # use non water-suppressed data to recombine and rephase channels
                                          "using_ref_data": True,
                                          # should we rephase (0th order) data while combining?
@@ -3351,13 +3387,11 @@ class pipeline:
                                          }
 
         # --- job: concatenate ---
-        self.job["concatenate"] = {0:
-                                   {"func": MRSData2.concatenate_2d, "name": "concatenate"}
+        self.job["concatenate"] = {"job_func": MRSData2.concatenate_2d, "job_name": "concatenate"
                                    }
 
-        # --- job: zero-filling ---
-        self.job["zero-filling"] = {0:
-                                    {"func": MRSData2.correct_zerofill_nd, "name": "zero-filling"},
+        # --- job: zero_filling ---
+        self.job["zero_filling"] = {"job_func": MRSData2.correct_zerofill_nd, "job_name": "zero_filling",
                                     # number of signal points after zf
                                     "npts": 8192 * 2,
                                     # display all this process to check what the hell is going on
@@ -3366,8 +3400,7 @@ class pipeline:
                                     }
 
         # --- job: analyze physio signal ---
-        self.job["physio-analysis"] = {0:
-                                       {"func": MRSData2.analyze_physio_2d, "name": "analyzing physio. signals"},
+        self.job["physio_analysis"] = {"job_func": MRSData2.analyze_physio_2d, "job_name": "analyzing physio. signals",
                                        # ppm range to look for a peak to analyze
                                        "POI_range_ppm": self.settings["POI_range_ppm"],
                                        # time range in (ms) to look around timestamp for correlation physio/MRS
@@ -3377,8 +3410,7 @@ class pipeline:
                                        }
 
         # --- job: automatic data rejection based on criterias ---
-        self.job["data-rejecting"] = {0:
-                                      {"func": MRSData2.correct_analyze_and_reject_2d, "name": "data rejecting"},
+        self.job["data_rejecting"] = {"job_func": MRSData2.correct_analyze_and_reject_2d, "job_name": "data rejecting",
                                       # ppm range to look for a peak to analyze
                                       "POI_range_ppm": self.settings["POI_range_ppm"],
                                       # size of moving average window
@@ -3403,8 +3435,7 @@ class pipeline:
                                       }
 
         # --- job: automatic data frequency realignment ---
-        self.job["realigning"] = {0:
-                                  {"func": MRSData2.correct_realign_2d, "name": "frequency realigning"},
+        self.job["realigning"] = {"job_func": MRSData2.correct_realign_2d, "job_name": "frequency realigning",
                                   # ppm range to look for a peak to analyze
                                   "POI_range_ppm": self.settings["POI_range_ppm"],
                                   # size of moving average window
@@ -3417,8 +3448,7 @@ class pipeline:
                                   }
 
         # --- job: spectral filtering ---
-        self.job["filtering"] = {0:
-                                 {"func": MRSData2.correct_bandpass_filtering_1d, "name": "FFT filtering"},
+        self.job["filtering"] = {"job_func": MRSData2.correct_bandpass_filtering_1d, "job_name": "FFT filtering",
                                  # ppm range to keep
                                  "range_ppm": [1, 6],
                                  # type of apodization window (take it from numpy/scipy)
@@ -3429,8 +3459,7 @@ class pipeline:
                                  }
 
         # --- job: data averaging ---
-        self.job["averaging"] = {0:
-                                 {"func": MRSData2.correct_average_2d, "name": "averaging"},
+        self.job["averaging"] = {"job_func": MRSData2.correct_average_2d, "job_name": "averaging",
                                  # number of averages to mean (None = all)
                                  "na": None,
                                  # display all this process to check what the hell is going on
@@ -3439,8 +3468,7 @@ class pipeline:
                                  }
 
         # --- job: phasing using suspect ---
-        self.job["phasing (suspect)"] = {0:
-                                         {"func": MRSData2.correct_phase_1d, "name": "phasing (suspect)"},
+        self.job["phasing_suspect"] = {  "job_func": MRSData2.correct_phase_1d, "job_name": "phasing (suspect)",
                                          # phasing method
                                          "suspect_method": suspect_phasing_method.MATCH_MAGNITUDE_REAL,
                                          # ppm range to analyze phase
@@ -3451,15 +3479,13 @@ class pipeline:
                                          }
 
         # --- job: noise level analysis ---
-        self.job["noise-estimation"] = {0:
-                                        {"func": MRSData2.analyze_noise_nd, "name": "estimating noise level"},
+        self.job["noise_estimation"] = {"job_func": MRSData2.analyze_noise_nd, "job_name": "estimating noise level",
                                         # estimate noise std time-domain on the last 100 pts of the FID
                                         "npts": 100
                                         }
 
         # --- job: data apodization ---
-        self.job["apodizing"] = {0:
-                                 {"func": MRSData2.correct_apodization_nd, "name": "apodizing"},
+        self.job["apodizing"] = {"job_func": MRSData2.correct_apodization_nd, "job_name": "apodizing",
                                  # exponential damping factor for apodization (Hz)
                                  "damping_hz": 5,
                                  # display all this process to check what the hell is going on
@@ -3468,8 +3494,7 @@ class pipeline:
                                  }
 
         # --- job: data cropping ---
-        self.job["cropping"] = {0:
-                                {"func": MRSData2.correct_crop_1d, "name": "cropping"},
+        self.job["cropping"] = {"job_func": MRSData2.correct_crop_1d, "job_name": "cropping",
                                 # final number of signal points after crop
                                 "final_npts": 6144,
                                 # display all this process to check what the hell is going on
@@ -3478,8 +3503,7 @@ class pipeline:
                                 }
 
         # --- job: water post-acquisition removal ---
-        self.job["water-removal"] = {0:
-                                     {"func": MRSData2.correct_water_removal_1d, "name": "removing water peak"},
+        self.job["water_removal"] = {"job_func": MRSData2.correct_water_removal_1d, "job_name": "removing water peak",
                                      # number of components when running HSVD
                                      "hsvd_components": 5,
                                      # ppm range where all components will be remove
@@ -3490,8 +3514,7 @@ class pipeline:
                                      }
 
         # --- job: spectrum chemical shift calibration ---
-        self.job["calibrating"] = {0:
-                                   {"func": MRSData2.correct_freqshift_1d, "name": "frequency shifting"},
+        self.job["calibrating"] = {"job_func": MRSData2.correct_freqshift_1d, "job_name": "frequency shifting",
                                    # ppm range to look for the peak of interest (NAA by default)
                                    "POI_shift_range_ppm": self.settings["POI_shift_range_ppm"],
                                    # real ppm value for this peak
@@ -3502,12 +3525,13 @@ class pipeline:
                                    }
 
         # --- job: SNR analysis ---
-        self.job["analyzing-snr"] = {0:
-                                     {"func": MRSData2.analyze_snr_1d, "name": "analyzing SNR"},
+        self.job["analyzing_snr"] = {"job_func": MRSData2.analyze_snr_1d, "job_name": "analyzing SNR",
                                      # ppm range to look for a peak to analyze
                                      "POI_SNR_range_ppm": self.settings["POI_SNR_range_ppm"],
                                      # ppm range to look for pure noise
                                      "n_range_ppm": [-2, -1],
+                                     # divide SNR by 2, like LCModel do
+                                     "half_factor": False,
                                      # should we look at the magnitude or real spectrum?
                                      "magnitude_mode": False,
                                      # display all this process to check what the hell is going on
@@ -3516,10 +3540,9 @@ class pipeline:
                                      }
 
         # --- job: LW analysis ---
-        self.job["analyzing-lw"] = {0:
-                                    {"func": MRSData2.analyze_linewidth_1d, "name": "analyzing peak-linewidth"},
+        self.job["analyzing_lw"] = {"job_func": MRSData2.analyze_linewidth_1d, "job_name": "analyzing peak-linewidth",
                                     # ppm range to look for a peak to analyze
-                                    "POI_range_ppm": self.settings["POI_range_ppm"],
+                                    "POI_LW_range_ppm": self.settings["POI_LW_range_ppm"],
                                     # should we look at the magnitude or real spectrum?
                                     "magnitude_mode": False,
                                     # display all this process to check what the hell is going on
@@ -3528,12 +3551,14 @@ class pipeline:
                                     }
 
         # --- job: ref data SNR analysis ---
-        self.job["ref-data-analyzing-snr"] = {0:
-                                     {"func": MRSData2.analyze_snr_1d, "name": "analyzing ref. data SNR"},
+        self.job["ref_data_analyzing_snr"] = {
+                                    "job_func": MRSData2.analyze_snr_1d, "job_name": "analyzing ref. data SNR",
                                      # ppm range to look for a peak to analyze
                                      "POI_ref_range_ppm": self.settings["POI_ref_range_ppm"],
                                      # ppm range to look for pure noise
                                      "n_range_ppm": [-2, -1],
+                                     # divide SNR by 2, like LCModel do
+                                     "half_factor": False,
                                      # should we look at the magnitude or real spectrum?
                                      "magnitude_mode": False,
                                      # display all this process to check what the hell is going on
@@ -3542,8 +3567,8 @@ class pipeline:
                                      }
 
         # --- job: ref data LW analysis ---
-        self.job["ref-data-analyzing-lw"] = {0:
-                                    {"func": MRSData2.analyze_linewidth_1d, "name": "analyzing ref. data peak-linewidth"},
+        self.job["ref_data_analyzing_lw"] = {
+                                    "job_func": MRSData2.analyze_linewidth_1d, "job_name": "analyzing ref. data peak-linewidth",
                                     # ppm range to look for a peak to analyze
                                     "POI_ref_range_ppm": self.settings["POI_ref_range_ppm"],
                                     # should we look at the magnitude or real spectrum?
@@ -3561,24 +3586,24 @@ class pipeline:
         self.job_list = [self.job["phasing"],
                          self.job["scaling"],
                          self.job["FID modulus"],
-                         self.job["channel-combining"],
+                         self.job["channel_combining"],
                          self.job["concatenate"],
-                         self.job["zero-filling"],
-                         self.job["physio-analysis"],
-                         self.job["data-rejecting"],
+                         self.job["zero_filling"],
+                         self.job["physio_analysis"],
+                         self.job["data_rejecting"],
                          self.job["realigning"],
                          self.job["averaging"],
-                         self.job["noise-estimation"],
+                         self.job["noise_estimation"],
                          self.job["apodizing"],
                          self.job["cropping"],
-                         self.job["water-removal"],
+                         self.job["water_removal"],
                          self.job["calibrating"],
                          self.job["displaying"]]
 
         # --- analyze job list ---
         # SNR/LW analysis job list
-        self.analyze_job_list = [self.job["channel-combining"],
-                                 self.job["zero-filling"],
+        self.analyze_job_list = [self.job["channel_combining"],
+                                 self.job["zero_filling"],
                                  self.job["averaging"],
                                  self.job["calibrating"]]
 
@@ -3615,16 +3640,17 @@ class pipeline:
         # get job name
         log.info_line_break()
         log.info_line________________________()
-        job_name = job[0]["name"]
+        job_name = job["job_name"]
         log.info("%s on [%s]..." % (job_name, data.display_label))
         # get function
-        job_func = job[0]["func"]
+        job_func = job["job_func"]
         if(default_args):
             job_args = [data]
         else:
             # get arguments
             job_args = job.copy()
-            del job_args[0]
+            del job_args["job_name"]
+            del job_args["job_func"]
             job_args = [data] + list(job_args.values())
 
         # call job on data
@@ -3672,18 +3698,18 @@ class pipeline:
             data = self._run_job(j, data, True)
 
         # measure snr
-        this_job = self.job["analyzing-snr"]
+        this_job = self.job["analyzing_snr"]
         data_snr, _, _ = self._run_job(this_job, data)
         # measure lw
-        this_job = self.job["analyzing-lw"]
+        this_job = self.job["analyzing_lw"]
         data_lw = self._run_job(this_job, data)
 
         if(data.data_ref is not None):
             # measure ref data snr
-            this_job = self.job["ref-data-analyzing-snr"]
+            this_job = self.job["ref_data_analyzing_snr"]
             ref_data_snr, _, _ = self._run_job(this_job, data.data_ref)
             # measure ref data lw
-            this_job = self.job["ref-data-analyzing-lw"]
+            this_job = self.job["ref_data_analyzing_lw"]
             ref_data_lw = self._run_job(this_job, data.data_ref)
         else:
             ref_data_snr = np.nan
@@ -3693,7 +3719,7 @@ class pipeline:
         log.setLevel(old_level)
 
         # output
-        job_label = "post-" + current_job[0]["name"]
+        job_label = "post-" + current_job["job_name"]
         log.info(job_label + " SNR of [%s] = %.2f" % (data.display_label, data_snr))
         log.info(job_label + " LW of [%s] = %.2f" % (data.display_label, data_lw))
 
@@ -3718,7 +3744,7 @@ class pipeline:
             * phasing
             * combining channels
             * analyze real noise level before going on with processing
-            * zero-filling
+            * zero_filling
             * peak analysis & data rejection
             * realigning
             * averaging
@@ -3751,8 +3777,8 @@ class pipeline:
             rawdata_ok = (d["raw"]["data"] is not None)
             rawfiles_ok = (d["raw"]["files"][0] is not None)
             dicomfiles_ok = (d["dcm"]["files"][0] is not None)
-            physiofile_ok = (d["physio-file"] is not None)
-            imagingfile_ok = (d["imaging-file"] is not None)
+            physiofile_ok = (d["physio_file"] is not None)
+            imagingfile_ok = (d["imaging_file"] is not None)
 
             # checking that this is an entry
             if(legend_ok or rawfiles_ok or dicomfiles_ok or physiofile_ok or imagingfile_ok):
@@ -3800,12 +3826,12 @@ class pipeline:
                     log.info("  dicom #1 [REF] = None")
                 # physio
                 if(physiofile_ok):
-                    self.dataset[i]["physio-file"] = d["physio-file"].strip()
-                    log.info("  physio = " + self.dataset[i]["physio-file"])
+                    self.dataset[i]["physio_file"] = d["physio_file"].strip()
+                    log.info("  physio = " + self.dataset[i]["physio_file"])
                 # imaging
                 if(imagingfile_ok):
-                    self.dataset[i]["imaging-file"] = d["imaging-file"].strip()
-                    log.info("  imaging = " + self.dataset[i]["imaging-file"])
+                    self.dataset[i]["imaging_file"] = d["imaging_file"].strip()
+                    log.info("  imaging = " + self.dataset[i]["imaging_file"])
 
                 # index of non-empty datasets
                 ind_dataset_ok.append(i)
@@ -3831,8 +3857,8 @@ class pipeline:
         log.info_line________________________()
         for i, d in enumerate(self.dataset):
             this_legend = d["legend"]
-            this_physio_filename = d["physio-file"]
-            this_imaging_filename = d["imaging-file"]
+            this_physio_filename = d["physio_file"]
+            this_imaging_filename = d["imaging_file"]
 
             for dtype in ["raw", "dcm"]:
                 # check if any data file to read
@@ -3903,17 +3929,16 @@ class pipeline:
                     else:
                         self.job[this_job][this_setting_name] = this_setting_value
 
-
         # remove display job if we don't want to display
         if(self.settings["display"] is False):
             if(self.job["displaying"] in self.job_list):
                 self.job_list.remove(self.job["displaying"])
-            if(self.job["displaying anatomy"] in self.job_list):
-                self.job_list.remove(self.job["displaying anatomy"])
+            if(self.job["displaying_anatomy"] in self.job_list):
+                self.job_list.remove(self.job["displaying_anatomy"])
 
         # for each job
         for k, this_job in enumerate(self.job_list):
-            this_job_name = this_job[0]["name"]
+            this_job_name = this_job["job_name"]
             log.info("#%d %s" % (k, this_job_name))
         log.info_line________________________()
 
@@ -3968,12 +3993,12 @@ class pipeline:
                             # measure SNR/LW after this process?
                             if(self.analyze_enable):
                                 # prepare storage
-                                if(self.dataset[i][dtype]["analysis-results"] is None):
-                                    self.dataset[i][dtype]["analysis-results"] = {}
+                                if(self.dataset[i][dtype]["analysis_results"] is None):
+                                    self.dataset[i][dtype]["analysis_results"] = {}
 
                                 # get job name, renaming if needed
-                                this_job_name = job[0]["name"]
-                                if(this_job_name in list(self.dataset[i][dtype]["analysis-results"].keys())):
+                                this_job_name = job["job_name"]
+                                if(this_job_name in list(self.dataset[i][dtype]["analysis_results"].keys())):
                                     # not the first time we apply this job?
                                     this_job_name = this_job_name + " (#2)"
 
@@ -3981,7 +4006,7 @@ class pipeline:
                                 this_data_snr, this_data_lw, _, _ = self._analyze(this_data, job, jobs_done_stack)
 
                                 # store analysis results
-                                self.dataset[i][dtype]["analysis-results"][this_job_name] = {"snr": this_data_snr, "lw": this_data_lw}
+                                self.dataset[i][dtype]["analysis_results"][this_job_name] = {"snr": this_data_snr, "lw": this_data_lw}
                                 log.info_line________________________()
 
                     # we finish running all jobs on a dataset, storing
@@ -4014,7 +4039,7 @@ class pipeline:
                     continue
 
                 _, _, this_data_ref_snr, this_data_ref_lw = self._analyze(this_data, job, jobs_done_stack)
-                self.dataset[i][dtype]["ref-data-analysis-results"] = {"snr": this_data_ref_snr, "lw": this_data_ref_lw}
+                self.dataset[i][dtype]["ref_data_analysis_results"] = {"snr": this_data_ref_snr, "lw": this_data_ref_lw}
 
         # --- summary final linewidths ---
         if(self.analyze_enable and self.settings["display"] is not False):
@@ -4058,10 +4083,10 @@ class pipeline:
         data_label_list = [d.ljust(data_label_nchar) for d in data_labels]
 
         # build job label list
-        if(self.dataset[0]["raw"]["analysis-results"] is not None):
-            job_labels = self.dataset[0]["raw"]["analysis-results"].keys()
-        elif(self.dataset[0]["dcm"]["analysis-results"] is not None):
-            job_labels = self.dataset[0]["dcm"]["analysis-results"].keys()
+        if(self.dataset[0]["raw"]["analysis_results"] is not None):
+            job_labels = self.dataset[0]["raw"]["analysis_results"].keys()
+        elif(self.dataset[0]["dcm"]["analysis_results"] is not None):
+            job_labels = self.dataset[0]["dcm"]["analysis_results"].keys()
         else:
             job_labels = []
 
@@ -4082,33 +4107,33 @@ class pipeline:
         # for each dataset
         for d in self.dataset:
             # if raw data, find snr and lw estimations and store it
-            if(d["raw"]["analysis-results"] is not None):
-                snr_raw_list.append([d["raw"]["analysis-results"][j]["snr"] for j in d["raw"]["analysis-results"].keys()])
-                lw_raw_list.append([d["raw"]["analysis-results"][j]["lw"] for j in d["raw"]["analysis-results"].keys()])
+            if(d["raw"]["analysis_results"] is not None):
+                snr_raw_list.append([d["raw"]["analysis_results"][j]["snr"] for j in d["raw"]["analysis_results"].keys()])
+                lw_raw_list.append([d["raw"]["analysis_results"][j]["lw"] for j in d["raw"]["analysis_results"].keys()])
             else:
                 snr_raw_list.append([np.nan] * len(job_label_list))
                 lw_raw_list.append([np.nan] * len(job_label_list))
 
             # if dcm data, find snr and lw estimations and store it
-            if(d["dcm"]["analysis-results"] is not None):
-                snr_dcm_list.append([d["dcm"]["analysis-results"][j]["snr"] for j in d["dcm"]["analysis-results"].keys()])
-                lw_dcm_list.append([d["dcm"]["analysis-results"][j]["lw"] for j in d["dcm"]["analysis-results"].keys()])
+            if(d["dcm"]["analysis_results"] is not None):
+                snr_dcm_list.append([d["dcm"]["analysis_results"][j]["snr"] for j in d["dcm"]["analysis_results"].keys()])
+                lw_dcm_list.append([d["dcm"]["analysis_results"][j]["lw"] for j in d["dcm"]["analysis_results"].keys()])
             else:
                 snr_dcm_list.append([np.nan] * len(job_label_list))
                 lw_dcm_list.append([np.nan] * len(job_label_list))
 
             # if raw ref data, find snr and lw estimations and store it
-            if(d["raw"]["ref-data-analysis-results"] is not None):
-                snr_ref_raw_list.append([d["raw"]["ref-data-analysis-results"]["snr"]])
-                lw_ref_raw_list.append([d["raw"]["ref-data-analysis-results"]["lw"]])
+            if(d["raw"]["ref_data_analysis_results"] is not None):
+                snr_ref_raw_list.append([d["raw"]["ref_data_analysis_results"]["snr"]])
+                lw_ref_raw_list.append([d["raw"]["ref_data_analysis_results"]["lw"]])
             else:
                 snr_ref_raw_list.append([np.nan])
                 lw_ref_raw_list.append([np.nan])
 
             # if dcm ref data, find snr and lw estimations and store it
-            if(d["dcm"]["ref-data-analysis-results"] is not None):
-                snr_ref_dcm_list.append([d["dcm"]["ref-data-analysis-results"]["snr"]])
-                lw_ref_dcm_list.append([d["dcm"]["ref-data-analysis-results"]["lw"]])
+            if(d["dcm"]["ref_data_analysis_results"] is not None):
+                snr_ref_dcm_list.append([d["dcm"]["ref_data_analysis_results"]["snr"]])
+                lw_ref_dcm_list.append([d["dcm"]["ref_data_analysis_results"]["lw"]])
             else:
                 snr_ref_dcm_list.append([np.nan])
                 lw_ref_dcm_list.append([np.nan])
@@ -4293,20 +4318,6 @@ class pipeline:
                 # run job on this dataset
                 self._run_job(disp_job, this_data)
 
-    def save_datasets(self, rdb):
-        """
-        Save each data set and the current pipeline to the PKL data storage file.
-
-        Parameters
-        ----------
-        rdb: data_db object
-            Data storage object
-        """
-        # for each dataset
-        log.info("saving all datasets to file [%s]..." % rdb.data_db_reco_file)
-        for d in self.dataset:
-            rdb.save_reco_dataset(d, self)
-
     def load_template(self, template_name):
         """
         Load reco pipeline attributes from template previously saved.
@@ -4347,6 +4358,82 @@ class pipeline:
         with open(default_paths.DEFAULT_RECO_TEMPLATE_FOLDER + template_filename, 'wb') as f:
             pickle.dump([self], f)
 
+    def _to_dataframe(self, prefix_str="reco_"):
+        """
+        Convert the object's attributes to dataframe.
+
+        Parameters
+        ----------
+        prefix_str : string
+            Prefix string to add to column names
+
+        Returns
+        -------
+        df : Dataframe
+            With all the datasets and parameters from this pipeline
+        """
+        log.debug("converting to dataframe...")
+
+        # use pandas json_normalize function to flatten all nested stuff (magic!)
+        # this takes care of the job attribute too
+        df_p = pd.json_normalize(vars(self), sep='_')
+
+        # need a specific call for the dataset attribute
+        df_dataset = pd.json_normalize(self.dataset, sep='_')
+        df_dataset = df_dataset.add_prefix("dataset_")
+        del df_p["dataset"]
+
+        # and need a specific call for the MRSData2 types
+        df_dataset_raw_data_list = [s.to_dataframe(True, "dataset_raw_data_") for s in df_dataset["dataset_raw_data"]]
+        df_dataset_dcm_data_list = [s.to_dataframe(True, "dataset_dcm_data_") for s in df_dataset["dataset_dcm_data"]]
+        df_dataset_raw_data = pd.concat(df_dataset_raw_data_list, axis=0)
+        df_dataset_dcm_data = pd.concat(df_dataset_dcm_data_list, axis=0)
+        del df_dataset["dataset_raw_data"]
+        del df_dataset["dataset_dcm_data"]
+
+        # append columns
+        df = pd.concat([df_dataset.reset_index(),
+                        df_dataset_raw_data.reset_index(),
+                        df_dataset_dcm_data.reset_index(),
+                        df_p.loc[df_p.index.repeat(len(df_dataset))].reset_index()], axis=1)
+
+        # set index
+        df = df.set_index("dataset_raw_data_file_hash")
+        del df["index"]
+
+        # prefix
+        df = df.add_prefix(prefix_str)
+
+        return(df)
+
+    def save_datasets(self):
+        """Save corresponding this pipeline, all its parameters and its datasets to a dataframe stored on the disk."""
+        log.info("saving to disk...")
+
+        # check it we have specified a file path
+        if(self.settings["pkl_filepath"] is None):
+            log.error("no pkl file path specified to save to disk!")
+            return()
+
+        # first, convert this pipeline and all to a df
+        this_df = self._to_dataframe()
+
+        # load current df from file, if exist
+        pkl_filepath = self.settings["pkl_filepath"]
+        if(os.path.isfile(pkl_filepath)):
+            # load
+            df = pd.read_pickle(pkl_filepath)
+            # remove rows for which we have new data
+            df = df.drop(df.loc[df.index.isin(this_df.index)].index)
+            # append new rows
+            df = pd.concat([df, this_df])
+
+            # save back
+            df.to_pickle(pkl_filepath)
+        else:
+            # no file
+            this_df.to_pickle(pkl_filepath)
+
 
 def remove_grids_from_all_figs():
     """Remove the grid in all axes for all open figures."""
@@ -4357,9 +4444,9 @@ def remove_grids_from_all_figs():
             a.grid(False)
 
 
-def reco_spatial_select_profile(dcm_folders_list, legends_list, analyze_selectivity_range_list = [[800, 3550], [-10600, -7800], [-3650, 1850]]):
+def reco_spatial_select_profile(dcm_folders_list, legends_list, analyze_selectivity_range_list=[[800, 3550], [-10600, -7800], [-3650, 1850]]):
     """
-    Reconstruct the VOI selection profile from data acquired using the 'VOI trace' mode (available in CMRR's MRS sequences)
+    Reconstruct the VOI selection profile from data acquired using the 'VOI trace' mode (available in CMRR's MRS sequences).
 
     Parameters
     ----------

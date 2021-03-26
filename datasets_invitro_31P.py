@@ -38,17 +38,17 @@ p.dataset[2]["dcm"]["files"] = ["/home/tangir/crmbm/acq/phosphates_mix_001/phosp
 p.job_list = [  p.job["phasing"],
                 # p.job["scaling"],
                 # p.job["FID modulus"],
-                p.job["channel-combining"],
+                p.job["channel_combining"],
                 # p.job["concatenate"],
-                # p.job["zero-filling"],
-                # p.job["physio-analysis"],
-                # p.job["data-rejecting"],
+                # p.job["zero_filling"],
+                # p.job["physio_analysis"],
+                # p.job["data_rejecting"],
                 # p.job["realigning"],
                 p.job["averaging"],
-                p.job["noise-estimation"],
+                p.job["noise_estimation"],
                 p.job["apodizing"],
                 # p.job["cropping"],
-                # p.job["water-removal"],
+                # p.job["water_removal"],
                 # p.job["calibrating"],
                 p.job["displaying"]]
 
@@ -103,17 +103,17 @@ p.dataset[10]["dcm"]["files"] = ["/home/tangir/crmbm/acq/phosphates_mix_002/phos
 p.job_list = [  p.job["phasing"],
                 # p.job["scaling"],
                 # p.job["FID modulus"],
-                p.job["channel-combining"],
+                p.job["channel_combining"],
                 # p.job["concatenate"],
-                # p.job["zero-filling"],
-                # p.job["physio-analysis"],
-                # p.job["data-rejecting"],
+                # p.job["zero_filling"],
+                # p.job["physio_analysis"],
+                # p.job["data_rejecting"],
                 # p.job["realigning"],
                 p.job["averaging"],
-                p.job["noise-estimation"],
+                p.job["noise_estimation"],
                 p.job["apodizing"],
                 # p.job["cropping"],
-                # p.job["water-removal"],
+                # p.job["water_removal"],
                 # p.job["calibrating"],
                 p.job["displaying"]]
 
@@ -141,17 +141,17 @@ p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/phosphates_mix_002/phosp
 p.job_list = [  p.job["phasing"],
                 # p.job["scaling"],
                 # p.job["FID modulus"],
-                p.job["channel-combining"],
+                p.job["channel_combining"],
                 # p.job["concatenate"],
-                # p.job["zero-filling"],
-                # p.job["physio-analysis"],
-                # p.job["data-rejecting"],
+                # p.job["zero_filling"],
+                # p.job["physio_analysis"],
+                # p.job["data_rejecting"],
                 # p.job["realigning"],
                 p.job["averaging"],
-                p.job["noise-estimation"],
+                p.job["noise_estimation"],
                 p.job["apodizing"],
                 # p.job["cropping"],
-                # p.job["water-removal"],
+                # p.job["water_removal"],
                 # p.job["calibrating"],
                 p.job["displaying"]]
 
@@ -179,22 +179,22 @@ p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/phosphates_mix_002/
 p.job_list = [  # p.job["phasing"],
                 # p.job["scaling"],
                 # p.job["FID modulus"],
-                p.job["channel-combining"],
+                p.job["channel_combining"],
                 # p.job["concatenate"],
-                # p.job["zero-filling"],
-                # p.job["physio-analysis"],
-                # p.job["data-rejecting"],
+                # p.job["zero_filling"],
+                # p.job["physio_analysis"],
+                # p.job["data_rejecting"],
                 # p.job["realigning"],
                 p.job["averaging"],
-                p.job["noise-estimation"],
+                p.job["noise_estimation"],
                 p.job["apodizing"],
                 # p.job["cropping"],
-                # p.job["water-removal"],
+                # p.job["water_removal"],
                 # p.job["calibrating"],
                 p.job["displaying"]]
 
-p.analyze_job_list = [  p.job["channel-combining"],
-                        # p.job["zero-filling"],
+p.analyze_job_list = [  p.job["channel_combining"],
+                        # p.job["zero_filling"],
                         # p.job["realigning"],
                         p.job["averaging"],
                         # p.job["calibrating"]
@@ -203,8 +203,8 @@ p.analyze_job_list = [  p.job["channel-combining"],
 p.job["phasing"]["POI_range_ppm"] = [-5, 5]
 
 # remove 1h channel from data
-p.job["channel-combining"]["phasing"] = False
-p.job["channel-combining"]["weights"] = [False, True]
+p.job["channel_combining"]["phasing"] = False
+p.job["channel_combining"]["weights"] = [False, True]
 
 p.job["apodizing"]["damping_hz"] = 110
 
@@ -254,22 +254,22 @@ p.dataset[9]["dcm"]["files"] = ["/home/tangir/crmbm/acq/phosphates_mix_003/phosp
 p.job_list = [  p.job["phasing"],
                 # p.job["scaling"],
                 # p.job["FID modulus"],
-                p.job["channel-combining"],
+                p.job["channel_combining"],
                 # p.job["concatenate"],
-                # p.job["zero-filling"],
-                # p.job["physio-analysis"],
-                # p.job["data-rejecting"],
+                # p.job["zero_filling"],
+                # p.job["physio_analysis"],
+                # p.job["data_rejecting"],
                 # p.job["realigning"],
                 p.job["averaging"],
-                p.job["noise-estimation"],
+                p.job["noise_estimation"],
                 p.job["apodizing"],
                 # p.job["cropping"],
-                # p.job["water-removal"],
+                # p.job["water_removal"],
                 # p.job["calibrating"],
                 p.job["displaying"]]
 
-p.analyze_job_list = [  p.job["channel-combining"],
-                        # p.job["zero-filling"],
+p.analyze_job_list = [  p.job["channel_combining"],
+                        # p.job["zero_filling"],
                         # p.job["realigning"],
                         p.job["averaging"],
                         # p.job["calibrating"]
@@ -279,8 +279,8 @@ p.job["phasing"]["POI_range_ppm"] = [-5, 5]
 p.job["phasing"]["POI_range_ppm"] = [-2, +2]
 
 # remove 1h channel from data
-p.job["channel-combining"]["phasing"] = False
-p.job["channel-combining"]["weights"] = [False, True]
+p.job["channel_combining"]["phasing"] = False
+p.job["channel_combining"]["weights"] = [False, True]
 
 p.analyze_enable = True
 p.job["analyzing-snr"]["POI_SNR_range_ppm"] = [13, 15]
@@ -326,22 +326,22 @@ p.dataset[6]["dcm"]["files"] = ["/home/tangir/crmbm/acq/phosphates_mix_003/phosp
 p.job_list = [  p.job["phasing"],
                 # p.job["scaling"],
                 # p.job["FID modulus"],
-                p.job["channel-combining"],
+                p.job["channel_combining"],
                 # p.job["concatenate"],
-                # p.job["zero-filling"],
-                # p.job["physio-analysis"],
-                # p.job["data-rejecting"],
+                # p.job["zero_filling"],
+                # p.job["physio_analysis"],
+                # p.job["data_rejecting"],
                 # p.job["realigning"],
                 p.job["averaging"],
-                p.job["noise-estimation"],
+                p.job["noise_estimation"],
                 p.job["apodizing"],
                 # p.job["cropping"],
-                # p.job["water-removal"],
+                # p.job["water_removal"],
                 # p.job["calibrating"],
                 p.job["displaying"]]
 
-p.analyze_job_list = [  p.job["channel-combining"],
-                        # p.job["zero-filling"],
+p.analyze_job_list = [  p.job["channel_combining"],
+                        # p.job["zero_filling"],
                         # p.job["realigning"],
                         p.job["averaging"],
                         # p.job["calibrating"]
@@ -351,8 +351,8 @@ p.job["phasing"]["POI_range_ppm"] = [-5, 5]
 p.job["phasing"]["POI_range_ppm"] = [-2, +2]
 
 # remove 1h channel from data
-p.job["channel-combining"]["phasing"] = False
-p.job["channel-combining"]["weights"] = [False, True]
+p.job["channel_combining"]["phasing"] = False
+p.job["channel_combining"]["weights"] = [False, True]
 
 p.analyze_enable = True
 p.job["analyzing-snr"]["POI_SNR_range_ppm"] = [13, 15]
@@ -413,22 +413,22 @@ p.dataset[11]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/phantom_31p/meas_M
 p.job_list = [  p.job["phasing"],
                 # p.job["scaling"],
                 # p.job["FID modulus"],
-                p.job["channel-combining"],
+                p.job["channel_combining"],
                 # p.job["concatenate"],
-                # p.job["zero-filling"],
-                # p.job["physio-analysis"],
-                # p.job["data-rejecting"],
+                # p.job["zero_filling"],
+                # p.job["physio_analysis"],
+                # p.job["data_rejecting"],
                 # p.job["realigning"],
                 p.job["averaging"],
-                p.job["noise-estimation"],
+                p.job["noise_estimation"],
                 p.job["apodizing"],
                 # p.job["cropping"],
-                # p.job["water-removal"],
+                # p.job["water_removal"],
                 # p.job["calibrating"],
                 p.job["displaying"]]
 
-p.analyze_job_list = [  p.job["channel-combining"],
-                        # p.job["zero-filling"],
+p.analyze_job_list = [  p.job["channel_combining"],
+                        # p.job["zero_filling"],
                         # p.job["realigning"],
                         p.job["averaging"],
                         # p.job["calibrating"]
@@ -437,8 +437,8 @@ p.analyze_job_list = [  p.job["channel-combining"],
 p.job["phasing"]["POI_range_ppm"] = [-1, 1]
 
 # remove 1h channel from data
-p.job["channel-combining"]["phasing"] = False
-p.job["channel-combining"]["weights"] = [False, True]
+p.job["channel_combining"]["phasing"] = False
+p.job["channel_combining"]["weights"] = [False, True]
 
 p.analyze_enable = True
 p.job["analyzing-snr"]["POI_SNR_range_ppm"] = [-1, 1]
@@ -478,22 +478,22 @@ p.dataset[4]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/phantom_31p/meas_MI
 p.job_list = [  p.job["phasing"],
                 # p.job["scaling"],
                 # p.job["FID modulus"],
-                p.job["channel-combining"],
+                p.job["channel_combining"],
                 # p.job["concatenate"],
-                # p.job["zero-filling"],
-                # p.job["physio-analysis"],
-                # p.job["data-rejecting"],
+                # p.job["zero_filling"],
+                # p.job["physio_analysis"],
+                # p.job["data_rejecting"],
                 # p.job["realigning"],
                 p.job["averaging"],
-                p.job["noise-estimation"],
+                p.job["noise_estimation"],
                 p.job["apodizing"],
                 # p.job["cropping"],
-                # p.job["water-removal"],
+                # p.job["water_removal"],
                 # p.job["calibrating"],
                 p.job["displaying"]]
 
-p.analyze_job_list = [  p.job["channel-combining"],
-                        # p.job["zero-filling"],
+p.analyze_job_list = [  p.job["channel_combining"],
+                        # p.job["zero_filling"],
                         # p.job["realigning"],
                         p.job["averaging"],
                         # p.job["calibrating"]
@@ -502,8 +502,8 @@ p.analyze_job_list = [  p.job["channel-combining"],
 p.job["phasing"]["POI_range_ppm"] = [-1, 1]
 
 # remove 1h channel from data
-p.job["channel-combining"]["phasing"] = False
-p.job["channel-combining"]["weights"] = [False, True]
+p.job["channel_combining"]["phasing"] = False
+p.job["channel_combining"]["weights"] = [False, True]
 
 p.analyze_enable = True
 p.job["analyzing-snr"]["POI_SNR_range_ppm"] = [-1, 1]
@@ -531,22 +531,22 @@ p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/csi-31p-phantom/mea
 p.job_list = [  # p.job["phasing"],
                 p.job["scaling"],
                 # p.job["FID modulus"],
-                p.job["channel-combining"],
+                p.job["channel_combining"],
                 # p.job["concatenate"],
-                # p.job["zero-filling"],
-                # p.job["physio-analysis"],
-                # p.job["data-rejecting"],
+                # p.job["zero_filling"],
+                # p.job["physio_analysis"],
+                # p.job["data_rejecting"],
                 #p.job["realigning"],
                 p.job["averaging"],
-                p.job["noise-estimation"],
+                p.job["noise_estimation"],
                 # p.job["cropping"],
-                # p.job["water-removal"],
+                # p.job["water_removal"],
                 p.job["apodizing"],
                 p.job["calibrating"],
                 p.job["displaying"]]
 
-p.analyze_job_list = [  p.job["channel-combining"],
-                        # p.job["zero-filling"],
+p.analyze_job_list = [  p.job["channel_combining"],
+                        # p.job["zero_filling"],
                         # p.job["realigning"],
                         p.job["averaging"],
                         # p.job["calibrating"]
@@ -555,8 +555,8 @@ p.analyze_job_list = [  p.job["channel-combining"],
 p.job["phasing"]["POI_range_ppm"] = [-1, 1]
 
 # remove 1h channel from data
-p.job["channel-combining"]["phasing"] = False
-p.job["channel-combining"]["weights"] = [False, True]
+p.job["channel_combining"]["phasing"] = False
+p.job["channel_combining"]["weights"] = [False, True]
 
 p.job["realigning"]["POI_range_ppm"] = [-2, 1.2]
 p.job["realigning"]["moving_averages"] = 2

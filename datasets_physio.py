@@ -33,17 +33,17 @@ p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/308-rs-p1-moelle/me
 p.job_list = [  p.job["phasing"],
                 p.job["scaling"],
                 # p.job["FID modulus"],
-                p.job["channel-combining"],
+                p.job["channel_combining"],
                 # p.job["concatenate"],
-                # p.job["zero-filling"],
-                # p.job["physio-analysis"],
-                p.job["data-rejecting"],
+                # p.job["zero_filling"],
+                # p.job["physio_analysis"],
+                p.job["data_rejecting"],
                 # p.job["realigning"],
                 p.job["averaging"],
-                p.job["noise-estimation"],
+                p.job["noise_estimation"],
                 # p.job["apodizing"],
                 # p.job["cropping"],
-                # p.job["water-removal"],
+                # p.job["water_removal"],
                 # p.job["calibrating"],
                 p.job["displaying"]]
 
@@ -77,28 +77,28 @@ p.dataset[5]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/311-sl-p1-moelle/me
 p.job_list = [  p.job["phasing"],
                 p.job["scaling"],
                 # p.job["FID modulus"],
-                p.job["channel-combining"],
+                p.job["channel_combining"],
                 # p.job["concatenate"],
-                p.job["zero-filling"],
-                # p.job["physio-analysis"],
-                # p.job["data-rejecting"],
+                p.job["zero_filling"],
+                # p.job["physio_analysis"],
+                # p.job["data_rejecting"],
                 # p.job["realigning"],
                 p.job["averaging"],
-                p.job["noise-estimation"],
+                p.job["noise_estimation"],
                 p.job["apodizing"],
                 # p.job["cropping"],
-                # p.job["water-removal"],
+                # p.job["water_removal"],
                 # p.job["calibrating"],
                 p.job["displaying"]]
 
-p.analyze_job_list = [  p.job["channel-combining"],
-                        p.job["zero-filling"],
+p.analyze_job_list = [  p.job["channel_combining"],
+                        p.job["zero_filling"],
                         # p.job["realigning"],
                         p.job["averaging"],
                         # p.job["calibrating"]
                         ]
 
-p.job["zero-filling"]["npts"] = 4096 * 8
+p.job["zero_filling"]["npts"] = 4096 * 8
 p.job["apodizing"]["damping_hz"] = 5
 
 p.job["analyzing-snr"]["POI_SNR_range_ppm"] = [4.5, 4.8]
@@ -119,23 +119,23 @@ p.dataset[0]["physio-file"] = "/home/tangir/crmbm/acq_physio/313_FT_P1_MOELLE_1.
 p.job_list = [  # p.job["phasing"],
                 p.job["scaling"],
                 # p.job["FID modulus"],
-                p.job["channel-combining"],
+                p.job["channel_combining"],
                 # p.job["concatenate"],
-                p.job["zero-filling"],
-                p.job["physio-analysis"],
-                # p.job["data-rejecting"],
+                p.job["zero_filling"],
+                p.job["physio_analysis"],
+                # p.job["data_rejecting"],
                 # p.job["realigning"],
                 p.job["averaging"],
-                p.job["noise-estimation"],
+                p.job["noise_estimation"],
                 # p.job["apodizing"],
                 # p.job["cropping"],
-                # p.job["water-removal"],
+                # p.job["water_removal"],
                 # p.job["calibrating"],
                 p.job["displaying"]]
 
-p.job["zero-filling"]["npts"] = 4096 * 2
-p.job["physio-analysis"]["POI_range_ppm"] = [4, 5]
-p.job["physio-analysis"]["delta_time_ms"] = 40000.0
+p.job["zero_filling"]["npts"] = 4096 * 2
+p.job["physio_analysis"]["POI_range_ppm"] = [4, 5]
+p.job["physio_analysis"]["delta_time_ms"] = 40000.0
 p.analyze_enable = False
 p.run()
 
@@ -151,23 +151,23 @@ p.dataset[0]["physio-file"] = "/home/tangir/crmbm/acq_physio/314_YT_P1_MOELLE_1.
 p.job_list = [  # p.job["phasing"],
                 p.job["scaling"],
                 # p.job["FID modulus"],
-                p.job["channel-combining"],
+                p.job["channel_combining"],
                 # p.job["concatenate"],
-                p.job["zero-filling"],
-                p.job["physio-analysis"],
-                # p.job["data-rejecting"],
+                p.job["zero_filling"],
+                p.job["physio_analysis"],
+                # p.job["data_rejecting"],
                 # p.job["realigning"],
                 p.job["averaging"],
-                p.job["noise-estimation"],
+                p.job["noise_estimation"],
                 # p.job["apodizing"],
                 # p.job["cropping"],
-                # p.job["water-removal"],
+                # p.job["water_removal"],
                 # p.job["calibrating"],
                 p.job["displaying"]]
 
-p.job["zero-filling"]["npts"] = 4096 * 2
-p.job["physio-analysis"]["POI_range_ppm"] = [4, 5]
-p.job["physio-analysis"]["delta_time_ms"] = 40000.0
+p.job["zero_filling"]["npts"] = 4096 * 2
+p.job["physio_analysis"]["POI_range_ppm"] = [4, 5]
+p.job["physio_analysis"]["delta_time_ms"] = 40000.0
 p.analyze_enable = False
 p.run()
 
@@ -183,23 +183,23 @@ p.dataset[0]["physio-file"] = "/home/tangir/crmbm/acq_physio/316_AP_P1_MOELLE.re
 p.job_list = [  # p.job["phasing"],
                 p.job["scaling"],
                 # p.job["FID modulus"],
-                p.job["channel-combining"],
+                p.job["channel_combining"],
                 # p.job["concatenate"],
-                p.job["zero-filling"],
-                p.job["physio-analysis"],
-                # p.job["data-rejecting"],
+                p.job["zero_filling"],
+                p.job["physio_analysis"],
+                # p.job["data_rejecting"],
                 # p.job["realigning"],
                 p.job["averaging"],
-                p.job["noise-estimation"],
+                p.job["noise_estimation"],
                 # p.job["apodizing"],
                 # p.job["cropping"],
-                # p.job["water-removal"],
+                # p.job["water_removal"],
                 # p.job["calibrating"],
                 p.job["displaying"]]
 
-p.job["zero-filling"]["npts"] = 4096 * 2
-p.job["physio-analysis"]["POI_range_ppm"] = [4, 5]
-p.job["physio-analysis"]["delta_time_ms"] = 10000.0
+p.job["zero_filling"]["npts"] = 4096 * 2
+p.job["physio_analysis"]["POI_range_ppm"] = [4, 5]
+p.job["physio_analysis"]["delta_time_ms"] = 10000.0
 p.analyze_enable = False
 p.run()
 
@@ -215,22 +215,22 @@ p.dataset[0]["physio-file"] = "/home/tangir/crmbm/acq_physio/328_AF_P1_MOELLE.re
 p.job_list = [  p.job["phasing"],
                 p.job["scaling"],
                 # p.job["FID modulus"],
-                p.job["channel-combining"],
+                p.job["channel_combining"],
                 # p.job["concatenate"],
-                p.job["zero-filling"],
-                p.job["physio-analysis"],
-                # p.job["data-rejecting"],
+                p.job["zero_filling"],
+                p.job["physio_analysis"],
+                # p.job["data_rejecting"],
                 # p.job["realigning"],
                 p.job["averaging"],
-                p.job["noise-estimation"],
+                p.job["noise_estimation"],
                 # p.job["apodizing"],
                 # p.job["cropping"],
-                # p.job["water-removal"],
+                # p.job["water_removal"],
                 # p.job["calibrating"],
                 p.job["displaying"]]
 
-p.job["zero-filling"]["npts"] = 4096 * 2
-p.job["physio-analysis"]["POI_range_ppm"] = [4, 5]
-p.job["physio-analysis"]["delta_time_ms"] = 40000.0
+p.job["zero_filling"]["npts"] = 4096 * 2
+p.job["physio_analysis"]["POI_range_ppm"] = [4, 5]
+p.job["physio_analysis"]["delta_time_ms"] = 40000.0
 p.analyze_enable = False
 p.run()

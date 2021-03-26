@@ -6,7 +6,7 @@ PASTIS stands for (P)rocessing (AS)sessment (T)echnique for (I)mproved (S)pectro
 
 PASTIS can be used to process and quantify single-voxel Magnetic Resonance SPectroscopy (MRS) data. It can also simulate MRS data using various MRS sequences for different B0 fields.
 
-## Dependencies
+## Requirements (see requirements.txt)
 
 * Python 3.7
 * Python packages:
