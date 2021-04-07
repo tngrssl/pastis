@@ -11,9 +11,9 @@ import matplotlib.pylab as plt
 import mrs.fit as fit
 import mrs.sim as sim
 import mrs.aliases as xxx
-import mrs.reco as reco
 import mrs.log as log
 
+import pandas as pd
 import numpy as np
 import csv
 import os.path
@@ -27,12 +27,14 @@ plt.rcParams['figure.max_open_warning'] = 1000
 plt.rcParams['font.size'] = 9
 log.setLevel(log.DEBUG)
 
-rdb = reco.data_db()
+# data to process is in here
+db_filepath = "/home/tangir/crmbm/acq_db/muscle.pkl"
 
 # %% retrieve data to process
-df_sel = rdb.df_reco.loc[rdb.df_reco["timestamp"] == rdb.df_reco["timestamp"].max()]
-data = df_sel["dataset"]["raw"]["data"]
-data_pipeline = df_sel["reco_pipeline"]
+
+df = pd.read_pickle(db_filepath)
+df = df.loc[df["timestamp"] == df["timestamp"].max()]
+data = df.iloc[0]["reco_dataset_raw_data_obj"]
 
 # %% set metabolites to fit, water concentration, csv file
 
@@ -54,20 +56,19 @@ lipids_fit = np.sort([
     xxx.m_Lip6])
 
 water_concentration = 87700.0  # mmol/kg
-fit_result_csv_filename = "fit_results.csv"
 
 # %% prepare simulation machine
 
+
+basis_set_name = 'Muscle'
+basis_set_pkl_file = "20210331_muscle.pkl"
+
 # metabolite db
-meta_bs = sim.metabolite_basis_set()
-meta_bs.basis_set_xls_file = "./metabolite_basis_sets/muscle_7T.xls"
-meta_bs.non_coupled_only = True
-meta_bs.one_proton_mode = True
-meta_bs.initialize()
+meta_bs = sim.metabolite_basis_set(basis_set_name=basis_set_name, non_coupled_only=True, one_proton_mode=True)
 
 # sequence
 seq = data.sequence
-seq.seqdb_file = "./metabolite_basis_sets/muscle_7T_20200611.pkl"
+seq.db_file = "20210331_muscle.pkl"
 seq.initialize(meta_bs)
 
 # B0 field switch
@@ -75,198 +76,137 @@ gamma1H = 42.576
 b0 = seq.f0 / gamma1H
 b0_factor = b0 / 7.0
 
-# %% area integration stuff
-
-# for non water-suppressed data
-prefittool = fit.prefit_tool(data.data_ref, seq)
-prefittool.area_integration_peak_ranges = [0.5]
-prefittool.area_integration_peaks = [xxx.m_Water]
-prefittool.initialize()
-params_ref_area, params_ref_area_pnorm = prefittool.run()
-
-# for water-suppressed data
-prefittool = fit.prefit_tool(data, seq)
-prefittool.area_integration_peak_ranges = [0.1, 1]
-prefittool.area_integration_peaks = [xxx.m_Cr_CH3, xxx.m_Lip2]
-prefittool.initialize()
-params_area, params_area_pnorm = prefittool.run()
-
 # %% fit non water-suppressed data
 
-fittool = fit.fit_tool(data.data_ref, seq)
+fittool_nows = fit.fit_tool(data.data_ref, seq)
 # min/max fitting bounds
-fittool.params_min = fittool.params_min.set_default_water_min()
-fittool.params_max = fittool.params_max.set_default_water_max()
+fittool_nows.params_min = fittool_nows.params_min.set_default_water_min()
+fittool_nows.params_max = fittool_nows.params_max.set_default_water_max()
 # water concentration parameter
-fittool.params_min[xxx.m_Water, xxx.p_cm] = 0
-fittool.params_max[xxx.m_Water, xxx.p_cm] = 1000000.0
+fittool_nows.params_min[xxx.m_Water, xxx.p_cm] = 0
+fittool_nows.params_max[xxx.m_Water, xxx.p_cm] = 1000000.0
 # water linewidth
-fittool.params_min[xxx.m_Water, xxx.p_dd] = 10.0 * b0_factor
-fittool.params_max[xxx.m_Water, xxx.p_dd] = 500.0 * b0_factor
+fittool_nows.params_min[xxx.m_Water, xxx.p_dd] = 10.0 * b0_factor
+fittool_nows.params_max[xxx.m_Water, xxx.p_dd] = 500.0 * b0_factor
 # water frequency shift
-fittool.params_min[xxx.m_Water, xxx.p_df] = -50.0 * b0_factor
-fittool.params_max[xxx.m_Water, xxx.p_df] = +50.0 * b0_factor
+fittool_nows.params_min[xxx.m_Water, xxx.p_df] = -50.0 * b0_factor
+fittool_nows.params_max[xxx.m_Water, xxx.p_df] = +50.0 * b0_factor
 # water phase
-fittool.params_min[xxx.m_Water, xxx.p_dp] = -0.1
-fittool.params_max[xxx.m_Water, xxx.p_dp] = +0.1
+fittool_nows.params_min[xxx.m_Water, xxx.p_dp] = -0.1
+fittool_nows.params_max[xxx.m_Water, xxx.p_dp] = +0.1
 
 # initial fit values
-fittool.params_init = fittool.params_min.copy()
-fittool.params_init[xxx.m_Water, xxx.p_cm] = 1.0
-fittool.params_init[xxx.m_Water, xxx.p_dd] = 100.0 * b0_factor
-fittool.params_init[xxx.m_Water, xxx.p_df] = 0.0 * b0_factor
-fittool.params_init[xxx.m_Water, xxx.p_dp] = 0.0
+fittool_nows.params_init = fittool_nows.params_min.copy()
+fittool_nows.params_init[xxx.m_Water, xxx.p_cm] = 1.0
+fittool_nows.params_init[xxx.m_Water, xxx.p_dd] = 100.0 * b0_factor
+fittool_nows.params_init[xxx.m_Water, xxx.p_df] = 0.0 * b0_factor
+fittool_nows.params_init[xxx.m_Water, xxx.p_dp] = 0.0
 
 # numerical optimization parameters
-fittool.optim_xtol = 1e-9
-fittool.optim_ftol = 1e-9
-fittool.optim_gtol = 1e-9
-fittool.display_range_ppm = [3, 7]
+fittool_nows.optim_xtol = 1e-9
+fittool_nows.optim_ftol = 1e-9
+fittool_nows.optim_gtol = 1e-9
+fittool_nows.display_range_ppm = [3, 7]
 
 # run the fit
-fittool.initialize()
-[params_ref_fit, params_ref_fit_CRBs_abs, params_ref_fit_CRBs_rel, optim_result_ref] = fittool.run()
+fittool_nows.run()
 
 # %% fit water-suppressed data
 
-fittool = fit.fit_tool(data, seq)
+fittool_ws = fit.fit_tool(data, seq)
 
 # default fitting bounds from muscle template
-fittool.params_min = fittool.params_min.set_default_min()
-fittool.params_max = fittool.params_max.set_default_max()
+fittool_ws.params_min = fittool_ws.params_min.set_default_min()
+fittool_ws.params_max = fittool_ws.params_max.set_default_max()
 
 # ranges for concentration
-fittool.params_min[:, xxx.p_cm] = 0.0
-fittool.params_max[:, xxx.p_cm] = 1000.0
-fittool.params_max[xxx.m_Water, xxx.p_cm] = 100000.0
+fittool_ws.params_min[:, xxx.p_cm] = 0.0
+fittool_ws.params_max[:, xxx.p_cm] = 1000.0
+fittool_ws.params_max[xxx.m_Water, xxx.p_cm] = 100000.0
 
 # linewidth bounds for metabolites
-fittool.params_min[xxx.m_All_MBs, xxx.p_dd] = 5.0 * b0_factor
-fittool.params_max[xxx.m_All_MBs, xxx.p_dd] = 90.0 * b0_factor
+fittool_ws.params_min[xxx.m_All_MBs, xxx.p_dd] = 5.0 * b0_factor
+fittool_ws.params_max[xxx.m_All_MBs, xxx.p_dd] = 90.0 * b0_factor
 
 # initial concentrations
-fittool.params_init[:, xxx.p_cm] = 0.0
-fittool.params_init[metabolites_fit, xxx.p_cm] = 0.1
+fittool_ws.params_init[:, xxx.p_cm] = 0.0
+fittool_ws.params_init[metabolites_fit, xxx.p_cm] = 0.1
 
 # frequency shifts for metabolites
-fittool.params_min[xxx.m_All_MBs, xxx.p_df] = -20.0 * b0_factor
-fittool.params_max[xxx.m_All_MBs, xxx.p_df] = 20.0 * b0_factor
+fittool_ws.params_min[xxx.m_All_MBs, xxx.p_df] = -20.0 * b0_factor
+fittool_ws.params_max[xxx.m_All_MBs, xxx.p_df] = 20.0 * b0_factor
 
 # phase bounds for metabolites and lipids
-fittool.params_min[:, xxx.p_dp] = -0.1
-fittool.params_max[:, xxx.p_dp] = +0.1
+fittool_ws.params_min[:, xxx.p_dp] = -0.1
+fittool_ws.params_max[:, xxx.p_dp] = +0.1
 
 # linklock
-fittool.params_init.linklock[:] = 1
-fittool.params_init.linklock[metabolites_fit[0], :] = [0, -200, 0, -100]
+fittool_ws.params_init.linklock[:] = 1
+fittool_ws.params_init.linklock[metabolites_fit[0], :] = [0, -200, 0, -100]
 for im in metabolites_fit[1:]:
-    fittool.params_init.linklock[im, :] = [0, 200, 0, 100]
+    fittool_ws.params_init.linklock[im, :] = [0, 200, 0, 100]
 
 # leave water phase free
-fittool.params_init.linklock[xxx.m_Water, :] = [0, 0, 0, 0]
+fittool_ws.params_init.linklock[xxx.m_Water, :] = [0, 0, 0, 0]
 
 # link Cr CH3 to CH2 ?
-# fittool.params_init.linklock[xxx.m_Cr_CH3, xxx.p_cm] = -6
-# fittool.params_init.linklock[xxx.m_Cr_CH2, xxx.p_cm] = +6
+# fittool_ws.params_init.linklock[xxx.m_Cr_CH3, xxx.p_cm] = -6
+# fittool_ws.params_init.linklock[xxx.m_Cr_CH2, xxx.p_cm] = +6
 
 # lipids concentration init
-fittool.params_init[lipids_fit, xxx.p_cm] = 0.1
+fittool_ws.params_init[lipids_fit, xxx.p_cm] = 0.1
 
 # max lipid cm
-fittool.params_max[lipids_fit, xxx.p_cm] = 1000.0
+fittool_ws.params_max[lipids_fit, xxx.p_cm] = 1000.0
 
 # linewidth bounds for metabolites
-fittool.params_min[lipids_fit, xxx.p_dd] = 70.0 * b0_factor
-fittool.params_max[lipids_fit, xxx.p_dd] = 225.0 * b0_factor
-fittool.params_init[lipids_fit, xxx.p_dd] = 71.0 * b0_factor
+fittool_ws.params_min[lipids_fit, xxx.p_dd] = 70.0 * b0_factor
+fittool_ws.params_max[lipids_fit, xxx.p_dd] = 225.0 * b0_factor
+fittool_ws.params_init[lipids_fit, xxx.p_dd] = 71.0 * b0_factor
 
 # lipids frequency shift init and bound values
-fittool.params_min[lipids_fit, xxx.p_df] = -40.0 * b0_factor
-fittool.params_max[lipids_fit, xxx.p_df] = +60.0 * b0_factor
-fittool.params_init[lipids_fit, xxx.p_df] = 0.0 * b0_factor
+fittool_ws.params_min[lipids_fit, xxx.p_df] = -40.0 * b0_factor
+fittool_ws.params_max[lipids_fit, xxx.p_df] = +60.0 * b0_factor
+fittool_ws.params_init[lipids_fit, xxx.p_df] = 0.0 * b0_factor
 
-fittool.params_init[xxx.m_Lip3, xxx.p_df] = +12
-fittool.params_init[xxx.m_Lip4, xxx.p_df] = +3
-fittool.params_init[xxx.m_Lip6, xxx.p_df] = -9
+fittool_ws.params_init[xxx.m_Lip3, xxx.p_df] = +12
+fittool_ws.params_init[xxx.m_Lip4, xxx.p_df] = +3
+fittool_ws.params_init[xxx.m_Lip6, xxx.p_df] = -9
 
 # lipids linklock
-fittool.params_init.linklock[xxx.m_All_MMs, :] = 1
-fittool.params_init.linklock[lipids_fit[0], :] = [0, 0, 0, 100]
+fittool_ws.params_init.linklock[xxx.m_All_MMs, :] = 1
+fittool_ws.params_init.linklock[lipids_fit[0], :] = [0, 0, 0, 100]
 for il in lipids_fit[1:]:
-    fittool.params_init.linklock[il, :] = [0, 0, 0, 100]
+    fittool_ws.params_init.linklock[il, :] = [0, 0, 0, 100]
 
 # add a "baseline" using vey large MM resonances
-fittool.params_min.add_macromolecules_min()
-fittool.params_max.add_macromolecules_max()
+fittool_ws.params_min.add_macromolecules_min()
+fittool_ws.params_max.add_macromolecules_max()
 # take ony one resonance
-fittool.params_init.linklock[xxx.m_All_MMs, :] = [1, 1, 1, 1]
-fittool.params_init.linklock[xxx.m_Offset2, :] = [0, 0, 0, 0]
+fittool_ws.params_init.linklock[xxx.m_All_MMs, :] = [1, 1, 1, 1]
+fittool_ws.params_init.linklock[xxx.m_Offset2, :] = [0, 0, 0, 0]
 
 # huge linewidth
-fittool.params_min[xxx.m_Offset2, xxx.p_dd] = 300
-fittool.params_max[xxx.m_Offset2, xxx.p_dd] = 2000
-fittool.params_init[xxx.m_Offset2, xxx.p_dd] = 600
+fittool_ws.params_min[xxx.m_Offset2, xxx.p_dd] = 300
+fittool_ws.params_max[xxx.m_Offset2, xxx.p_dd] = 2000
+fittool_ws.params_init[xxx.m_Offset2, xxx.p_dd] = 600
 
 # not too strong
-fittool.params_max[xxx.m_Offset2, xxx.p_cm] = 200
-fittool.params_init[xxx.m_Offset2, xxx.p_cm] = 0.1
+fittool_ws.params_max[xxx.m_Offset2, xxx.p_cm] = 200
+fittool_ws.params_init[xxx.m_Offset2, xxx.p_cm] = 0.1
 
 # numerical optimization parameters
-fittool.display_range_ppm = [0, 6]
-fittool.display_frequency = 2
+fittool_ws.display_range_ppm = [0, 6]
+fittool_ws.display_frequency = 2
 
 # run the fit
-fittool.initialize()
-[params_fit_final, params_fit_CRBs_abs, params_fit_CRBs_rel, optim_result] = fittool.run()
+fittool_ws.run()
 
-# %% normalize and display concentrations
+# %% dump results to csv file
 
-# correct for T2/T1 relaxation assuming some T1/T2s found in literature
-params_fit_final_Ts = params_fit_final.correct_T2s(data.te).correct_T1s(data.tr)
-params_ref_fit_Ts = params_ref_fit.correct_T2s(data.data_ref.te).correct_T1s(data.data_ref.tr)
-
-# normalize concentrations to water
-params_fit_final_Ts_abs_water = params_fit_final_Ts.correct_absolute(params_ref_fit_Ts, water_concentration)
-
-# nice display
-fig = plt.figure(700)
-fig.clf()
-fig.canvas.set_window_title("Final results")
-
-# fit plot
-ax = plt.subplot(1, 2, 1)
-fit.disp_fit(ax, data, params_fit_final, seq, True, True)
-
-# now the bargraphs
-ax = plt.subplot(2, 2, 2)
-fit.disp_bargraph(ax, [params_fit_final_Ts_abs_water], [params_fit_final_Ts_abs_water * params_fit_CRBs_rel / 100.0], ['Fit Ts-cor rel. Water'], False, False, False, False, xxx.p_cm, np.concatenate([metabolites_fit, lipids_fit]), 0.2)
-
-ax = plt.subplot(2, 2, 4)
-fit.disp_bargraph(ax, [params_fit_final_Ts_abs_water], [params_fit_final_Ts_abs_water * params_fit_CRBs_rel / 100.0], ['Fit Ts-cor rel. Water'], False, False, False, False, xxx.p_cm, np.concatenate([metabolites_fit, lipids_fit]), 0.2)
-plt.ylim([0, 1000])
-
-# adjust subplots
-fig.subplots_adjust(left=0.02, bottom=0.1, right=0.98, top=0.95, wspace=0.2, hspace=None)
-
-# %% save results to csv file
-
-# prepare stuff to write in csv file
-metabolites_names = np.array(params_fit_final.get_meta_names())
-data_legend_caption = data_pipeline._display_legends_list[0]
-header_line = ["Dataset"] + list(metabolites_names[np.concatenate([metabolites_fit, lipids_fit])]) + [metabolites_names[xxx.m_Water] + "(REF)"] + [lbl +" (CRB%)" for lbl in list(metabolites_names[np.concatenate([metabolites_fit, lipids_fit])])] + [metabolites_names[xxx.m_Water] + "(REF) (CRB%)"] + ["Cr_CH3 area (no norm)", "Lip2 area (no norm)", "Water (REF) area (no norm)"]
-
-data_line = [data_legend_caption] + list(params_fit_final[np.concatenate([metabolites_fit, lipids_fit]), xxx.p_cm]) + [params_ref_fit[xxx.m_Water, xxx.p_cm]] + list(params_fit_CRBs_rel[np.concatenate([metabolites_fit, lipids_fit]), xxx.p_cm]) + [params_ref_fit_CRBs_rel[xxx.m_Water, xxx.p_cm]] + [params_area[xxx.m_Cr_CH3, xxx.p_cm], params_area[xxx.m_Lip2, xxx.p_cm], params_ref_area[xxx.m_Water, xxx.p_cm]]
-
-# if csv file does not exist, create it and write header row
-if not os.path.isfile(fit_result_csv_filename):
-    with open(fit_result_csv_filename, 'w') as csvfile:
-        spamwriter = csv.writer(csvfile, delimiter=',')
-        spamwriter.writerow(header_line)
-        csvfile.close()
-
-# write data
-with open(fit_result_csv_filename, 'a') as csvfile:
-    spamwriter = csv.writer(csvfile, delimiter=',')
-    spamwriter.writerow(data_line)
-    csvfile.close()
-
+# save the fit results ---
+this_fit_nows_df = fittool_nows.to_dataframe('nows_')
+this_fit_ws_df = fittool_ws.to_dataframe('ws_')
+this_fit_df = pd.concat([this_fit_nows_df, this_fit_ws_df], axis=1)
+this_fit_df = this_fit_df.set_index(["ws_fit_hash", "ws_data_file_hash"])
+this_fit_df.to_csv("fit_results.csv")

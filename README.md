@@ -6,6 +6,8 @@ PASTIS stands for (P)rocessing (AS)sessment (T)echnique for (I)mproved (S)pectro
 
 PASTIS can be used to process and quantify single-voxel Magnetic Resonance SPectroscopy (MRS) data. It can also simulate MRS data using various MRS sequences for different B0 fields.
 
+PASTIS relies a lot on the suspect package.
+
 ## Requirements (see requirements.txt)
 
 * Python 3.7
@@ -19,6 +21,7 @@ PASTIS can be used to process and quantify single-voxel Magnetic Resonance SPect
 
 * Read raw data from Siemens (TWIX VB17 format preferred)
 * Read dicom data
+* VOI overlay on anatomical image
 * Data processing
 	* Automatic phasing
 	* Automatic channel combination
@@ -30,7 +33,6 @@ PASTIS can be used to process and quantify single-voxel Magnetic Resonance SPect
 	* Signal and noise estimation
 	* Linewidth estimation
 	* Spectral display
-	* VOI overlay on anatomical image
 * Data simulation
 	* Based on GAMMA library
 	* PRESS, STEAM, sLASER sequences
@@ -38,6 +40,7 @@ PASTIS can be used to process and quantify single-voxel Magnetic Resonance SPect
 	* Fully editable metabolite basis set
 	* Macromolecular baseline modelization
 	* Linear combination time-domain model
+	* Possible to save/load metabolite simulation signals
 * Quantification
 	* Based on the previous model
 	* Dynamic model options
@@ -45,5 +48,6 @@ PASTIS can be used to process and quantify single-voxel Magnetic Resonance SPect
 		* Parameters can be linked to each other
 	* Jacobian matrix information
 	* Cramér-Rao Bounds estimations
+* Quantification using suspect's LCModel wrapper
 * Dataframe-based storage in pkl files
 * Reconstruction and quantification of diffusion-weighted MRS data (experimental)

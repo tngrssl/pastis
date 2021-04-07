@@ -40,6 +40,14 @@ class fit_plot_type(Enum):
     TIME_DOMAIN = 7
 
 
+class fit_adjust_metabolite_mode(Enum):
+    """The enum fit_adjust_metabolite_mode describes how the algorithm should look for fittable metabolites. See the method fit_pastis.adjust_metabolites() for more info."""
+
+    OPTIMISTIC = 1
+    AVERAGE = 2
+    PESSIMISTIC = 3
+
+
 class fit_tool():
     """The fit_tool class is a virtual class, mother of other classes used for fitting."""
 
@@ -171,7 +179,7 @@ class fit_lcmodel(fit_tool):
             "LCSV": self.lcmodel_lcsv
         }
         # call suspect to prepare LCModel files
-        suspect.io.lcmodel.write_all_files(self.lcmodel_rawfile_fullpath, self.data, params=params)
+        suspect.io.lcmodel.write_all_files(self.lcmodel_rawfile_fullpath, self.data, self.data.data_ref, params=params)
 
         # guess CONTROL file name
         fullpath_noext, ext = os.path.splitext(self.lcmodel_rawfile_fullpath)
@@ -527,6 +535,9 @@ class fit_pastis(fit_tool):
 
         # init
         s = self.data.copy()
+        # zero-fill for improved resolution
+        s = s.correct_zerofill_nd()
+        # chemical shift axis
         ppm = s.frequency_axis_ppm()
 
         # find maximum peak in range and its chemical shift
@@ -537,7 +548,7 @@ class fit_pastis(fit_tool):
             fig = plt.figure(self.display_fig_index)
             fig.clf()
             axs = fig.subplots()
-            fig.canvas.set_window_title("run (mrs.fit.prefit_tool)")
+            fig.canvas.set_window_title("run (mrs.fit.fit_pastis)")
             axs.plot(self.data.frequency_axis_ppm(), self.data.spectrum().real, "k-", label="data")
 
         # now for each peak, integrate the area
@@ -810,27 +821,24 @@ class fit_pastis(fit_tool):
             fig = plt.figure(self.display_fig_index)
             fig.clf()
             axs = fig.subplots(2, 4)
-            fig.canvas.set_window_title("_minimizeThis (mrs.fit.lsqfit)")
+            fig.canvas.set_window_title("_minimizeThis (mrs.fit.fit_pastis)")
 
             # display real-time bargraphs
             # real-time CRBs
             if(self.display_CRBs):
                 params._errors = self.get_CRBs(params)
 
-            params_val_list = [self.params_min, self.params_max, params]
-            params_leg_list = ['lower bounds', 'upper bounds', 'current']
-
             # let's display the subplots as required by self.display_subplots_types
             axs_list = [axs[0, 2], axs[0, 3], axs[1, 2], axs[1, 3]]
             for ax, plt_type in zip(axs_list, self.display_subplots_types):
                 if(plt_type == fit_plot_type.BARGRAPH_CM):
-                    disp_bargraph(ax, params_val_list, params_leg_list, True, True, self._water_only, True, xxx.p_cm)
+                    self.disp_bargraph(ax, params, xxx.p_cm)
                 elif(plt_type == fit_plot_type.BARGRAPH_DD):
-                    disp_bargraph(ax, params_val_list, params_leg_list, True, True, self._water_only, True, xxx.p_dd)
+                    self.disp_bargraph(ax, params, xxx.p_dd)
                 elif(plt_type == fit_plot_type.BARGRAPH_DF):
-                    disp_bargraph(ax, params_val_list, params_leg_list, True, True, self._water_only, True, xxx.p_df)
+                    self.disp_bargraph(ax, params, xxx.p_df)
                 elif(plt_type == fit_plot_type.BARGRAPH_DP):
-                    disp_bargraph(ax, params_val_list, params_leg_list, True, True, self._water_only, True, xxx.p_dp)
+                    self.disp_bargraph(ax, params, xxx.p_dp)
                 elif(plt_type == fit_plot_type.COST_FUNCTION):
                     ax.plot(self._cost_function, 'k-')
                     ax.set_xlabel('iterations')
@@ -869,6 +877,127 @@ class fit_pastis(fit_tool):
 
         return(diff_cmplx_odd_even)
 
+    def get_fittable_metabolites(self, snr_threshold=1, mode=fit_adjust_metabolite_mode.AVERAGE):
+        """
+        Adjust the list of metabolites to fit. This method is experimental. It runs an algorithm to try and test which metabolites are actually fittable. How? Based on their common concentration and simulated time-domain SNR. If the metabolite SNR is above the threshold (1, by default, meaning above noise level in short), the metabolite is kept in the fit list. The final metabolite basis set is printed on screen. This method should be run after the run() method in order to get some first fit results.
+
+        Parameters
+        ----------
+        snr_threshold : float
+            SNR threshold in order to keep the metabolite in the fit metabolite basis set. This is a time-domain SNR calculated using the maximum point of the real part of FID divided by the STD of noise at the end of the FID.
+        mode : fit_adjust_metabolite_mode
+            This describes how optimistic is the algorithm. When running on the OPTIMISTIC mode, the algorithm will assume a low concentration for the reference metabolite (Cr_CH3 for example) based on the concentration ranges in the xls metabolite basis set. It will also keep in the basis set metabolites giving a SNR above the threshold even with the lowest concentration. AVERAGE mode uses average concentrations while PESSIMISTIC uses maximum concentrations available in the xls metabolite basis set.
+
+        Returns
+        -------
+        new_metabolites_list : list
+            New list of metabolite indexes to fit
+        metabolites_excluded_list : list
+            List of metabolite indexes to exclude from fit
+        """
+        # first get original noise level
+        noise_std = self.data.noise_level
+
+        # get reference metabolite concentration
+        # correct for T1/T2 effects
+        params_fit_ref = self.params_fit.correct_T2s(self.data.te).correct_T1s(self.data.tr)
+        # go and get concentration for this metabolites according to literature
+        if(mode == fit_adjust_metabolite_mode.AVERAGE):
+            cm_lit_ref = (self.meta_bs.get_literature_min() + self.meta_bs.get_literature_max()) / 2.0
+            cm_lit_test = (self.meta_bs.get_literature_min() + self.meta_bs.get_literature_max()) / 2.0
+        elif(mode == fit_adjust_metabolite_mode.OPTIMISTIC):
+            cm_lit_ref = self.meta_bs.get_literature_min()
+            cm_lit_test = self.meta_bs.get_literature_max()
+        if(mode == fit_adjust_metabolite_mode.PESSIMISTIC):
+            cm_lit_ref = self.meta_bs.get_literature_max()
+            cm_lit_test = self.meta_bs.get_literature_min()
+
+        # get our reference metabolite from metabolite basis set
+        m_ref = xxx.m_Ref_MB
+
+        # for each metabolite we attempt to fit here, we test its SNR
+        snr_metabolites_list = []
+        metabolites_kept_list = []
+        metabolites_excluded_list = []
+
+        # metabolites
+        meta_names = params_fit_ref.get_meta_names()
+        metabolites_to_test_list = [m for m in self.metabolites if(m in xxx.m_All_MBs)]
+        macromolecules_to_keep_list = [m for m in self.metabolites if(m in xxx.m_All_MMs)]
+
+        # init display
+        if(self.display_enable):
+            n_subplots = len(metabolites_to_test_list)
+            n_subplots_side = int(np.ceil(np.sqrt(n_subplots)))
+            fig = plt.figure(self.display_fig_index)
+            fig.clf()
+            axs = fig.subplots(n_subplots_side, n_subplots_side, sharex='all')
+            fig.canvas.set_window_title("adjust_metabolites (mrs.fit.fit_pastis)")
+
+        for plot_index, m in enumerate(metabolites_to_test_list):
+            # simulate its signal with the noise level estimated on the data
+            p = sim.params(self.meta_bs)
+            p[:, xxx.p_cm] = 0.0
+            # concentration parameter according to fit results and known concentrations
+            p[m, xxx.p_cm] = params_fit_ref[m_ref, xxx.p_cm] * cm_lit_test[m] / cm_lit_ref[m_ref]
+            # take damping/T2* parameter from fit results of ref metabolite
+            p[:, xxx.p_dd] = params_fit_ref[m_ref, xxx.p_dd]
+            # go simulation without noise
+            s = self.sequence.simulate_signal(p, 0.0)
+
+            # noise only
+            p[:, xxx.p_cm] = 0.0
+            # go simulation
+            s_noise = self.sequence.simulate_signal(p, noise_std)
+
+            # estimate time SNR
+            this_snr_s = np.max(np.real(s))
+            this_snr_n = noise_std
+            this_snr = this_snr_s / this_snr_n
+            snr_metabolites_list.append(this_snr)
+
+            # check snr and store
+            if(this_snr > snr_threshold):
+                metabolites_kept_list.append(m)
+            else:
+                metabolites_excluded_list.append(m)
+
+            # display
+            if(self.display_enable):
+                axs.flat[plot_index].plot(s_noise.time_axis() * 1000.0, np.real(s_noise), 'k')
+                axs.flat[plot_index].axhline(this_snr_n, color='w', linestyle='--')
+                if(this_snr > snr_threshold):
+                    axs.flat[plot_index].plot(s.time_axis() * 1000.0, np.real(s), 'g')
+                else:
+                    axs.flat[plot_index].plot(s.time_axis() * 1000.0, np.real(s), 'r')
+                axs.flat[plot_index].set(xlabel='FID time (ms)', title=meta_names[m])
+
+        # display
+        if(self.display_enable):
+            old_log_level = log.getLevel()
+            log.setLevel(log.INFO)
+            for ax in fig.get_axes():
+                ax.label_outer()
+
+            fig.subplots_adjust(left=0.02, bottom=0.1, right=0.98, top=0.95, wspace=0.2, hspace=None)
+            fig.show()
+            plt.pause(0.5)
+            # put back log
+            log.setLevel(old_log_level)
+
+        # merge back with macromolecules
+        new_metabolites_list = list(set(np.sort(metabolites_kept_list + macromolecules_to_keep_list)))
+
+        # display results
+        log.info("Initial basis set (n=%d): %s" % (len(self.metabolites), " ".join([meta_names[im] for im in self.metabolites])))
+        log.info("Metabolite tested (n=%d): %s" % (len(metabolites_to_test_list), " ".join([meta_names[im] for im in metabolites_to_test_list])))
+        log.info("Metabolite included (n=%d): %s" % (len(metabolites_kept_list), " ".join([meta_names[im] for im in metabolites_kept_list])))
+        log.info("Metabolite excluded (n=%d): %s" % (len(metabolites_excluded_list), " ".join([meta_names[im] for im in metabolites_excluded_list])))
+        log.info("Final basis set (n=%d): %s" % (len(new_metabolites_list), " ".join([meta_names[im] for im in new_metabolites_list])))
+
+        # and return
+        return(new_metabolites_list, metabolites_excluded_list)
+
     def get_hash(self):
         """
         Generate a hash of this strategy.
@@ -878,7 +1007,7 @@ class fit_pastis(fit_tool):
         h : string
             Hash code of this strategy. Usefull later when dealing with databases...
         """
-        bytes_to_hash = self.metabolites.tobytes() + self.params_linklock.tobytes() + str(self.sequence).encode()
+        bytes_to_hash = np.array(self.metabolites).tobytes() + self.params_linklock.tobytes() + str(self.sequence).encode()
 
         h = hashlib.md5(bytes_to_hash)
 
@@ -909,15 +1038,7 @@ class fit_pastis(fit_tool):
         F = np.dot(j_free, np.transpose(j_free))
 
         # covariance
-        try:
-            covar = np.linalg.inv(np.real(F))
-        except:
-            # it happens that F is a singular matrix
-            # I believe it is just bad luck but I am not really sure how to handle this error...
-            # for now, I just had some little salt to F
-            log.warning("weird singular matrix bug while inverting Fisher matrix during CRB calculation!")
-            F[0, 0] = F[0, 0] + 1e-6
-            covar = np.linalg.inv(np.real(F))
+        covar = np.linalg.inv(np.real(F))
 
         # CRBs
         CRBs = np.zeros(covar.shape[0])
@@ -1088,6 +1209,81 @@ class fit_pastis(fit_tool):
         if(disp_color_bar):
             plt.colorbar(im)
 
+    def disp_bargraph(self, ax, params, pIndex=xxx.p_cm):
+        """
+        Plot a bargraph of concentrations.
+
+        Parameters
+        ----------
+        ax : matplotlib axis
+            Axis to use for plotting
+        params : sim.params
+            Parameters to barplot
+        pIndex : int
+            Parameter index to display in bargraph
+        """
+        # LLcolor_names=[name for name in mcd.XKCD_COLORS]
+        LLcolor_names = ['xkcd:blue', 'xkcd:red', 'xkcd:violet', 'xkcd:green',
+                         'xkcd:goldenrod', 'xkcd:crimson', 'xkcd:salmon', 'xkcd:wheat', 'xkcd:lightblue']
+        # fixed bar width, maybe an issue one day
+        width = 0.3
+        # label
+        lbl = PARS_LONG_NAMES[pIndex]
+
+        # build logical mask
+        meta_mask = np.full(params.shape, True, dtype=bool)
+        # filter out the fixed LLs
+        meta_mask[params.linklock[:, xxx.p_cm] == 1, :] = False
+        # filter out water?
+        if(not self._water_only):
+            meta_mask[xxx.m_Water, :] = False
+
+        # parameter filter
+        meta_mask_p = meta_mask.copy()
+        meta_mask_p[:] = False
+        meta_mask_p[:, pIndex] = True
+        meta_mask = np.logical_and(meta_mask, meta_mask_p)
+
+        # check that we still have something to display
+        if(np.all(meta_mask == False)):
+            log.error("nothing to display! :(")
+
+        # prepare data
+        params = params[meta_mask]
+        params_min = self.params_min[meta_mask]
+        params_max = self.params_max[meta_mask]
+        params_range = params_max - params_min  # we want to plot the ranges
+        params_LL = params.linklock[meta_mask]
+        params_std = params.errors[meta_mask]
+        meta_names = params.get_meta_names()
+        meta_names = [meta_names[i] for i in range(len(meta_names)) if meta_mask[i, pIndex]]
+
+        # prepare bars
+        n = np.sum(meta_mask[:])
+        pos_bars = np.arange(n)
+
+        # draw bars
+        ax.bar(pos_bars, params_range, width * 2, bottom=params_min, color="grey")
+        bar_params = ax.bar(pos_bars, params, width, yerr=params_std, color="red")
+
+        # set color according to linklock
+        for this_bar, this_LL in zip(bar_params, params_LL):
+            this_LLcolor_name = LLcolor_names[np.mod(int(np.abs(this_LL)), len(LLcolor_names))]
+            this_LLcolor = mcd.XKCD_COLORS[this_LLcolor_name].upper()
+            this_bar.set_color(this_LLcolor)
+
+        # ylim
+        if(pIndex in [xxx.p_cm, xxx.p_dd]):
+            ax.set_ylim([0.0, params_max.max()])
+        elif(pIndex in [xxx.p_df, xxx.p_dp]):
+            minmax = max(np.max(np.abs(params_min)), np.max(np.abs(params_max)))
+            ax.set_ylim([-minmax, +minmax])
+
+        ax.set_ylabel(lbl)
+        ax.set_xticks(pos_bars)
+        ax.set_xticklabels(meta_names, rotation=90)
+        ax.grid('on')
+
     def to_dataframe(self, prefix_str="fit_"):
         """
         Convert the object's attributes to dataframe. Can include the object itself.
@@ -1140,121 +1336,7 @@ class fit_pastis(fit_tool):
         return(df)
 
 
-def disp_bargraph(ax, params_val_list, params_leg_list, colored_LLs=True, bMM=False, bWater=False, bFitMode=False, pIndex=xxx.p_cm, mIndex_list=None, width=0.3):
-    """
-    Plot a bargraph of concentrations.
-
-    Parameters
-    ----------
-    ax : matplotlib axis
-        Axis to use for plotting
-    params_val_list : list of params objects
-        List of parameter arrays to display as bars
-    params_leg_list : list of params objects
-        List of legend caption for each bar
-    colored_LLs : boolean
-        Shows link-lock connections using colors (True) or not (False)
-    bMM : boolean
-        Includes macromolecular parameters (True) or not (False)
-    bWater : boolean
-        Includes water parameters (True) or not (False)
-    bFitMode : boolean
-        If (True), plot the first two bars in black (bounds), the last one with colors (fit), at the same x, no legends
-    pIndex : int
-        Parameter index to display in bargraph
-    mIndex_list : list of int
-        Metabolite indexes to display in bargraph
-    width : float (optional)
-        Bar width
-    """
-    # LLcolor_names=[name for name in mcd.XKCD_COLORS]
-    LLcolor_names = ['xkcd:grey', 'xkcd:blue', 'xkcd:red', 'xkcd:violet', 'xkcd:green',
-                     'xkcd:goldenrod', 'xkcd:crimson', 'xkcd:salmon', 'xkcd:wheat', 'xkcd:lightblue']
-
-    # init
-    lbl = PARS_LONG_NAMES[pIndex]
-
-    # build logical mask
-    meta_mask = np.full(params_val_list[0].shape, True, dtype=bool)
-
-    # filter out the fixed LLs
-    meta_mask[params_val_list[0].linklock[:, xxx.p_cm] == 1, :] = False
-
-    # filter out MMs?
-    if(not bMM):
-        meta_mask[xxx.m_All_MMs, :] = False
-
-    # filter out water?
-    if(not bWater):
-        meta_mask[xxx.m_Water, :] = False
-
-    if(mIndex_list is not None):
-        meta_mask_m = meta_mask.copy()
-        meta_mask_m[:] = False
-        meta_mask_m[mIndex_list, :] = True
-        meta_mask = np.logical_and(meta_mask, meta_mask_m)
-
-    # parameter filter
-    meta_mask_p = meta_mask.copy()
-    meta_mask_p[:] = False
-    meta_mask_p[:, pIndex] = True
-    meta_mask = np.logical_and(meta_mask, meta_mask_p)
-
-    # check that we still have something to display
-    if(np.all(meta_mask == False)):
-        log.error("nothing to display! Please check disp_bargraph parameters like pIndex, mIndex_list, bWater and bMM!")
-
-    # filter data now
-    params_val_list = [p[meta_mask] for p in params_val_list]
-    params_LL_list = [p.linklock[meta_mask] for p in params_val_list]
-    params_std_list = [p._errors[meta_mask] for p in params_val_list]
-    meta_names = params_val_list[0].get_meta_names()
-    meta_names = [meta_names[i] for i in range(len(meta_names)) if meta_mask[i, pIndex]]
-
-    # how many metabolites to display?
-    n = np.sum(meta_mask[:])
-
-    # prepare bars
-    nBars = len(params_val_list)
-    pos_bars = np.arange(n)
-    pos_shift = np.linspace(-width * (nBars - 1) / 2.0, +width * (nBars - 1) / 2.0, nBars)
-    pv_min = params_val_list[0].min()
-    pv_max = params_val_list[0].max()
-    if(bFitMode):
-        pos_shift = pos_shift * 0.0
-
-    # iterate in lists and plot bars yeah
-    for (k, pv, pll, ps, pl, pos) in zip(range(len(params_val_list)), params_val_list, params_LL_list, params_std_list, params_leg_list, pos_shift):
-        bar_list = ax.bar(pos_bars + pos, pv, width, yerr=ps, label=pl)
-
-        # record min/max for later use
-        if(np.min(pv) < pv_min):
-            pv_min = np.min(pv)
-        if(np.max(pv) > pv_max):
-            pv_max = np.max(pv)
-
-        for im_bar, this_bar, this_LL in zip(range(len(bar_list)), bar_list, pll):
-            if(colored_LLs):
-                this_LLcolor_name = LLcolor_names[np.mod(k + int(np.abs(this_LL)), len(LLcolor_names))]
-            else:
-                this_LLcolor_name = LLcolor_names[np.mod(k, len(LLcolor_names))]
-
-            this_LLcolor = mcd.XKCD_COLORS[this_LLcolor_name].upper()
-            if(bFitMode and k < 2):
-                this_bar.set_color('grey')
-            else:
-                this_bar.set_color(this_LLcolor)
-
-    ax.set_ylabel(lbl)
-    ax.set_ylim([pv_min, pv_max])
-    ax.set_xticks(pos_bars)
-    ax.set_xticklabels(meta_names, rotation=90)
-    ax.grid('on')
-    if(not bFitMode):
-        ax.legend()
-
-
-def disp_fit(ax, data, params, seq, LL_exluding=True, LL_merging=False, mIndex_list=None, water_only=False, display_range=[1, 5]):
+def disp_fit(ax, data, params, seq, LL_exluding=True, LL_merging=False, mIndex_list=None, water_only=False, display_range=[1, 5], zerofilling_final_npts=16384):
     """
     Plot a bargraph of concentrations.
 
@@ -1275,16 +1357,22 @@ def disp_fit(ax, data, params, seq, LL_exluding=True, LL_merging=False, mIndex_l
     water_only : boolean
         If only water is displayed
     display_range : list [2]
-            Range in ppm used for display
+        Range in ppm used for display
+    zerofilling_final_npts : int
+        Final npts of points after zero-filling data to smooth display; if (None), no zero-filling
     """
     # dummy full>free>full conversion to apply master/slave rules
     params_free = params.toFreeParams()
     params_full = params.toFullParams(params_free)
 
     # the data
+    if(zerofilling_final_npts is not None):
+        data = data.correct_zerofill_nd(zerofilling_final_npts)
     ax.plot(data.frequency_axis_ppm(), data.spectrum().real, 'k-', linewidth=0.5, label='data')
     # the full model
     mod = seq._model(params_full)
+    if(zerofilling_final_npts is not None):
+        mod = mod.correct_zerofill_nd(zerofilling_final_npts)
     ax.plot(mod.frequency_axis_ppm(), mod.spectrum().real, 'k-', linewidth=2, label='model')
     # the residue
     diff = data - mod
