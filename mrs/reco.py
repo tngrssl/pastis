@@ -3321,7 +3321,7 @@ class pipeline:
                             # ppm range to for SNR/LW estimation in ref. data
                             "POI_ref_range_ppm" : [4.5, 5.2],
                             # path to pkl file to store processed data
-                            "pkl_filepath" : None,
+                            "storage_file" : None,
                             # force display off if needed
                             "display": None,
                             # ppm range used for display
@@ -4189,8 +4189,14 @@ class pipeline:
 
         return(data_label_list, snr_raw_list, lw_raw_list, lw_ref_raw_list)
 
-    def check_analyze_results(self, warning_only=False):
-        """Check for each dataset that we got a beter reconstruction with raw data than dicom."""
+    def check_analyze_results(self, raise_error=True):
+        """Check for each dataset that we got a beter reconstruction with raw data than dicom.
+
+        Returns
+        -------
+        raise_error : boolean
+            Raise error if raw data reconstruction gave worst results than DICOM in terms of SNR and /or LW. If (False), just raise a warning.
+        """
         log.info("quality checking analyze results...")
 
         data_label_list, job_label_list, snr_raw_list, lw_raw_list, snr_dcm_list, lw_dcm_list, _, _, _, _ = self.get_analyze_results()
@@ -4202,20 +4208,20 @@ class pipeline:
         lw_dcm_list = lw_dcm_list[:, -1]
 
         error_str = "final SNR and/or LW is worst for raw data than for dicom for dataset(s): "
-        raise_error = False
+        n_bad_reco = 0
         # compare dcm analyze results to raw data results, when possible
         for this_dataset_label, this_snr_raw, this_lw_raw, this_snr_dcm, this_lw_dcm in zip(data_label_list, snr_raw_list, lw_raw_list, snr_dcm_list, lw_dcm_list):
             if(not np.isnan(this_snr_raw) and not np.isnan(this_snr_dcm) and not np.isnan(this_lw_raw) and not np.isnan(this_lw_dcm)):
                 if((this_snr_raw < this_snr_dcm) or (this_lw_raw > this_lw_dcm)):
                     # the raw data reconstruction was worst than the dicom :(
-                    raise_error = True
+                    n_bad_reco = n_bad_reco + 1
                     error_str = error_str + ("[%s], " % this_dataset_label)
 
-        if(raise_error):
-            if(warning_only):
-                log.warning(error_str[:-2])
-            else:
+        if(n_bad_reco > 0):
+            if(raise_error):
                 log.error(error_str[:-2])
+            else:
+                log.warning(error_str[:-2])
 
     def display_analyze_results(self):
         """Print final SNR and peak-linewidth for each dataset. Plot bargraph showing evolution of SNR and linewidth during data processing (to check that a job did not destroy the data for example!) and compare with dicom when possible."""
@@ -4348,6 +4354,8 @@ class pipeline:
             self.analyze_job_list = reco_pipe_template.analyze_job_list
             self.analyze_enable = reco_pipe_template.analyze_enable
             self.analyze_display = reco_pipe_template.analyze_display
+        else:
+            log.error("no template [%s] found in [%s]!" % (template_filename, default_paths.DEFAULT_RECO_TEMPLATE_FOLDER))
 
     def save_template(self, template_name):
         """
@@ -4417,7 +4425,7 @@ class pipeline:
         log.info("saving to disk...")
 
         # check it we have specified a file path
-        if(self.settings["pkl_filepath"] is None):
+        if(self.settings["storage_file"] is None):
             log.error("no pkl file path specified to save to disk!")
             return()
 
@@ -4427,7 +4435,7 @@ class pipeline:
         this_df["timestamp"] = datetime.now()
 
         # load current df from file, if exist
-        pkl_filepath = self.settings["pkl_filepath"]
+        pkl_filepath = self.settings["storage_file"]
         if(os.path.isfile(pkl_filepath)):
             # load
             df = pd.read_pickle(pkl_filepath)

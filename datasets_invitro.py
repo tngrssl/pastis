@@ -11,6 +11,8 @@ import matplotlib.pylab as plt
 import mrs.reco as reco
 import mrs.log as log
 import numpy as np
+get_ipython().magic("clear")
+plt.close("all")
 
 get_ipython().magic("matplotlib auto")
 plt.rcParams['figure.dpi'] = 100
