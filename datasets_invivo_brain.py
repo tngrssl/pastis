@@ -16,22 +16,31 @@ plt.close("all")
 get_ipython().magic("matplotlib auto")
 plt.rcParams['figure.dpi'] = 100
 plt.rcParams['figure.max_open_warning'] = 1000
+plt.rcParams['font.size'] = 9
 log.setLevel(log.DEBUG)
 
 # display stuff?
-display_stuff = True
+display_stuff = False
 
-# %% create standard brain template used here
+# stop pipeline if the reco went bad
+raise_error_on_bad_reco = False
+
+# template to use here (see definitions below)
+reco_template = "brain_noapo"
+
+# %% "brain" reconstruction template
+template_name = "brain"
+
 p = reco.pipeline()
-
+p.settings["storage_file"] = "/home/tangir/crmbm/acq_db/%s.pkl" % template_name
 p.settings["POI_range_ppm"] = [1.8, 2.2]
 p.settings["POI_shift_range_ppm"] = [1.8, 2.2]
 p.settings["POI_shift_true_ppm"] = 2.008
 p.settings["POI_LW_range_ppm"] = [1.8, 2.2]
 p.settings["display"] = display_stuff
-p.settings["pkl_filepath"] = "/home/tangir/crmbm/acq_db/brain.pkl"
 
-p.job_list = [  p.job["phasing"],
+p.job_list = [  # p.job["displaying_anatomy"],
+                p.job["phasing"],
                 p.job["scaling"],
                 # p.job["FID modulus"],
                 p.job["channel_combining"],
@@ -58,13 +67,22 @@ p.job["cropping"]["final_npts"] = 2048
 p.job["analyzing_snr"]["half_factor"] = True
 p.job["ref_data_analyzing_snr"]["half_factor"] = True
 
-p.save_template("brain_std_nows")
+p.save_template(template_name)
+
+# %% "brain_noapo" reconstruction template
+# remove apodization to evaluate its impact on SNR...
+template_name = "brain_noapo"
+
+p = reco.pipeline("brain")
+p.job_list.remove(p.job["apodizing"])
+p.settings["storage_file"] = "/home/tangir/crmbm/acq_db/%s.pkl" % template_name
+p.save_template(template_name)
 
 # %% 20/06/2019 - 296_ym_p1_brainmoelle - Yasmin :)
 get_ipython().magic("clear")
 plt.close("all")
 
-p = reco.pipeline("brain_std_nows")
+p = reco.pipeline(reco_template)
 
 p.dataset[0]["legend"] = "brain - sLASER R:N=5:5"
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/296_ym_p1_brainmoelle/meas_MID81_slaser_R_N=5_5+_shortTE_SNR++_FID33880.dat",
@@ -87,13 +105,13 @@ p.dataset[2]["dcm"]["files"] = ["/home/tangir/crmbm/acq/296_ym_p1_brainmoelle/29
 
 p.settings["datasets_indexes"] = [0, 1]
 p.run()
-p.check_analyze_results(True)
+p.check_analyze_results(False and raise_error_on_bad_reco)
 p.save_datasets()
 
 # %% 25/06/2019 - 296_ym_p1_brainmoelle - FID modulus tests
 get_ipython().magic("clear")
 
-p = reco.pipeline("brain_std_nows")
+p = reco.pipeline(reco_template)
 
 p.dataset[0]["legend"] = "brain - sLASER no VAPOR + conventionnal process"
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/296_ym_p1_brainmoelle/meas_MID73_slaser_R_N=20+_1_longTE_SNR++++_FID33872.dat"]
@@ -103,7 +121,7 @@ p.job_list.remove(p.job["data_rejecting"])
 p.settings["POI_range_ppm"] = [4.5, 5.2]
 p.run()
 
-p = reco.pipeline("brain_std_nows")
+p = reco.pipeline(reco_template)
 
 p.dataset[0]["legend"] = "brain - sLASER no VAPOR + FID process"
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/296_ym_p1_brainmoelle/meas_MID73_slaser_R_N=20+_1_longTE_SNR++++_FID33872.dat"]
@@ -118,7 +136,7 @@ p.run()
 get_ipython().magic("clear")
 plt.close("all")
 
-p = reco.pipeline("brain_std_nows")
+p = reco.pipeline(reco_template)
 
 p.dataset[0]["legend"] = "brain - sLASER 20:1 resp trig"
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/308-rs-p1-moelle/meas_MID210_slaser_R_N=20+_1_longTE_SNR++++_FID38955.dat",
@@ -127,14 +145,14 @@ p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/308-rs-p1-moelle/2019082
                                 "/home/tangir/crmbm/acq/308-rs-p1-moelle/20190827/01_0025_slaser-r-n/original-primary_e09_0001.dcm"]
 
 p.run()
-p.check_analyze_results(True)
+p.check_analyze_results(False and raise_error_on_bad_reco)
 p.save_datasets()
 
 # %% 23/01/2019 - 347-re-p1-moelle - Renaud
 get_ipython().magic("clear")
 plt.close("all")
 
-p = reco.pipeline("brain_std_nows")
+p = reco.pipeline(reco_template)
 
 p.dataset[0]["legend"] = "sLASER 10:2 IR TE=40ms"
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/347-re-p1-moelle/meas_MID216_slaser_R_N=10_2_longTE_SNR+++_FID50575.dat",
@@ -156,5 +174,5 @@ p.dataset[3]["dcm"]["files"] = ["/home/tangir/crmbm/acq/347-re-p1-moelle/2020012
 
 p.settings["datasets_indexes"] = 3
 p.run()
-p.check_analyze_results()
+p.check_analyze_results(raise_error_on_bad_reco)
 p.save_datasets()
