@@ -8,19 +8,14 @@ A user script used to store calls for the reconstruction of physio data.
 # %% init
 from IPython import get_ipython
 import matplotlib.pylab as plt
-import mrs.aliases as xxx
 import mrs.reco as reco
-import mrs.db as db
 import mrs.log as log
-import numpy as np
 
 get_ipython().magic("matplotlib auto")
 plt.rcParams['figure.dpi'] = 100
 plt.rcParams['figure.max_open_warning'] = 1000
 plt.rcParams['font.size'] = 9
 log.setLevel(log.DEBUG)
-
-rdb = db.data_db()
 
 # %% 27/08/2019 - 308-rs-p1-moelle - Ocha - short TR resp test
 get_ipython().magic("clear")

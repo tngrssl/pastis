@@ -9,7 +9,6 @@ A user script used to store calls for the reconstruction of in vivo data.
 from IPython import get_ipython
 import matplotlib.pylab as plt
 import mrs.reco as reco
-import mrs.db as db
 import mrs.log as log
 import numpy as np
 get_ipython().magic("clear")
@@ -20,8 +19,6 @@ plt.rcParams['figure.dpi'] = 100
 plt.rcParams['figure.max_open_warning'] = 1000
 plt.rcParams['font.size'] = 9
 log.setLevel(log.DEBUG)
-
-rdb = db.data_db()
 
 # %% process data
 get_ipython().magic("clear")
@@ -793,6 +790,8 @@ p.analyze_job_list = [  p.job["channel_combining"],
                         p.job["calibrating"]
                         ]
 
+p.settings["pkl_filepath"] = "/home/tangir/crmbm/acq_db/muscle.pkl"
+
 # self-phasing the WS spectrum using the the big lipid peak at ~1.5ppm (Here you can choose btw Lipid and Cr for phasing)
 p.job["phasing"]["POI_range_ppm"] = [4, 5]  # find this peak in this ppm range
 p.job["phasing"]["offset"] = 0.0  # manual phase offset
@@ -843,7 +842,7 @@ p.job["displaying"]["range_ppm"] = [0.5, 5]
 p.settings["datasets_indexes"] = [index_to_process]
 p.run()
 # save this to db file
-p.save_datasets(rdb)
+p.save_datasets()
 
 reco.remove_grids_from_all_figs()
 
@@ -851,7 +850,7 @@ reco.remove_grids_from_all_figs()
 p._data_list[0] = p._data_list[0] * np.exp(1j * 0.0)
 p._data_list[0].display_spectrum_1d()
 # save this to db file
-p.save_datasets(rdb)
+p.save_datasets()
 
 # %% print data rejection stuff + NOVAPOR water lw
 if(p._data_list[0].data_rejection is None):
@@ -865,34 +864,3 @@ else:
 
 water_lw = p._data_list[0].data_ref.analyze_linewidth_1d([4.5, 5])
 print(">>> Water LW = %.2fHz" % water_lw)
-
-# %% jowjow
-
-# colors = {
-#         'AT': 'r',
-#         'TA': 'k',
-#         'GA': 'g',
-#         'AG': 'r',
-#         'CA': 'b',
-#         'AC': 'r',
-#         'GT': 'g',
-#         'TG': 'k',
-#         'CT': 'b',
-#         'TC': 'k',
-#         'GC': 'g',
-#         'CG': 'b'}
-
-# labels = ["Jowjow !", "Tangigi !", "Huguette la vieille chouette !", "Talky la pie !", "Jojo l'asticot !"]
-
-# plt.figure()
-# while(True):
-#     x = np.random.rand()
-#     y = np.random.rand()
-#     s = np.random.rand() * 50
-#     r = np.random.rand() * 360
-#     c = list(colors.values())[int(np.random.rand() * 11)]
-#     l = labels[int(np.random.rand() * 5)]
-#     plt.text(x, y, l, fontsize=s, rotation=r, color=c)
-#     plt.pause(0.2)
-
-

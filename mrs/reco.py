@@ -1139,7 +1139,13 @@ class MRSData2(suspect.mrsobjects.MRSData):
         # init
         log.debug("zero_filling [%s]..." % self.display_label)
         s = self.copy()
+
+        # check
         nZeros = nPoints_final - s.np
+        if(nZeros <= 0):
+            log.warning("no zero-filling performed. The number of zeros to add was negative (%d)!" % nZeros)
+            return(s)
+
         s_new_shape = list(s.shape)
         s_new_shape[-1] = nZeros
         log.debug("%d-pts signal + %d zeros = %d-pts zero-filled signal..." % (s.np, nZeros, nPoints_final))
@@ -4417,6 +4423,8 @@ class pipeline:
 
         # first, convert this pipeline and all to a df
         this_df = self._to_dataframe()
+        # add timestamp
+        this_df["timestamp"] = datetime.now()
 
         # load current df from file, if exist
         pkl_filepath = self.settings["pkl_filepath"]

@@ -11,23 +11,14 @@ Three classes' definition in here.
 @author: Tangi Roussel
 """
 
-try:
-    import pygamma as pg
-    GAMMA_LIB_LOADED = True
-except ImportError:
-    GAMMA_LIB_LOADED = False
-
-# GAMMA_LIB_LOADED forced to False for debug
-# GAMMA_LIB_LOADED = False
-
 import suspect
 import numpy as np
 import math as ma
 import matplotlib.pylab as plt
 import pandas as pd
-import pickle
 import warnings
 import pathlib
+from IPython.display import display
 from xlrd import open_workbook
 from termcolor import cprint
 from enum import Enum
@@ -38,6 +29,15 @@ from mrs import paths as default_paths
 import copy as copy
 
 import pdb
+
+try:
+    import pygamma as pg
+    GAMMA_LIB_LOADED = True
+except ImportError:
+    GAMMA_LIB_LOADED = False
+
+# GAMMA_LIB_LOADED forced to False for debug
+# GAMMA_LIB_LOADED = False
 
 
 class sequence_exc_type(Enum):
@@ -411,7 +411,7 @@ class params(np.ndarray):
         # get denominator rel CRBs for cm
         relCRBs_den = p2.get_errors_prct()[mIndex, xxx.p_cm]
         # calculate the final relCRB
-        rel_CRBs_ratio = np.sqrt( relCRBs_num**2 + relCRBs_den**2 )
+        rel_CRBs_ratio = np.sqrt(relCRBs_num**2 + relCRBs_den**2)
         # back to absCRB
         abs_CRBs_ratio = p2[:, xxx.p_cm] * rel_CRBs_ratio / 100.0
 
@@ -488,7 +488,7 @@ class params(np.ndarray):
 
         return(p2)
 
-    def _set_default_min(self):
+    def set_default_min(self):
         """
         Initialize the params object to the default minimum values, no macromolecules.
 
@@ -515,7 +515,7 @@ class params(np.ndarray):
 
         return(self.copy())
 
-    def _set_default_max(self):
+    def set_default_max(self):
         """
         Initialize the params object to the default maximum values, no macromolecules.
 
@@ -551,7 +551,7 @@ class params(np.ndarray):
         self.copy() : params object
             Copy of this current object with the applied modification
         """
-        self._set_default_min()
+        self.set_default_min()
         # all concentrations to zero
         self[:, xxx.p_cm] = 0.0
 
@@ -572,7 +572,7 @@ class params(np.ndarray):
         self.copy() : params object
             Copy of this current object with the applied modification
         """
-        self._set_default_max()
+        self.set_default_max()
         # all concentrations to zero
         self[:, xxx.p_cm] = 0.0
 
@@ -584,81 +584,6 @@ class params(np.ndarray):
         self.linklock[:] = 1
         self.linklock[xxx.m_Water, :] = 0
         return(self.copy())
-
-    def set_default_min(self):
-        """
-        Initialize the params object to the minimum in vivo human values, no macromolecules.
-
-        Returns
-        -------
-        self.copy() : params object
-            Copy of this current object with the applied modification
-        """
-        self._set_default_min()
-
-        # browse though the database and find min values from literature
-        cmin = []
-        for this_metagroup_key, this_metagroup_entry in self._meta_bs.items():
-            cmin.append(this_metagroup_entry["Concentration min"])
-
-        # convert to np
-        cmin = np.array(cmin)
-
-        self[xxx.m_All_MBs, xxx.p_cm] = cmin[xxx.m_All_MBs]
-
-        return(self.copy())
-
-    def set_default_max(self):
-        """
-        Initialize the params object to the maximum in vivo values, no macromolecules.
-
-        Returns
-        -------
-        self.copy() : params object
-            Copy of this current object with the applied modification
-        """
-        self._set_default_max()
-
-        # browse though the database and find min values from literature
-        cmax = []
-        for this_metagroup_key, this_metagroup_entry in self._meta_bs.items():
-            cmax.append(this_metagroup_entry["Concentration max"])
-
-        # convert to np
-        cmax = np.array(cmax)
-
-        self[xxx.m_All_MBs, xxx.p_cm] = cmax[xxx.m_All_MBs]
-
-        return(self.copy())
-
-    def get_MBs_above_concentration(self, cm_threshold):
-        """
-        Return indexes for metabolites with average concentrations above a threshold.
-
-        Parameters
-        ----------
-        cm_threshold : float
-            Concentration threshold
-
-        Returns
-        -------
-        im : list of integers
-            Metabolite indexes
-        """
-        cm_mean = (self.set_default_min() + self.set_default_max()) / 2.0
-        cm_mean = cm_mean[:, 0]
-        metabolites_inds = np.where(cm_mean > cm_threshold)
-        metabolites_inds = metabolites_inds[0]
-
-        # display
-        log.info("found %d metabolites above %f mmol/kg..." % (len(metabolites_inds), cm_threshold))
-        meta_names = self.get_meta_names()
-        found_meta_names = ""
-        for im in metabolites_inds:
-            found_meta_names += str(meta_names[im]) + " "
-        log.info(found_meta_names)
-
-        return(metabolites_inds)
 
     def add_macromolecules_min(self):
         """
@@ -900,7 +825,7 @@ class mrs_sequence:
         self.allow_evolution_during_hard_pulses = True
 
         # in case GAMMA could not be loaded, we can load the sequence from a stored file
-        self.seqdb_file = None
+        self.db_file = None
 
         # pre-calculated stuff
         # 'metabase': set of numerically computed metabolite FID signals
@@ -1091,7 +1016,7 @@ class mrs_sequence:
             # append this metabolite group to the metabase
             self._meta_signals.append(s)
 
-    def _load_from_seqdb_file(self, te_tol=5.0, f0_tol=5.0):
+    def _load_from_file(self, te_tol=5.0, f0_tol=5.0):
         """
         Try to load the simulated metabolite signals from a stored PKL file.
 
@@ -1102,148 +1027,106 @@ class mrs_sequence:
         f0_tol : float
             Maximum f0 difference tolerated when looking for a sequence (MHz)
         """
-        if(self.seqdb_file is None):
-            log.error("pyGAMMA library could not be loaded and no sequence database PKL file (seqdb_file) was specified :(")
+        if(self.db_file is None):
+            log.error("pyGAMMA library could not be loaded and no sequence database PKL file (db_file) was specified :(")
 
         log.info("reading sequence database file...")
         # load pickle file
-        with open(self.seqdb_file, 'rb') as f:
-            [seqdb] = pickle.load(f)
-
-        # convert to np
-        seqdb = np.array(seqdb)
+        df = pd.read_pickle(self.db_file)
 
         # compare sequences
         log.info("trying to find the right simulated sequence for you...")
 
         # sequence excitation type
-        seqdb_exc_type_mask = np.array([s.exc_type == self.exc_type for s in seqdb])
-        seqdb_exc_type_n = np.sum(seqdb_exc_type_mask)
-        log.info("sequence type match: n=%d (%s)" % (seqdb_exc_type_n, self.exc_type))
+        df_exc_type = df.loc[df["sequence_exc_type"] == self.exc_type]
+        n_exc_type = len(df_exc_type)
+        log.info("sequence type match: n=%d (%s)" % (n_exc_type, self.exc_type))
 
         # sequence name
-        seqdb_name_mask = np.array([s.name == self.name for s in seqdb])
-        seqdb_name_n = np.sum(seqdb_name_mask)
-        log.info("sequence name match: n=%d (%s)" % (seqdb_name_n, self.name))
+        df_name = df.loc[df["sequence_name"] == self.name]
+        n_name = len(df_name)
+        log.info("sequence name match: n=%d (%s)" % (n_name, self.name))
 
         # initialize final mask
-        if(seqdb_name_n > 0):
-            seqdb_final_mask = seqdb_name_mask
+        # if cannot find exact sequence name, at least choose a similar excitation scheme (spin-echo or stim for example)
+        if(n_name > 0):
+            df = df_name
         else:
-            seqdb_final_mask = seqdb_exc_type_mask
+            df = df_exc_type
 
         # nuclei
-        seqdb_nuclei_mask = np.array([s.nuclei == self.nuclei for s in seqdb])
-        seqdb_nuclei_n = np.sum(seqdb_nuclei_mask)
-        log.info("nuclei match: n=%d (%s)" % (seqdb_nuclei_n, self.nuclei))
-        # adjust final mask
-        seqdb_final_mask = np.logical_and(seqdb_final_mask, seqdb_nuclei_mask)
+        df = df.loc[df["sequence_nuclei"] == self.nuclei]
+        log.info("nuclei match: n=%d (%s)" % (len(df), self.nuclei))
 
-        # f0
-        seqdb_f0_diff = np.abs([s.f0 - self.f0 for s in seqdb])
-        seqdb_f0_diff_mask = (seqdb_f0_diff < f0_tol)
-        seqdb_f0_diff_n = np.sum(seqdb_f0_diff_mask)
-        log.info("f0 match: need %.3fMHz, found n=%d sequences simulated at +/-%.3fMHz" % (self.f0, seqdb_f0_diff_n, f0_tol))
-        # adjust final mask
-        seqdb_final_mask = np.logical_and(seqdb_final_mask, seqdb_f0_diff_mask)
+        # f0 (with tolerance)
+        df = df.loc[(df["sequence_f0"] > (self.f0 - f0_tol)) & (df["sequence_f0"] < (self.f0 + f0_tol))]
+        log.info("f0 match: need %.3fMHz, found n=%d sequences simulated at +/-%.3fMHz" % (self.f0, len(df), f0_tol))
 
         # ppm water
-        seqdb_ppm_water_mask = np.array([s.ppm_water == self.ppm_water for s in seqdb])
-        seqdb_ppm_water_n = np.sum(seqdb_ppm_water_mask)
-        log.info("water ppm match: n=%d (%.2f)" % (seqdb_ppm_water_n, self.ppm_water))
-        # adjust final mask
-        seqdb_final_mask = np.logical_and(seqdb_final_mask, seqdb_ppm_water_mask)
+        df = df.loc[df["sequence_ppm_water"] == self.ppm_water]
+        log.info("water ppm match: n=%d (%.2f)" % (len(df), self.ppm_water))
 
         # additional_phi0
-        seqdb_ph0_mask = np.array([s.additional_phi0 == self.additional_phi0 for s in seqdb])
-        seqdb_ph0_n = np.sum(seqdb_ph0_mask)
-        log.info("0th order phase match: n=%d (%.2f)" % (seqdb_ph0_n, self.additional_phi0))
-        # adjust final mask
-        seqdb_final_mask = np.logical_and(seqdb_final_mask, seqdb_ph0_mask)
+        df = df.loc[df["sequence_additional_phi0"] == self.additional_phi0]
+        log.info("0th order phase match: n=%d (%.2f)" % (len(df), self.additional_phi0))
 
         # allow_evolution_during_hard_pulses
-        seqdb_evol_mask = np.array([s.allow_evolution_during_hard_pulses == self.allow_evolution_during_hard_pulses for s in seqdb])
-        seqdb_evol_n = np.sum(seqdb_evol_mask)
-        log.info("complicated stuff match: n=%d (%r)" % (seqdb_evol_n, self.allow_evolution_during_hard_pulses))
-        # adjust final mask
-        seqdb_final_mask = np.logical_and(seqdb_final_mask, seqdb_evol_mask)
+        df = df.loc[df["sequence_allow_evolution_during_hard_pulses"] == self.allow_evolution_during_hard_pulses]
+        log.info("complicated stuff match: n=%d (%r)" % (len(df), self.allow_evolution_during_hard_pulses))
 
         # metabolites
-        seqdb_meta_bs_mask = np.array([s.meta_bs == self.meta_bs for s in seqdb])
-        seqdb_meta_bs_n = np.sum(seqdb_meta_bs_mask)
-        log.info("metabolites match: n=%d" % seqdb_meta_bs_n)
-        # adjust final mask
-        seqdb_final_mask = np.logical_and(seqdb_final_mask, seqdb_meta_bs_mask)
+        df["sequence_metabolite_basisset_ppm_range_0"] = [r[0] for r in df["sequence_metabolite_basisset_ppm_range"]]
+        df["sequence_metabolite_basisset_ppm_range_1"] = [r[1] for r in df["sequence_metabolite_basisset_ppm_range"]]
+        df = df.loc[(df["sequence_metabolite_basisset_basis_set_name"] == self.meta_bs.basis_set_name) &
+                            (df["sequence_metabolite_basisset_ppm_range_0"] == self.meta_bs.ppm_range[0]) &
+                            (df["sequence_metabolite_basisset_ppm_range_1"] == self.meta_bs.ppm_range[1]) &
+                            (df["sequence_metabolite_basisset_non_coupled_only"] == self.meta_bs.non_coupled_only) &
+                            (df["sequence_metabolite_basisset_one_proton_mode"] == self.meta_bs.one_proton_mode) &
+                            (df["sequence_metabolite_basisset_obj"] == dict(self.meta_bs))]
+        log.info("metabolites match: n=%d" % len(df))
 
-        # check mask
-        if(not np.any(seqdb_final_mask)):
+        if(len(df) == 0):
             log.error("sorry, there is no simulated sequence that matches with your acquisition criterias :(")
 
-        # mask all the useless sequences and clean memory
-        seqdb_match = seqdb[seqdb_final_mask]
-        seqdb = []
+        # te: look for closest
+        df["te_diff"] = (df["sequence_te"] - self.te).abs()
+        found_sequence = df.sort_values("te_diff").iloc[0]["sequence_obj"]
+        log.info("TE match: need %.2fms, found %.2fms" % (self.te, found_sequence.te))
 
-        # te
-        seqdb_te_diff = np.abs([s.te - self.te for s in seqdb_match])
-        imin_te_diff = np.argmin(seqdb_te_diff)
-        log.info("TE match: need %.2fms, found %.2fms" % (self.te, seqdb_match[imin_te_diff].te))
-        if(seqdb_te_diff[imin_te_diff] > te_tol and self.meta_bs.non_coupled_only):
-            log.info("TE match: This might seem a lot but I see you want to generate only singulet's metabolites so that is really not a big deal ;)")
-
-        # optimal sequence and clean memory
-        optim_seq = seqdb_match[imin_te_diff]
-        seqdb_match = []
+        # check if below tolerance
+        te_diff = np.abs(self.te - found_sequence.te)
+        if(te_diff > te_tol and self.meta_bs.non_coupled_only):
+            log.info("TE match: the difference might seem a lot but I see you want to generate only singulet's metabolites so that is really not a big deal ;)")
 
         # display
         log.info("comparing what you asked/what you got...")
-        cell_nchar = 20
-        log.info("parameter".ljust(cell_nchar) + " requested".ljust(cell_nchar) + " obtained".ljust(cell_nchar))
-
-        unique_key_list = list(set(list(self.__dict__.keys()) + list(optim_seq.__dict__.keys())))
-        for this_key in unique_key_list:
-            my_val = self.__dict__[this_key]
-            my_val_len = 1
-            try:
-                my_val_len = len(my_val)
-            except:
-                pass
-
-            if(this_key[0] != '_' and my_val_len == 1):
-                found_val = optim_seq.__dict__[this_key]
-                # format floats
-                if(type(my_val) == float):
-                    my_val_str = "%.2f" % my_val
-                    found_val_str = "%.2f" % found_val
-                else:
-                    my_val_str = str(my_val)
-                    found_val_str = str(found_val)
-
-                # crop strings
-                this_key_str = this_key[0:cell_nchar]
-                my_val_str = my_val_str[0:cell_nchar]
-                found_val_str = found_val_str[0:cell_nchar]
-                # pretty print
-                log.info(this_key_str.ljust(cell_nchar) + " " + my_val_str.ljust(cell_nchar) + " " + found_val_str.ljust(cell_nchar))
+        df_self = self.to_dataframe()
+        df_self["Index"] = "Current"
+        df_found = found_sequence.to_dataframe()
+        df_found["Index"] = "Found"
+        df_display = pd.concat([df_self, df_found], axis=0)
+        df_display = df_display.set_index("Index")
+        display(df_display.T)
 
         # ok well done. Now we maybe have to fix a few issues: number of samples, sampling frequency, amplification factor, this can be done with some signal processing stuff
 
         # resampling (even if not needed)
-        log.info("resampling metabolite signals: %dpts/%.2fHz to %dpts/%.2fHz..." % (optim_seq.npts, optim_seq.fs, self.npts, self.fs))
-        log.info("rescaling metabolite signals by a factor of %.2f..." % (self.scaling_factor / optim_seq.scaling_factor))
-        old_dt = 1 / optim_seq.fs
-        old_t = np.arange(0, optim_seq.npts * old_dt, old_dt)
+        log.info("resampling metabolite signals: %dpts/%.2fHz to %dpts/%.2fHz..." % (found_sequence.npts, found_sequence.fs, self.npts, self.fs))
+        log.info("rescaling metabolite signals by a factor of %.2f..." % (self.scaling_factor / found_sequence.scaling_factor))
+        old_dt = 1 / found_sequence.fs
+        old_t = np.arange(0, found_sequence.npts * old_dt, old_dt)
         new_dt = 1 / self.fs
         new_t = np.arange(0, self.npts * new_dt, new_dt)
 
         # resample each metabolite signal
         new_meta_signals = []
-        for s in optim_seq._meta_signals:
+        for s in found_sequence._meta_signals:
             s2_np = np.interp(new_t, old_t, s)
             # convert to suspect
-            s_MRSData = suspect.MRSData(s2_np, new_dt, optim_seq.f0)
+            s_MRSData = suspect.MRSData(s2_np, new_dt, found_sequence.f0)
             s_MRSData2 = s_MRSData.view(reco.MRSData2)
             # rescale
-            s_MRSData2 = s_MRSData2 * self.scaling_factor / optim_seq.scaling_factor
+            s_MRSData2 = s_MRSData2 * self.scaling_factor / found_sequence.scaling_factor
             # and rebuild metabase
             new_meta_signals.append(s_MRSData2)
 
@@ -1251,11 +1134,14 @@ class mrs_sequence:
         keys_not_to_copy = ["_meta_bs", "_meta_signals", "_t", "_ready", "_last_params", "_last_model", "npts", "fs"]
         for this_key in list(self.__dict__.keys()):
             if(this_key not in keys_not_to_copy):
-                self.__dict__[this_key] = optim_seq.__dict__[this_key]
+                self.__dict__[this_key] = found_sequence.__dict__[this_key]
 
         # apply changes
         self._t = new_t.copy()
         self._meta_signals = new_meta_signals.copy()
+
+        # reinit meta_bs aliases
+        self._meta_bs._write_header_file()
 
         log.info("successfully imported metabolite signal basis set! :)")
 
@@ -1283,7 +1169,7 @@ class mrs_sequence:
         else:
             log.info("loading sequence from disk...")
             # ops, so let's try to load the simulations from a pkl file
-            self._load_from_seqdb_file()
+            self._load_from_file()
 
         # initialize the model persistent memory
         self._last_params = None
@@ -1322,8 +1208,8 @@ class mrs_sequence:
             s_MRSData2 = s_MRSData2 + s_meta * p[k, 0] * np.exp((-p[k, 1] + 2.0 * np.pi * 1j * p[k, 2]) * self._t + 1j * (p[k, 3] + self.additional_phi0))
 
         # remember
-        self._last_params = p
-        self._last_model = s_MRSData2
+        self._last_params = p.copy()
+        self._last_model = s_MRSData2.copy()
 
         return(s_MRSData2)
 
@@ -1442,6 +1328,10 @@ class mrs_sequence:
 
         if(include_obj):
             df["obj"] = self.copy()
+
+        # add private attribute _meta_bs
+        df_meta_bs = self._meta_bs.to_dataframe(True)
+        df = pd.concat([df, df_meta_bs], axis=1)
 
         df = df.add_prefix(prefix_str)
 
@@ -2722,7 +2612,7 @@ class metabolite_basis_set(dict):
             log.error_new_attribute(key)
         object.__setattr__(self, key, value)
 
-    def __init__(self, basis_set_name=default_paths.DEFAULT_META_BASIS_SET_NAME, database_xls_file=default_paths.DEFAULT_META_DB_FILE):
+    def __init__(self, basis_set_name=default_paths.DEFAULT_META_BASIS_SET_NAME, database_xls_file=default_paths.DEFAULT_META_DB_FILE, ppm_range=[0, 6], non_coupled_only=False, one_proton_mode=False):
         """
         Construct a metabolite_basis_set object.
 
@@ -2732,6 +2622,12 @@ class metabolite_basis_set(dict):
             Metabolite basis set name corresponding the a "Template_BASISSETNAME" tab in the xls file
         database_xls_file : string
             Excel file containing metabolite chemical shifts, J-coupling, etc.
+        ppm_range : list
+            Will keep chemical shifts in this range
+        non_coupled_only : boolean
+            Keep only non-coupled resonances (J=0Hz)
+        one_proton_mode : boolean
+            Consider only 1 proton per resonance
         """
         super(metabolite_basis_set, self).__init__()
         # xls file that contains metabolites properties (you should not change that)
@@ -2739,12 +2635,12 @@ class metabolite_basis_set(dict):
         self.basis_set_name = basis_set_name
         self._xls_file = default_paths.DEFAULT_META_DB_FILE
         # include peaks only in this range of chemical shifts
-        self.ppm_range = [0, 6]
+        self.ppm_range = ppm_range
         # include only non-coupled peaks
-        self.non_coupled_only = False
+        self.non_coupled_only = non_coupled_only
         # set all metabolites to have only one peak (first chemical shift) and one proton
         # one proton only for each metabolite
-        self.one_proton_mode = False
+        self.one_proton_mode = one_proton_mode
 
         log.info("initializing metabolite database...")
         self._read_xls_file()
@@ -2831,13 +2727,16 @@ class metabolite_basis_set(dict):
 
         # browse metabolite groups in template
         for this_metagroup_name, this_row in df.iterrows():
-            if(type(this_row["Consisting of"]) != list):
+
+            if(type(this_row["Consisting of"]) is float):
                 # solo metabolite
                 this_metaname_list = [this_metagroup_name]
-            else:
+            elif(type(this_row["Consisting of"]) is str):
                 # group
                 this_metaname_list = this_row["Consisting of"].split("+")
                 this_metaname_list = [m.strip() for m in this_metaname_list]
+            else:
+                log.error("weird bug while reading XLS file. Sorry :P")
 
             # prepare group entry
             this_metagroup_entry = {"metabolites": {}}
@@ -2891,10 +2790,12 @@ class metabolite_basis_set(dict):
 
                     # append metabolite entry for this metabolite group
                     this_metagroup_entry["metabolites"][this_meta_name] = {"ppm": this_ppm_list, "iso": this_iso_list, "J": this_j_list}
+            if(len(this_metagroup_entry["metabolites"]) == 0):
+                log.error("Metabolite %s is empty! Check your metabolite basis set in the XLS file!" % this_metagroup_name)
 
             # add extra infos to metabolite group
             # is it a MM?
-            this_metagroup_entry["Macromecule"] = (this_row["Type"] == "Macromolecule")
+            this_metagroup_entry["Macromecule"] = (this_row["Type"] == "Macromolecule") or (this_row["Type"] == "Ref. Macromolecule")
             # omg, is it the reference MM?
             this_metagroup_entry["Reference macromolecule"] = (this_row["Type"] == "Ref. Macromolecule")
 
@@ -2988,6 +2889,42 @@ class metabolite_basis_set(dict):
             f.write("n_MMs = " + str(n_MM) + "\n")
             f.write("\n")
 
+    def get_literature_min(self):
+        """
+        Return the minimum in vivo human values found in literature, no macromolecules.
+
+        Returns
+        -------
+        cmin : numpy array
+            Array containing the minimum metabolite concentrations
+        """
+        # browse though the database and find min values from literature
+        cmin = []
+        for this_metagroup_key, this_metagroup_entry in self.items():
+            cmin.append(this_metagroup_entry["Concentration min"])
+
+        # convert to np
+        cmin = np.array(cmin)
+        return(cmin)
+
+    def get_literature_max(self):
+        """
+        Return the maximum in vivo values found in literature, no macromolecules.
+
+        Returns
+        -------
+        cmax : numpy array
+            Array containing the maximum metabolite concentrations
+        """
+        # browse though the database and find min values from literature
+        cmax = []
+        for this_metagroup_key, this_metagroup_entry in self.items():
+            cmax.append(this_metagroup_entry["Concentration max"])
+
+        # convert to np
+        cmax = np.array(cmax)
+        return(cmax)
+
     def print(self):
         """Print the metabolite database with all the information (chemical shifts, nuclei, J couplings)."""
         cell_nchar = 8
@@ -3046,7 +2983,7 @@ class metabolite_basis_set(dict):
         df = df.filter(regex=("^(?!_).*"))
 
         if(include_obj):
-            df["obj"] = self.copy()
+            df["obj"] = [self.copy()]
 
         df = df.add_prefix(prefix_str)
 

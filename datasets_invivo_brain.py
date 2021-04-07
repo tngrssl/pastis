@@ -27,6 +27,7 @@ p = reco.pipeline()
 p.settings["POI_range_ppm"] = [1.8, 2.2]
 p.settings["POI_shift_range_ppm"] = [1.8, 2.2]
 p.settings["POI_shift_true_ppm"] = 2.008
+p.settings["POI_LW_range_ppm"] = [1.8, 2.2]
 p.settings["display"] = display_stuff
 p.settings["pkl_filepath"] = "/home/tangir/crmbm/acq_db/brain.pkl"
 
@@ -38,7 +39,7 @@ p.job_list = [  p.job["phasing"],
                 p.job["noise_estimation"],
                 p.job["zero_filling"],
                 # p.job["physio_analysis"],
-                # p.job["apodizing"],
+                p.job["apodizing"],
                 p.job["realigning"],
                 p.job["data_rejecting"],
                 p.job["averaging"],

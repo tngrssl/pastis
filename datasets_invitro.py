@@ -9,19 +9,14 @@ A user script used to store calls for the reconstruction of in vitro data.
 from IPython import get_ipython
 import matplotlib.pylab as plt
 import mrs.reco as reco
-import mrs.db as db
 import mrs.log as log
 import numpy as np
-
-import pdb
 
 get_ipython().magic("matplotlib auto")
 plt.rcParams['figure.dpi'] = 100
 plt.rcParams['figure.max_open_warning'] = 1000
 plt.rcParams['font.size'] = 9
 log.setLevel(log.DEBUG)
-
-rdb = db.data_db()
 
 # %% 27/02/2019 - spinal cord phantom - nice WS STEAM, testing TWIX reco
 get_ipython().magic("clear")
