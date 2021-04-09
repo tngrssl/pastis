@@ -30,6 +30,9 @@ log.setLevel(log.DEBUG)
 # data to process is in here
 db_filepath = "/home/tangir/crmbm/acq_db/brain.pkl"
 
+# apodize before fitting (WARNING WARNING experimental achtung)
+apodization_factor = 0.0
+
 # display real-time fit and other stuff?
 display_stuff = True
 
@@ -236,7 +239,8 @@ for this_index, this_row in df.iterrows():
     # filtering
     # this_data = this_data.correct_bandpass_filtering_1d([0, 6], np.ones, display_stuff)
     # reapodize to remove filtering artefact (will not affect linewidth because already apodized)
-    # this_data = this_data.correct_apodization_nd(5.0, display_stuff)
+    if(apodization_factor > 0):
+        this_data = this_data.correct_apodization_nd(apodization_factor, display_stuff)
 
     # measure linewidth of NAA to help initialize stuff
     this_linewidth_estimated = this_data.correct_zerofill_nd().analyze_linewidth_1d([1.8, 2.2], False, True)

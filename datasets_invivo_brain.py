@@ -20,13 +20,13 @@ plt.rcParams['font.size'] = 9
 log.setLevel(log.DEBUG)
 
 # display stuff?
-display_stuff = False
+display_stuff = True
 
 # stop pipeline if the reco went bad
-raise_error_on_bad_reco = False
+raise_error_on_bad_reco = True
 
 # template to use here (see definitions below)
-reco_template = "brain_noapo"
+reco_template = "brain"
 
 # %% "brain" reconstruction template
 template_name = "brain"
@@ -48,7 +48,7 @@ p.job_list = [  # p.job["displaying_anatomy"],
                 p.job["noise_estimation"],
                 p.job["zero_filling"],
                 # p.job["physio_analysis"],
-                p.job["apodizing"],
+                # p.job["apodizing"],
                 p.job["realigning"],
                 p.job["data_rejecting"],
                 p.job["averaging"],
@@ -62,20 +62,12 @@ p.job["realigning"]["moving_averages"] = 2
 p.job["data_rejecting"]["moving_averages"] = 2
 
 p.job["cropping"]["final_npts"] = 2048
+p.job["displaying"]["apodization_factor"] = 5.0
 
 # SNR like LCModel...
 p.job["analyzing_snr"]["half_factor"] = True
 p.job["ref_data_analyzing_snr"]["half_factor"] = True
 
-p.save_template(template_name)
-
-# %% "brain_noapo" reconstruction template
-# remove apodization to evaluate its impact on SNR...
-template_name = "brain_noapo"
-
-p = reco.pipeline("brain")
-p.job_list.remove(p.job["apodizing"])
-p.settings["storage_file"] = "/home/tangir/crmbm/acq_db/%s.pkl" % template_name
 p.save_template(template_name)
 
 # %% 20/06/2019 - 296_ym_p1_brainmoelle - Yasmin :)
