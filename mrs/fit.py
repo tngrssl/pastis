@@ -135,8 +135,7 @@ class fit_lcmodel(fit_tool):
         log.info("adjusting metabolite basis set TE...")
 
         # hold debugs logs during parse
-        old_log_level = log.getLevel()
-        log.setLevel(log.INFO)
+        log.pause()
 
         # scan basis set files
         metabs_folder = "/".join(self.lcmodel_filbas.split("/")[0:-1])
@@ -150,7 +149,7 @@ class fit_lcmodel(fit_tool):
                     metabs_files_dict[this_metabs_te] = metabs_folder + "/" + this_metabs_filename
 
         # put back log
-        log.setLevel(old_log_level)
+        log.resume()
 
         # find metabs with a TE close to the data's TE
         metabs_te_arr = np.array(list(metabs_files_dict.keys())).astype(float)
@@ -568,7 +567,7 @@ class fit_pastis(fit_tool):
 
             # first find closest peak in range
             this_peak_search_range = [this_peak_ppm - this_peak_range / 2.0, this_peak_ppm + this_peak_range / 2.0]
-            _, this_peak_ppm, _, this_peak_lw_hz, _, _ = self.data._analyze_peak_1d(this_peak_search_range)
+            this_peak_ppm, _, this_peak_lw_hz, _, _ = self.data._analyze_peak_1d(this_peak_search_range)
             log.debug("found it in the spectrum at %.2fppm" % this_peak_ppm)
 
             # integrate area
@@ -974,16 +973,12 @@ class fit_pastis(fit_tool):
 
         # display
         if(self.display_enable):
-            old_log_level = log.getLevel()
-            log.setLevel(log.INFO)
             for ax in fig.get_axes():
                 ax.label_outer()
 
             fig.subplots_adjust(left=0.02, bottom=0.1, right=0.98, top=0.95, wspace=0.2, hspace=None)
             fig.show()
             plt.pause(0.5)
-            # put back log
-            log.setLevel(old_log_level)
 
         # merge back with macromolecules
         new_metabolites_list = list(set(np.sort(metabolites_kept_list + macromolecules_to_keep_list)))

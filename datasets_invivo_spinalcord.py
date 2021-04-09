@@ -20,7 +20,7 @@ plt.rcParams['font.size'] = 9
 log.setLevel(log.DEBUG)
 
 # display stuff?
-display_stuff = False
+display_stuff = True
 
 # stop pipeline if the reco went bad
 raise_error_on_bad_reco = True
@@ -33,10 +33,10 @@ template_name = "sc"
 
 p = reco.pipeline()
 p.settings["storage_file"] = "/home/tangir/crmbm/acq_db/%s.pkl" % template_name
-p.settings["POI_range_ppm"] = [1.8, 2.2]
+p.settings["POI_range_ppm"] = [4.5, 5.2]
 p.settings["POI_shift_range_ppm"] = [1.8, 2.2]
 p.settings["POI_shift_true_ppm"] = 2.008
-p.settings["POI_LW_range_ppm"] = [1.8, 2.2]
+p.settings["POI_LW_range_ppm"] = [4.5, 5.2]
 p.settings["display"] = display_stuff
 
 p.job_list = [  # p.job["displaying_anatomy"],
@@ -48,8 +48,9 @@ p.job_list = [  # p.job["displaying_anatomy"],
                 p.job["noise_estimation"],
                 p.job["zero_filling"],
                 # p.job["physio_analysis"],
-                p.job["apodizing"],
+                # p.job["apodizing"],
                 p.job["realigning"],
+                p.job["data_rejecting"],
                 p.job["data_rejecting"],
                 p.job["averaging"],
                 p.job["calibrating"],
@@ -64,6 +65,7 @@ p.job["data_rejecting"]["auto_method_list"] = [reco.data_rejection_method.AUTO_A
                                                 reco.data_rejection_method.AUTO_PHASE]
 
 p.job["cropping"]["final_npts"] = 2048
+p.job["displaying"]["apodization_factor"] = 5.0
 
 # SNR like LCModel...
 p.job["analyzing_snr"]["half_factor"] = True
@@ -110,7 +112,7 @@ p.settings["storage_file"] = "/home/tangir/crmbm/acq_db/%s.pkl" % (template_name
 p.save_template(template_name + "_concatenate")
 
 # %% 15/03/2019 - 291-vs-moelle-spectro-p1 - concatenated STEAM #1 :(
-# not included in group, the protocol was not ead, RFC pulses were too short...
+# not included in group, the protocol was not ready, RFC pulses were too short...
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -137,7 +139,7 @@ p.dataset[3]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/291-vs-moelle-spect
 # p.save_datasets()
 
 # %% 15/03/2019 - 291-vs-moelle-spectro-p1 - concatenated sLASER #1 :(
-# not included in group, the protocol was not ead, RFC pulses were too short...
+# not included in group, the protocol was not ready, RFC pulses were too short...
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -199,9 +201,10 @@ p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/296_ym_p1_brainmoelle/29
 p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/296_ym_p1_brainmoelle/meas_MID157_slaser_R_N=20+_1_longTE_SNR++++_FID34191.dat",
                                 "/home/tangir/crmbm/acq_twix/296_ym_p1_brainmoelle/meas_MID155_slaser_R_N=20+_1_longTE_SNR++++_FID34189.dat"]
 
-p.job["data_rejecting"]["auto_method_list"] = None
+#p.job["data_rejecting"]["auto_method_list"] = None
+p.settings["datasets_indexes"] = 1
 p.run()
-p.check_analyze_results(False and raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 # %% 16/07/2019 - 300-pm-p1-moelle - Pelayo :)

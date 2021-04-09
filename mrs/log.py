@@ -16,13 +16,12 @@ import pdb
 
 # init the logger
 logging.basicConfig(format='(%(levelname)s) %(message)s', level=DEBUG)
-# characters used in log messages
-_INDENT_CHAR = '>'
-_INDENT_CHAR2 = ' '
 # separator lines in logs
 _LINE_CHAR = '-'
 _LINE_WIDTH = 40
 
+# stack used to handle pause/resume of logging
+_pause_logging_stack = []
 
 def getLevel():
     """
@@ -48,6 +47,33 @@ def setLevel(l):
     logging.getLogger().setLevel(l)
     # to avoid DEBUG messages from matplotlib!
     logging.getLogger('matplotlib.font_manager').disabled = True
+    # reinit pause stack
+    global _pause_logging_stack
+    _pause_logging_stack = []
+
+
+def pause():
+    """Turn off logger until resume() method is called."""
+    # push level in stack
+    global _pause_logging_stack
+    _pause_logging_stack.append(getLevel())
+
+
+def resume():
+    """Turn on logger."""
+    # pop level from stack
+    global _pause_logging_stack
+    old_level = _pause_logging_stack.pop()
+    # if not paused, apply level to resume logging
+    if(not _paused()):
+        setLevel(old_level)
+
+
+def _paused():
+    """Return (True) if logging is currently paused."""
+    global _pause_logging_stack
+    # logging is paused if stuff in the stack
+    return(len(_pause_logging_stack) > 0)
 
 
 def _wrap_message(s, cl):
@@ -93,18 +119,21 @@ def info(s):
     s : string
         Logging string
     """
-    s = _wrap_message(s, INFO)
-    logging.info(s)
+    if(not _paused()):
+        s = _wrap_message(s, INFO)
+        logging.info(s)
 
 
 def info_line________________________():
     """Log a line as INFO."""
-    logging.info(_LINE_CHAR * _LINE_WIDTH)
+    if(not _paused()):
+        logging.info(_LINE_CHAR * _LINE_WIDTH)
 
 
 def info_line_break():
     """Log a line break as INFO."""
-    logging.info("")
+    if(not _paused()):
+        logging.info("")
 
 
 def debug(s):
@@ -116,18 +145,21 @@ def debug(s):
     s : string
         Logging string
     """
-    s = _wrap_message(s, DEBUG)
-    logging.debug(s)
+    if(not _paused()):
+        s = _wrap_message(s, DEBUG)
+        logging.debug(s)
 
 
 def debug_line________________________():
     """Log a line as DEBUG."""
-    logging.debug(_LINE_CHAR * _LINE_WIDTH)
+    if(not _paused()):
+        logging.debug(_LINE_CHAR * _LINE_WIDTH)
 
 
 def debug_line_break():
     """Log a line break as DEBUG."""
-    logging.info("")
+    if(not _paused()):
+        logging.info("")
 
 
 def warning(s):
@@ -139,9 +171,10 @@ def warning(s):
     s : string
         Logging string
     """
-    s = _wrap_message(s, WARN)
-    logging.warning(s)
-    Warning(s)
+    if(not _paused()):
+        s = _wrap_message(s, WARN)
+        logging.warning(s)
+        Warning(s)
 
 
 def error(s):
@@ -206,7 +239,7 @@ class progressbar:
             # add empty an empty progressbar
             bar_str += self._empty_char * self._progressbar_length
         # only print progress bar if we are logging at INFO level or more
-        if(logging.getLogger().getEffectiveLevel() <= INFO):
+        if((logging.getLogger().getEffectiveLevel() <= INFO) and (not _paused())):
             print(bar_str, end="", flush=True)
 
     def update(self, current_step):
@@ -230,8 +263,9 @@ class progressbar:
                 bar_str += self._empty_char * (self._progressbar_length - current_bar_counter)
             else:
                 bar_str = self._full_char * (current_bar_counter - self._progress_bar_counter)
+
             # only print progress bar if we are logging at INFO level or more
-            if(logging.getLogger().getEffectiveLevel() <= INFO):
+            if((logging.getLogger().getEffectiveLevel() <= INFO) and (not _paused())):
                 print(bar_str, end="", flush=True)
 
             # remember progression
@@ -256,5 +290,5 @@ class progressbar:
         # add finish message
         bar_str += " " + s + "."
         # only print progress bar if we are logging at INFO level or more
-        if(logging.getLogger().getEffectiveLevel() <= INFO):
+        if((logging.getLogger().getEffectiveLevel() <= INFO) and (not _paused())):
             print(bar_str, flush=True)

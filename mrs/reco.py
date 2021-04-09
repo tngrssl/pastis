@@ -14,6 +14,7 @@ import suspect
 import numpy as np
 import pandas as pd
 from scipy import signal
+from scipy import interpolate
 import scipy.io as sio
 import matplotlib.pylab as plt
 import matplotlib._pylab_helpers
@@ -27,8 +28,21 @@ from mrs import paths as default_paths
 
 import pdb
 
+# max number of datasets in a pipeline
 MAX_NUM_DATASETS = 1000
 
+# constants used during data rejection
+# minimum step while setting amplitude threshold (% of signal relative change)
+DATA_REJECTION_AMPLITUDE_STEP = 2.0
+# minimum step while setting linewidth threshold (Hz)
+DATA_REJECTION_LINEWIDTH_STEP = 1.0
+# minimum step while setting chemical shift threshold (ppm)
+DATA_REJECTION_FREQUENCY_STEP = 0.001
+# minimum step while setting phase threshold (rad)
+DATA_REJECTION_PHASE_STEP = 0.1
+
+# spectral resolution for peak realignment using inter-correlation mode (experimental) (ppm)
+RECO_CORRECT_REALIGN_INTER_CORR_MODE_DF = 0.1
 
 class suspect_phasing_method(Enum):
     """The enum suspect_phasing_method describes the type of phasing method to use (phasing method from the suspect package."""
@@ -450,7 +464,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         """
         return(self._is_rawdata)
 
-    def _analyze_peak_1d(self, ppm_range):
+    def _analyze_peak_1d(self, ppm_range, allowed_apodization=1.0):
         """
         Find peak in specific ppm range using magnitude mode and return stuff.
 
@@ -460,11 +474,11 @@ class MRSData2(suspect.mrsobjects.MRSData):
         ----------
         ppm_range : list [2]
             Range in ppm used for peak searching
+        allowed_apodization : float/boolean
+            If >0 or !=False, apodize signal during peak analysis
 
         Returns
         -------
-        peak_index : float
-            Index position of the peak
         peak_ppm : float
             Position in PPM of the peak
         peak_val : np.complex128
@@ -476,8 +490,14 @@ class MRSData2(suspect.mrsobjects.MRSData):
         peak_seg_val : numpy complex array
             Peak segment value
         """
-        ppm = self.frequency_axis_ppm()
-        sf = self.spectrum()
+        # silently zero-fill and apodize if needed
+        log.pause()
+        s = self.correct_zerofill_nd().correct_apodization_nd(allowed_apodization)
+        log.resume()
+
+        # init
+        ppm = s.frequency_axis_ppm()
+        sf = s.spectrum()
         sf_abs = np.abs(sf)
 
         # mask outside range
@@ -503,16 +523,16 @@ class MRSData2(suspect.mrsobjects.MRSData):
         ippm_max = peak_index + np.argmax(sf_real[peak_index:] < amp_peak / 2)
         ippm_min = peak_index - np.argmax(sf_real[peak_index::-1] < amp_peak / 2)
         dppm = np.abs(ppm[ippm_max] - ppm[ippm_min])
-        peak_lw = dppm * self.f0
+        peak_lw = dppm * s.f0
 
         # peak segment
         ippm_half_peak = np.arange(ippm_min, ippm_max)
         ppm_seg = ppm[ippm_half_peak]
         peak_seg = sf[ippm_half_peak]
 
-        return(peak_index, peak_ppm, peak_val, peak_lw, ppm_seg, peak_seg)
+        return(peak_ppm, peak_val, peak_lw, ppm_seg, peak_seg)
 
-    def _analyze_peak_2d(self, peak_range=[4.5, 5]):
+    def _analyze_peak_2d(self, peak_range=[4.5, 5], allowed_apodization=1.0):
         """
         Analyze a peak in the spectrum by estimating its amplitude, linewidth, frequency shift and phase for each average.
 
@@ -522,6 +542,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
         ----------
         peak_range : array [2]
             Range in ppm used to analyze peak phase when no reference signal is specified
+        allowed_apodization : float/boolean
+            If >0 or !=False, apodize signal during peak analysis
 
         Returns
         -------
@@ -537,18 +559,21 @@ class MRSData2(suspect.mrsobjects.MRSData):
         if(self.ndim != 2):
             log.error("this method only works for 2D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
 
+        # apodize if needed
+        s = self.copy()
+
         # first, find peak of interest in range, just to check
-        s_avg = np.mean(self, axis=0)
-        _, peak_ppm, _, _, _, _ = s_avg._analyze_peak_1d(peak_range)
+        s_avg = np.mean(s, axis=0)
+        peak_ppm, _, _, _, _ = s_avg._analyze_peak_1d(peak_range, allowed_apodization)
         log.debug("found peak of interest at %0.2fppm!" % peak_ppm)
 
         # for each average in moving averaged data
-        peak_trace = np.zeros([self.shape[0], 4])
-        pbar = log.progressbar("analyzing", self.shape[0])
-        for a in range(0, self.shape[0]):
+        peak_trace = np.zeros([s.shape[0], 4])
+        pbar = log.progressbar("analyzing", s.shape[0])
+        for a in range(0, s.shape[0]):
 
             # call 1D peak analysis
-            peak_index, peak_ppm, peak_val, peak_lw, _, _ = self[a, :]._analyze_peak_1d(peak_range)
+            peak_ppm, peak_val, peak_lw, _, _ = s[a, :]._analyze_peak_1d(peak_range, allowed_apodization)
 
             # shift in ppm
             peak_trace[a, 2] = peak_ppm
@@ -564,14 +589,14 @@ class MRSData2(suspect.mrsobjects.MRSData):
         # normalize stuff
 
         # relative to mean
-        peak_trace_rel2mean = np.zeros([self.shape[0], 4])
+        peak_trace_rel2mean = np.zeros([s.shape[0], 4])
         peak_trace_rel2mean[:, 0] = peak_trace[:, 0] / peak_trace[:, 0].mean() * 100 - 100
         peak_trace_rel2mean[:, 1] = peak_trace[:, 1] - peak_trace[:, 1].mean()
         peak_trace_rel2mean[:, 2] = peak_trace[:, 2] - peak_trace[:, 2].mean()
         peak_trace_rel2mean[:, 3] = peak_trace[:, 3] - peak_trace[:, 3].mean()
 
         # relative to 1st pt
-        peak_trace_rel2firstpt = np.zeros([self.shape[0], 4])
+        peak_trace_rel2firstpt = np.zeros([s.shape[0], 4])
         peak_trace_rel2firstpt[:, 0] = peak_trace[:, 0] / peak_trace[0, 0] * 100 - 100
         peak_trace_rel2firstpt[:, 1] = peak_trace[:, 1] - peak_trace[0, 1]
         peak_trace_rel2firstpt[:, 2] = peak_trace[:, 2] - peak_trace[0, 2]
@@ -590,7 +615,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         Parameters
         ----------
         n_pts : int
-            Apodization factor in Hz
+            Number of points at the end of the FID signal which we should use to estimate the noise STD
 
         Returns
         -------
@@ -612,7 +637,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         # we really want real noise, not zeros from zero_filling
         s_nonzero_mask = (s_real != 0.0)
         s_analyze = s_real[s_nonzero_mask]
-        # now take the last 100 points
+        # now take the last n_pts points
         noise_lev = np.std(s_analyze[-n_pts:-1])
         log.info("noise level = %.2E" % noise_lev)
 
@@ -620,13 +645,13 @@ class MRSData2(suspect.mrsobjects.MRSData):
         log.debug("updating noise level...")
         s._noise_level = noise_lev
 
-        # if any ref data available, we crop it too (silently)
+        # if any ref data available, analyze noise there too
         if(s.data_ref is not None):
             s.data_ref = s.data_ref.analyze_noise_nd(n_pts)
 
         return(s)
 
-    def analyze_physio_2d(self, peak_range=[4.5, 5], delta_time_range=1000.0, display=False):
+    def analyze_physio_2d(self, peak_range=[4.5, 5], delta_time_range=1000.0, allowed_apodization=1.0, display=False):
         """
         Analyze the physiological signal and try to correlate it to a peak amplitude, linewidth, frequency shift and phase variations.
 
@@ -638,6 +663,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
             Range in ppm used to analyze peak phase when no reference signal is specified
         delta_time_range : float
             Range in ms used to correlate / match the NMR and the physiological signal. Yes, since we are not really sure of the start timestamp we found in the TWIX header, we try to match perfectly the two signals.
+        allowed_apodization : float/boolean
+            If >0 or !=False, apodize signal during correction process. However, the final corrected signal will not be apodized.
         display : boolean
             Display correction process (True) or not (False)
         """
@@ -660,7 +687,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         resp_s = resp_trace[3]
 
         # perform peak analysis
-        peak_prop_abs, _, _ = self.correct_zerofill_nd()._analyze_peak_2d(peak_range)
+        peak_prop_abs, _, _ = self._analyze_peak_2d(peak_range, allowed_apodization)
 
         # init
         mri_t = np.linspace(self.sequence.timestamp, self.sequence.timestamp + self.sequence.tr * peak_prop_abs.shape[0], peak_prop_abs.shape[0])
@@ -931,7 +958,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         # find maximum peak in range
         sf = s.spectrum()
-        _, ppm_peak, peak_val, _, _, _ = s._analyze_peak_1d(peak_range)
+        # analyse peak WITHOUT ANY apodization (important)
+        ppm_peak, peak_val, _, _, _ = s._analyze_peak_1d(peak_range, False)
         if(magnitude_mode):
             log.debug("measuring the MAGNITUDE intensity at %0.2fppm!" % ppm_peak)
             snr_signal = np.abs(peak_val)
@@ -1015,8 +1043,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
         # init
         s = self.copy()
 
-        # call 1D peak analysis
-        _, ppm_peak, _, lw, peak_seg_ppm, peak_seg_val = s._analyze_peak_1d(POI_range_ppm)
+        # call 1D peak analysis WITHOUT ANY apodization (important)
+        ppm_peak, _, lw, peak_seg_ppm, peak_seg_val = s._analyze_peak_1d(POI_range_ppm, False)
         if(magnitude_mode):
             log.debug("estimating the MAGNITUDE peak linewidth at %0.2fppm!" % ppm_peak)
         else:
@@ -1423,7 +1451,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 s_avg = s[:, c, :].mean(axis=0)
 
                 # find maximum peak in range and its phase
-                _, peak_ppm, peak_val, _, _, _ = s_avg._analyze_peak_1d(peak_range)
+                peak_ppm, peak_val, _, _, _ = s_avg._analyze_peak_1d(peak_range)
                 phase_peak_avg = np.angle(peak_val)
                 if(c == 0):
                     log.debug("measuring phase at %0.2fppm on 1st channel!" % peak_ppm)
@@ -1455,7 +1483,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                     this_s_phased = this_s * np.exp(-1j * (phase_fid_avg + phase_offset))
                 elif(phase_method == 4):
                     # find maximum peak in range and its phase
-                    _, peak_ppm, peak_val, _, _, _ = this_s._analyze_peak_1d(peak_range)
+                    peak_ppm, peak_val, _, _, _ = this_s._analyze_peak_1d(peak_range)
                     phase_peak = np.angle(peak_val)
 
                     # apply phase to spectrum
@@ -1690,9 +1718,9 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         return(s_ma)
 
-    def correct_analyze_and_reject_2d(self, peak_range=[4.5, 5], moving_Naverages=1, peak_properties_ranges={"amplitude (%)": None, "linewidth (Hz)": [5.0, 30.0], "chemical shift (ppm)": 0.5, "phase std. factor (%)": 60.0}, peak_properties_rel2mean=True, auto_method_list=None, auto_adjust_allowed_snr_change=0.0, display=False, display_range=[1, 6]):
+    def correct_analyze_and_reject_2d(self, peak_range=[4.5, 5], moving_Naverages=1, peak_properties_ranges={"amplitude (%)": None, "linewidth (Hz)": [5.0, 30.0], "chemical shift (ppm)": 0.5, "phase std. factor (%)": 60.0}, peak_properties_rel2mean=True, auto_method_list=None, auto_adjust_allowed_snr_change=0.0, allowed_apodization=1.0, display=False, display_range=[1, 6]):
         """
-        Analyze peak in each average in terms intensity, linewidth, chemical shift and phase and reject data if one of these parameters goes out of the min / max bounds. Usefull to understand what the hell went wrong during your acquisition when you have the raw data (TWIX) and to try to improve things a little. You can choose to set the bounds manually or automatically based on a peak property (amplitude, linewidth, frequency, phase). And you can run several automatic adjusment methods, the one giving the highest SNR and/or the lowest peak linewidth will be selected.
+        Analyze peak in each average in terms intensity, linewidth, chemical shift and phase and reject data if one of these parameters goes out of the min / max bounds. Usefull to understand what the hell went wrong during your acquisition when you have the raw data and to try to improve things a little. You can choose to set the bounds manually or automatically based on a peak property (amplitude, linewidth, frequency, phase). And you can run several automatic adjusment methods, the one giving the highest SNR and/or the lowest peak linewidth will be selected. All this is very experimental and the code is long and not optimized, sorry ;)
 
         * Works only with a 2D [averages,timepoints] signal.
         * Returns a 2D [averages,timepoints] signal.
@@ -1715,6 +1743,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
             Automatic rejection bounds adjustment methods
         auto_adjust_allowed_snr_change : float
             Allowed change in SNR (%), a positive or negative relative to the initial SNR without data rejection
+        allowed_apodization : float/boolean
+            If >0 or !=False, apodize signal during correction process. However, the final corrected signal will not be apodized.
         display : boolean
             Display correction process (True) or not (False)
         display_range : list [2]
@@ -1746,19 +1776,18 @@ class MRSData2(suspect.mrsobjects.MRSData):
             log.info("This is the %dth time we perform data rejection on this signal!" % iround_data_rej)
 
         # estimate initial SNR and linewidth
-        old_level = log.getLevel()
-        log.setLevel(log.ERROR)
-        initial_snr, _, _ = s.correct_zerofill_nd().correct_realign_2d().correct_average_2d().correct_apodization_nd().analyze_snr_1d(peak_range)
-        initial_lw = s.correct_zerofill_nd().correct_realign_2d().correct_average_2d().correct_apodization_nd().analyze_linewidth_1d(peak_range)
-        log.setLevel(old_level)
+        log.pause()
+        initial_snr, _, _ = s.correct_realign_2d().correct_average_2d().analyze_snr_1d(peak_range)
+        initial_lw = s.correct_realign_2d().correct_average_2d().analyze_linewidth_1d(peak_range)
+        log.resume()
         log.info("* Pre-data-rejection SNR = %.2f" % initial_snr)
         log.info("* Pre-data-rejection linewidth = %.2f Hz" % initial_lw)
 
         # build moving averaged data
-        s_ma = self.correct_zerofill_nd()._build_moving_average_data_2d(moving_Naverages)
+        s_ma = self._build_moving_average_data_2d(moving_Naverages)
 
-        # perform peak analysis
-        peak_prop_abs, peak_prop_rel2mean, peak_prop_rel2firstpt = s_ma._analyze_peak_2d(peak_range)
+        # perform peak analysis (possibly with apodization to stabilize things)
+        peak_prop_abs, peak_prop_rel2mean, peak_prop_rel2firstpt = s_ma._analyze_peak_2d(peak_range, allowed_apodization)
 
         # first set the data according to relative option: this is a user option
         if(peak_properties_rel2mean):
@@ -1824,6 +1853,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         # automatic rejection ?
         if(auto_method_list is not None):
 
+            # init
             display_axes_ready = [False, False]
             properties_names = list(peak_properties_ranges.keys())
             auto_method_final_snr_list = np.array([0.0] * 4)
@@ -1831,40 +1861,50 @@ class MRSData2(suspect.mrsobjects.MRSData):
             peak_prop_min_auto_res = peak_prop_min.copy()
             peak_prop_max_auto_res = peak_prop_max.copy()
 
+            # for each auto method
             for this_auto_method in auto_method_list:
+                # prepare min/max peak property range
+                this_prop_min = np.abs(peak_prop_analyze[:, this_auto_method.value]).min()
+                this_prop_max = np.abs(peak_prop_analyze[:, this_auto_method.value]).max()
 
-                if(this_auto_method == data_rejection_method.AUTO_LINEWIDTH):
-                    this_prop_min = max(peak_prop_analyze[:, 1].min(), peak_properties_ranges_list[1][0])
-                    this_prop_max = peak_prop_analyze[:, 1].max()
-                else:
-                    this_prop_min = np.abs(peak_prop_analyze[:, this_auto_method.value]).min()
-                    this_prop_max = np.abs(peak_prop_analyze[:, this_auto_method.value]).max()
-
-                # adjust the number of tries / number of steps depending on criteria
+                # get range resolution from constants
                 if(this_auto_method == data_rejection_method.AUTO_AMPLITUDE):
-                    this_prop_step = 1.0
+                    this_prop_step = DATA_REJECTION_AMPLITUDE_STEP
                 elif(this_auto_method == data_rejection_method.AUTO_LINEWIDTH):
-                    this_prop_step = 1.0
+                    this_prop_step = DATA_REJECTION_LINEWIDTH_STEP
                 elif(this_auto_method == data_rejection_method.AUTO_FREQUENCY):
-                    this_prop_step = 0.001
+                    this_prop_step = DATA_REJECTION_FREQUENCY_STEP
                 elif(this_auto_method == data_rejection_method.AUTO_PHASE):
-                    this_prop_step = 0.01
+                    this_prop_step = DATA_REJECTION_PHASE_STEP
                 else:
                     log.error("upsyy! I am not aware of this automatic data rejection method: " + str(this_auto_method))
 
-                # generate a range of criteria value to test, using the step
-                this_prop_range = np.arange(this_prop_min, this_prop_max, this_prop_step)
+                # generate a range to test, using the resolution
+                this_prop_range = np.arange(this_prop_min - this_prop_step, this_prop_max + this_prop_step, this_prop_step)
 
                 # checking that there is actually a variation and a range to test
                 if(this_prop_range.size == 0):
-                    # let's skip this method
+                    # no? let's skip this method
                     this_prop_range = np.array([this_prop_min])
-                # if that is too short/long, just generate a list of 50
-                if(this_prop_range.size > 50):
-                    this_prop_range = np.linspace(this_prop_min, this_prop_max, 50)
+                else:
+                    # now let's be smart and reduce the number of values to test according to the peak property measurements
+                    # regrid to nearest in previously computed range
+                    this_prop_analyze_set = np.abs(peak_prop_analyze[:, this_auto_method.value])
+                    this_prop_analyze_set = interpolate.interp1d(this_prop_range, this_prop_range, kind='nearest')(this_prop_analyze_set)
+                    # remove one step resolution, remove duplicates and sort
+                    this_prop_analyze_set = np.sort(np.array(list(set(this_prop_analyze_set - this_prop_step))))
+                    # remove negative values
+                    this_prop_analyze_set = this_prop_analyze_set[this_prop_analyze_set > 0]
+                    # we should now have an optimized set of thresholds to test
+                    this_prop_range = this_prop_analyze_set
 
-                # iterate between max and min for linewidth, and test the resulting data
-                pbar = log.progressbar("adjusting rejection threshold for [" + properties_names[this_auto_method.value] + "]", this_prop_range.shape[0])
+                    # checking that there is actually a variation and a range to test (again, sorry)
+                    if(this_prop_range.size == 0):
+                        # no? let's skip this method
+                        this_prop_range = np.array([this_prop_min])
+
+                # iterate and test the resulting data
+                pbar = log.progressbar("adjusting rejection threshold for [" + properties_names[this_auto_method.value] + "] in range [%.3f;%.3f] (n=%d)" % (this_prop_range.min(), this_prop_range.max(), this_prop_range.size), this_prop_range.shape[0])
 
                 test_snr_list = np.zeros(this_prop_range.shape)
                 test_lw_list = np.zeros(this_prop_range.shape)
@@ -1872,7 +1912,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
                 # test each criteria bound
                 for (i_prop_val, this_prop_val) in enumerate(this_prop_range):
-                    # rebuild min/max rejection bounds
+                    # rebuild min/max rejection bounds including user values
                     peak_prop_min_auto = peak_prop_min.copy()
                     peak_prop_max_auto = peak_prop_max.copy()
                     peak_prop_max_auto[this_auto_method.value] = this_prop_val
@@ -1891,14 +1931,11 @@ class MRSData2(suspect.mrsobjects.MRSData):
                     this_s_cor = s[(this_mask_reject_data_sumup == False), :]
 
                     # analyze snr / lw and number of rejections
-                    # by default, apply silently zerofilling, realigning, averaging and apodization
-                    # TODO: maybe need to make this customizable?
                     if(this_mask_reject_data_sumup.sum() < s_ma.shape[0]):
-                        old_level = log.getLevel()
-                        log.setLevel(log.ERROR)
-                        test_snr_list[i_prop_val], _, _ = this_s_cor.correct_zerofill_nd().correct_realign_2d().correct_average_2d().correct_apodization_nd().analyze_snr_1d(peak_range)
-                        test_lw_list[i_prop_val] = this_s_cor.correct_zerofill_nd().correct_realign_2d().correct_average_2d().correct_apodization_nd().analyze_linewidth_1d(peak_range)
-                        log.setLevel(old_level)
+                        log.pause()
+                        test_snr_list[i_prop_val], _, _ = this_s_cor.correct_realign_2d().correct_average_2d().analyze_snr_1d(peak_range)
+                        test_lw_list[i_prop_val] = this_s_cor.correct_realign_2d().correct_average_2d().analyze_linewidth_1d(peak_range)
+                        log.resume()
                         test_nrej_list[i_prop_val] = this_mask_reject_data_sumup.sum()
 
                     # progression
@@ -2078,12 +2115,12 @@ class MRSData2(suspect.mrsobjects.MRSData):
         s_cor = s[(mask_reject_data_sumup == False), :]
         # build rejected spectrum
         s_rej = s[(mask_reject_data_sumup == True), :]
-        s_rej_avg = s_rej.correct_zerofill_nd().correct_realign_2d().correct_average_2d().correct_apodization_nd()
+        s_rej_avg = s_rej.correct_realign_2d().correct_average_2d()
 
         log.info("TOTAL data rejection = %d / %d (%.0f%%)" % (mask_reject_data_sumup.sum(), s_ma.shape[0], (mask_reject_data_sumup.sum() / s_ma.shape[0] * 100)))
 
         # perform post-correction measurements
-        peak_prop_abs, peak_prop_rel2mean, peak_prop_rel2firstpt = s_ma._analyze_peak_2d(peak_range)
+        peak_prop_abs, peak_prop_rel2mean, peak_prop_rel2firstpt = s_ma._analyze_peak_2d(peak_range, allowed_apodization)
 
         # first set the data according to relative option: this is a user option
         if(peak_properties_rel2mean):
@@ -2156,7 +2193,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                     plt.plot(ppm, s_ma[k, :].spectrum().real * ampfactor + ystep * k, 'g-', linewidth=1)
 
                 # build lineshape segment
-                _, _, _, _, peak_seg_ppm, peak_seg_val = s_ma[k, :]._analyze_peak_1d(peak_range)
+                _, _, _, peak_seg_ppm, peak_seg_val = s_ma[k, :]._analyze_peak_1d(peak_range)
                 plt.plot(peak_seg_ppm, np.real(peak_seg_val) * ampfactor + ystep * k, 'k-', linewidth=1)
 
             plt.xlim(peak_range[1], peak_range[0])
@@ -2189,8 +2226,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         # display corected and rejected spectra
         if(display):
-            s_avg = s.correct_zerofill_nd().correct_realign_2d().correct_average_2d().correct_apodization_nd()
-            s_cor_avg = s_cor.correct_zerofill_nd().correct_realign_2d().correct_average_2d().correct_apodization_nd()
+            s_avg = s.correct_realign_2d().correct_average_2d()
+            s_cor_avg = s_cor.correct_realign_2d().correct_average_2d()
 
             # change legends
             s_avg.set_display_label("original spectrum")
@@ -2219,11 +2256,10 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig.show()
 
         # estimate final SNR and linewidth
-        old_level = log.getLevel()
-        log.setLevel(log.ERROR)
-        final_snr, _, _ = s_cor.correct_zerofill_nd().correct_realign_2d().correct_average_2d().correct_apodization_nd().analyze_snr_1d(peak_range)
-        final_lw = s_cor.correct_zerofill_nd().correct_realign_2d().correct_average_2d().correct_apodization_nd().analyze_linewidth_1d(peak_range)
-        log.setLevel(old_level)
+        log.pause()
+        final_snr, _, _ = s_cor.correct_realign_2d().correct_average_2d().analyze_snr_1d(peak_range)
+        final_lw = s_cor.correct_realign_2d().correct_average_2d().analyze_linewidth_1d(peak_range)
+        log.resume()
         log.info("* Final post-data-rejection SNR = %.2f" % final_snr)
         log.info("* Final post-data-rejection linewidth = %.2f Hz" % final_lw)
 
@@ -2264,9 +2300,9 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         return(s_cor)
 
-    def correct_realign_2d(self, peak_range=[4.5, 5], moving_Naverages=1, inter_corr_mode=False, display=False, display_range=[1, 6]):
+    def correct_realign_2d(self, peak_range=[4.5, 5], moving_Naverages=1, inter_corr_mode=False, allowed_apodization=1.0, display=False, display_range=[1, 6]):
         """
-        Realign each signal of interest in frequency by taking as a reference the first spectra in absolute mode.
+        Realign each signal of interest in frequency by taking as a reference the first spectra in absolute mode using pick-picking or inter-correlation (experimental).
 
         * Works only with a 2D [averages,timepoints] signal.
         * Returns a 2D [averages,timepoints] signal.
@@ -2279,6 +2315,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
             Number of averages to perform when using moving average, need to be an odd number
         inter_corr_mode : boolean
             Use inter-correlation technique to adjust frequency shifts. Could be more robust when SNR is low.
+        allowed_apodization : float/boolean
+            If >0 or !=False, apodize signal during correction process. However, the final corrected signal will not be apodized.
         display : boolean
             Display correction process (True) or not (False)
         display_range : list [2]
@@ -2311,12 +2349,12 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 # let's fix a +/-0.5ppm range
                 f_shifts_min = - np.abs(peak_range[1] - peak_range[0]) * s_ma.f0
                 f_shifts_max = + np.abs(peak_range[1] - peak_range[0]) * s_ma.f0
-                # let's fix a 0.1ppm resolution here for inter-correlation tests
-                f_shifts_step = 0.1 * s_ma.f0
+                # let's fix a the resolution here for inter-correlation tests
+                f_shifts_step = RECO_CORRECT_REALIGN_INTER_CORR_MODE_DF * s_ma.f0
                 f_shifts_list = np.arange(f_shifts_min, f_shifts_max, f_shifts_step)
             else:
                 # find peak in average spectrum absolute mode
-                ippm_peak_avg, ppm_peak_avg, peak_val, _, _, _ = s_avg._analyze_peak_1d(peak_range)
+                ppm_peak_avg, peak_val, _, _, _ = s_avg._analyze_peak_1d(peak_range, allowed_apodization)
                 log.debug("measuring peak properties at %0.2fppm!" % ppm_peak_avg)
 
             # for each average in moving averaged data
@@ -2328,12 +2366,20 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 if(inter_corr_mode):
                     # compare this individual spectrum with the first,  using inter-correlation
 
+
+                    # zero-fill and apodize moving average signal if needed
+                    # btw, I only do this in the case of the intercorrelation mode because it is done internally for the peak-picking mode by the the method _analyze_peak_1d
+                    log.pause()
+                    s_ma_ic = s_ma.correct_zerofill_nd().correct_apodization(allowed_apodization)
+                    log.resume()
+
+                    # first spectrum as reference
+                    s_ma_ic_ref = np.abs(s_ma_ic[0, :].spectrum())
                     # use the peak_range as a range for inter-corr tests
                     cc_2d = f_shifts_list * 0.0
                     for ifs, fs in enumerate(f_shifts_list):
-                        s_ma_ref = np.abs(s_ma[0, :].spectrum())
-                        s_ma_shifted = np.abs(s_ma[a, :].adjust_frequency(fs).spectrum())
-                        cc = np.corrcoef(s_ma_ref, s_ma_shifted)
+                        s_ma_ic_shifted = np.abs(s_ma_ic[a, :].adjust_frequency(fs).spectrum())
+                        cc = np.corrcoef(s_ma_ic_ref, s_ma_ic_shifted)
                         cc_2d[ifs] = np.abs(cc[0, 1])
 
                     # find max correlation
@@ -2342,13 +2388,13 @@ class MRSData2(suspect.mrsobjects.MRSData):
                     df_trace[a] = optimal_fs
                 else:
                     # measure shift on moving average data
-                    ippm_peak, ppm_peak, _, _, _, _ = s_ma[a, :]._analyze_peak_1d(peak_range)
+                    ppm_peak, _, _, _, _ = s_ma[a, :]._analyze_peak_1d(peak_range, allowed_apodization)
 
                     # estimate frequency shift in Hz compared to average spectrum
                     dppm = -(ppm_peak_avg - ppm_peak)
                     df_trace[a] = dppm * s_ma.f0
 
-                # correct moving averaged data
+                # correct moving averaged data (for display only, less heavy)
                 s_realigned_ma[a, :] = s_ma[a, :].adjust_frequency(df_trace[a])
 
                 # correct original data
@@ -2489,7 +2535,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         return(s_mean)
 
-    def correct_phase_1d(self, suspect_method=suspect_phasing_method.MATCH_MAGNITUDE_REAL, ppm_range=[0, 6], display=False, display_range=[1, 6]):
+    def correct_phase_1d(self, suspect_method=suspect_phasing_method.MATCH_MAGNITUDE_REAL, ppm_range=[0, 6], allowed_apodization=1.0, display=False, display_range=[1, 6]):
         """
         Phase signal using suspect's (hidden) phasing functions. You can choose between 3 different types of phasing methods. See suspect/processing/phase.py file.
 
@@ -2502,6 +2548,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
             Suspect phasing method to use here
         ppm_range : list [2]
             Range in ppm when analyzing spectra for phasing
+        allowed_apodization : float/boolean
+            If >0 or !=False, apodize signal during phase analysis process. However, the final corrected signal will not be apodized.
         display : boolean
             Display correction process (True) or not (False)
         display_range : list [2]
@@ -2519,14 +2567,15 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         # init
         s = self.copy()
+        s_analyze = self.correct_apodization_nd(allowed_apodization)
 
         # estimate phases
         if(suspect_method == suspect_phasing_method.MATCH_MAGNITUDE_REAL):
-            phi0, phi1 = suspect.processing.phase.mag_real(s, range_ppm=ppm_range)
+            phi0, phi1 = suspect.processing.phase.mag_real(s_analyze, range_ppm=ppm_range)
         elif(suspect_method == suspect_phasing_method.MIN_IMAG_INTEGRAL):
-            phi0, phi1 = suspect.processing.phase.ernst(s)
+            phi0, phi1 = suspect.processing.phase.ernst(s_analyze)
         elif(suspect_method == suspect_phasing_method.ACME):
-            phi0, phi1 = suspect.processing.phase.acme(s, range_ppm=ppm_range)
+            phi0, phi1 = suspect.processing.phase.acme(s_analyze, range_ppm=ppm_range)
         else:
             log.error("hey, I do not know this suspect phasing method!?")
 
@@ -2593,8 +2642,13 @@ class MRSData2(suspect.mrsobjects.MRSData):
         log.debug("apodizing [%s]..." % self.display_label)
 
         # apodize each individual signal
-
         s = self.copy()
+
+        # check apodization factor
+        if(apo_factor <= 0):
+            log.warning("apodization factor is zero or negative, skipping!")
+            return(s)
+
         t = s.time_axis()
         w_apo = np.exp(-apo_factor * t)
         if(s.ndim == 1):
@@ -2833,7 +2887,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         return(s_water_removed)
 
-    def correct_freqshift_1d(self, peak_range=[4.5, 5], peak_real_ppm=4.7, display=False, display_range=[1, 6]):
+    def correct_freqshift_1d(self, peak_range=[4.5, 5], peak_real_ppm=4.7, allowed_apodization=1.0, display=False, display_range=[1, 6]):
         """
         Shift the spectrum in frequency in order to get the right peaks at the right chemical shifts.
 
@@ -2846,6 +2900,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
             Range in ppm used to find a peak of interest
         peak_real_ppm : float
             Chemical shift to set to the peak found
+        allowed_apodization : float/boolean
+            If >0 or !=False, apodize signal during peak analysis process. However, the final corrected signal will not be apodized.
         display : boolean
             Display correction process (True) or not (False)
         display_range : list [2]
@@ -2866,7 +2922,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         ppm = s.frequency_axis_ppm()
 
         # find maximum peak in range and its chemical shift
-        _, ppm_peak, peak_val, _, _, _ = s._analyze_peak_1d(peak_range)
+        ppm_peak, peak_val, _, _, _ = s._analyze_peak_1d(peak_range, allowed_apodization)
         log.debug("peak detected at %0.2fppm -> %0.2fppm!" % (ppm_peak, peak_real_ppm))
 
         # estimate frequency shift in Hz
@@ -3030,7 +3086,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         plt.yticks([])
         plt.show()
 
-    def display_spectrum_1d(self, ifig=1, display_range=[1, 6], magnitude_mode=False):
+    def display_spectrum_1d(self, ifig=1, display_range=[1, 6], apodization_factor=5.0, magnitude_mode=False):
         """
         Display spectrum in figure 'ifig', overlaying if needed.
 
@@ -3044,6 +3100,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
             MRS data to display
         display_range : list [2]
             Range in ppm used for display
+        apodization_factor : float
+            Apodization factor used for display (Hz)
         magnitude_mode : boolean
             Displays in magnitude mode (True) or the real part (False)
 
@@ -3058,7 +3116,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             log.error("this method only works for 1D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
 
         # init
-        s = self.copy()
+        s = self.correct_apodization_nd(apodization_factor)
         log.debug("displaying stuff!")
 
         plt.figure(ifig).canvas.set_window_title("display_spectrum_1d (mrs.reco.MRSData2)")
@@ -3320,6 +3378,8 @@ class pipeline:
                             "POI_LW_range_ppm": [4.5, 5.2],
                             # ppm range to for SNR/LW estimation in ref. data
                             "POI_ref_range_ppm" : [4.5, 5.2],
+                            # apodization factor used during signal analysis, never actually applied for signal correction
+                            "allowed_apodization" : 5.0,
                             # path to pkl file to store processed data
                             "storage_file" : None,
                             # force display off if needed
@@ -3337,6 +3397,8 @@ class pipeline:
                                   "fig_index": 1,
                                   # ppm range used for display
                                   "range_ppm": self.settings["display_range_ppm"],
+                                  # apodization factor used for display (Hz)
+                                  "apodization_factor": 5.0,
                                   # display spectrum in magnitude mode?
                                   "magnitude_mode": False
                                   }
@@ -3383,7 +3445,7 @@ class pipeline:
                                      }
 
         # --- job: channel combination ---
-        self.job["channel_combining"] = {"job_func": MRSData2.correct_combine_channels_3d, "job_name": "channel_combining",
+        self.job["channel_combining"] = {"job_func": MRSData2.correct_combine_channels_3d, "job_name": "channel-combining",
                                          # use non water-suppressed data to recombine and rephase channels
                                          "using_ref_data": True,
                                          # should we rephase (0th order) data while combining?
@@ -3397,7 +3459,7 @@ class pipeline:
                                    }
 
         # --- job: zero_filling ---
-        self.job["zero_filling"] = {"job_func": MRSData2.correct_zerofill_nd, "job_name": "zero_filling",
+        self.job["zero_filling"] = {"job_func": MRSData2.correct_zerofill_nd, "job_name": "zero-filling",
                                     # number of signal points after zf
                                     "npts": 8192 * 2,
                                     # display all this process to check what the hell is going on
@@ -3411,6 +3473,8 @@ class pipeline:
                                        "POI_range_ppm": self.settings["POI_range_ppm"],
                                        # time range in (ms) to look around timestamp for correlation physio/MRS
                                        "delta_time_ms": 1000.0,
+                                       # apodization factor used during signal analysis stage
+                                       "allowed_apodization": self.settings["allowed_apodization"],
                                        # display all this process to check what the hell is going on
                                        "display": True
                                        }
@@ -3436,6 +3500,8 @@ class pipeline:
                                       "auto_method_list": None,
                                       # minimum allowed SNR change (%) when adjusting the linewidth criteria, this can be positive (we want to increase SNR +10% by rejecting crappy dat) or negative (we are ok in decreasing the SNR -10% in order to get better resolved spectra)
                                       "auto_allowed_snr_change": 1.0,
+                                      # apodization factor used during signal analysis stage
+                                      "allowed_apodization": self.settings["allowed_apodization"],
                                       # display all this process to check what the hell is going on
                                       "display": True
                                       }
@@ -3448,6 +3514,8 @@ class pipeline:
                                   "moving_averages": 1,
                                   # use correlation mode
                                   "inter_corr_mode": False,
+                                  # apodization factor used during signal analysis stage
+                                  "allowed_apodization": self.settings["allowed_apodization"],
                                   # display all this process to check what the hell is going on
                                   "display": True,
                                   "display_range_ppm": self.job["displaying"]["range_ppm"]
@@ -3479,6 +3547,8 @@ class pipeline:
                                          "suspect_method": suspect_phasing_method.MATCH_MAGNITUDE_REAL,
                                          # ppm range to analyze phase
                                          "range_ppm": [1, 6],
+                                         # apodization factor used during signal analysis stage
+                                         "allowed_apodization": self.settings["allowed_apodization"],
                                          # display all this process to check what the hell is going on
                                          "display": True,
                                          "display_range_ppm": self.job["displaying"]["range_ppm"]
@@ -3525,6 +3595,8 @@ class pipeline:
                                    "POI_shift_range_ppm": self.settings["POI_shift_range_ppm"],
                                    # real ppm value for this peak
                                    "POI_shift_true_ppm": self.settings["POI_shift_true_ppm"],
+                                   # apodization factor used during signal analysis stage
+                                   "allowed_apodization": self.settings["allowed_apodization"],
                                    # display all this process to check what the hell is going on
                                    "display": True,
                                    "display_range_ppm": self.job["displaying"]["range_ppm"]
@@ -3690,15 +3762,14 @@ class pipeline:
         ref_data_lw : float
             Peak linewidth estimated on ref. data if any
         """
-        log.debug("estimating SNR and peak-linewidth for [%s]..." % data.display_label)
+        log.debug("estimating SNR and LW for [%s]..." % data.display_label)
 
         # init job list
         this_analyze_job_list = [j for j in self.analyze_job_list + already_done_jobs if (j in self.analyze_job_list) and (j not in already_done_jobs)]
 
         # run mini-pipeline with default arguments (= no display)
         # and with no log output
-        old_level = log.getLevel()
-        log.setLevel(log.ERROR)
+        log.pause()
         for j in this_analyze_job_list:
             # run job on this dataset with default arguments
             data = self._run_job(j, data, True)
@@ -3721,10 +3792,8 @@ class pipeline:
             ref_data_snr = np.nan
             ref_data_lw = np.nan
 
-        # allow outputs
-        log.setLevel(old_level)
-
         # output
+        log.resume()
         job_label = "post-" + current_job["job_name"]
         log.info(job_label + " SNR of [%s] = %.2f" % (data.display_label, data_snr))
         log.info(job_label + " LW of [%s] = %.2f" % (data.display_label, data_lw))
