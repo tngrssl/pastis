@@ -17,7 +17,7 @@ get_ipython().magic("matplotlib auto")
 plt.rcParams['figure.dpi'] = 100
 plt.rcParams['figure.max_open_warning'] = 1000
 plt.rcParams['font.size'] = 9
-log.setLevel(log.DEBUG)
+log.setLevel(log.INFO)
 
 # display stuff?
 display_stuff = True
@@ -57,9 +57,6 @@ p.job_list = [  # p.job["displaying_anatomy"],
                 p.job["cropping"],
                 p.job["displaying"]
                 ]
-
-p.job["realigning"]["moving_averages"] = 2
-p.job["data_rejecting"]["moving_averages"] = 2
 
 p.job["cropping"]["final_npts"] = 2048
 p.job["displaying"]["apodization_factor"] = 5.0

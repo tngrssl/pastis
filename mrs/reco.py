@@ -5,7 +5,6 @@ Three classes' definition in here.
 
     * a MRSData2 class with a bunch of methods based on the suspect module to deal with SIEMENS 7T MRS data
     * a pipeline class to run the reconstruction process on a bunch of acquired data
-    * a voi_pipeline class to reconstruct VOI profile data acquired using the debug mode on CMRR's MRS sequences
 
 @author: Tangi Roussel
 """
@@ -1013,7 +1012,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         return(snr, snr_signal, snr_noise)
 
-    def analyze_linewidth_1d(self, POI_range_ppm, magnitude_mode=False, display=False, display_range=[1, 6]):
+    def analyze_linewidth_1d(self, peak_range, magnitude_mode=False, display=False, display_range=[1, 6]):
         """
         Estimate the linewidth of a peak in the spectrum ; chemical shift ranges for the peak and the noise regions are specified by the user.
 
@@ -1021,7 +1020,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         Parameters
         ----------
-        POI_range_ppm : list [2]
+        peak_range : list [2]
             Range in ppm used to find a peak of interest
         magnitude_mode : boolean
             analyze signal in magnitude mode (True) or the real part (False)
@@ -1044,7 +1043,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         s = self.copy()
 
         # call 1D peak analysis WITHOUT ANY apodization (important)
-        ppm_peak, _, lw, peak_seg_ppm, peak_seg_val = s._analyze_peak_1d(POI_range_ppm, False)
+        ppm_peak, _, lw, peak_seg_ppm, peak_seg_val = s._analyze_peak_1d(peak_range, False)
         if(magnitude_mode):
             log.debug("estimating the MAGNITUDE peak linewidth at %0.2fppm!" % ppm_peak)
         else:
@@ -1718,7 +1717,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         return(s_ma)
 
-    def correct_analyze_and_reject_2d(self, peak_range=[4.5, 5], moving_Naverages=1, peak_properties_ranges={"amplitude (%)": None, "linewidth (Hz)": [5.0, 30.0], "chemical shift (ppm)": 0.5, "phase std. factor (%)": 60.0}, peak_properties_rel2mean=True, auto_method_list=None, auto_adjust_allowed_snr_change=0.0, allowed_apodization=1.0, display=False, display_range=[1, 6]):
+    def correct_analyze_and_reject_2d(self, peak_analyse_range=[4.5, 5], peak_snr_range=[1.8, 2.2], peak_lw_range=[4.5, 5], moving_Naverages=1, peak_properties_ranges={"amplitude (%)": None, "linewidth (Hz)": [5.0, 30.0], "chemical shift (ppm)": 0.5, "phase std. factor (%)": 60.0}, peak_properties_rel2mean=True, auto_method_list=None, auto_adjust_allowed_snr_change=0.0, allowed_apodization=1.0, display=False, display_range=[1, 6]):
         """
         Analyze peak in each average in terms intensity, linewidth, chemical shift and phase and reject data if one of these parameters goes out of the min / max bounds. Usefull to understand what the hell went wrong during your acquisition when you have the raw data and to try to improve things a little. You can choose to set the bounds manually or automatically based on a peak property (amplitude, linewidth, frequency, phase). And you can run several automatic adjusment methods, the one giving the highest SNR and/or the lowest peak linewidth will be selected. All this is very experimental and the code is long and not optimized, sorry ;)
 
@@ -1727,8 +1726,12 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         Parameters
         ----------
-        peak_range : list
-            Range in ppm used to analyze peak phase when no reference signal is specified
+        peak_analyse_range : list
+            Range in ppm used to analyze peak properties (amplitude, linewidth, chemical shift, phase)
+        peak_snr_range : list
+            Range in ppm used to estimate SNR
+        peak_lw_range : list
+            Range in ppm used to estimate linewidth
         moving_Naverages : int
             Number of averages to perform when using moving average, need to be an odd number
         peak_properties_ranges : dict
@@ -1777,8 +1780,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         # estimate initial SNR and linewidth
         log.pause()
-        initial_snr, _, _ = s.correct_realign_2d().correct_average_2d().analyze_snr_1d(peak_range)
-        initial_lw = s.correct_realign_2d().correct_average_2d().analyze_linewidth_1d(peak_range)
+        initial_snr, _, _ = s.correct_realign_2d().correct_average_2d().analyze_snr_1d(peak_snr_range)
+        initial_lw = s.correct_realign_2d().correct_average_2d().analyze_linewidth_1d(peak_lw_range)
         log.resume()
         log.info("* Pre-data-rejection SNR = %.2f" % initial_snr)
         log.info("* Pre-data-rejection linewidth = %.2f Hz" % initial_lw)
@@ -1787,7 +1790,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         s_ma = self._build_moving_average_data_2d(moving_Naverages)
 
         # perform peak analysis (possibly with apodization to stabilize things)
-        peak_prop_abs, peak_prop_rel2mean, peak_prop_rel2firstpt = s_ma._analyze_peak_2d(peak_range, allowed_apodization)
+        peak_prop_abs, peak_prop_rel2mean, peak_prop_rel2firstpt = s_ma._analyze_peak_2d(peak_analyse_range, allowed_apodization)
 
         # first set the data according to relative option: this is a user option
         if(peak_properties_rel2mean):
@@ -1933,8 +1936,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
                     # analyze snr / lw and number of rejections
                     if(this_mask_reject_data_sumup.sum() < s_ma.shape[0]):
                         log.pause()
-                        test_snr_list[i_prop_val], _, _ = this_s_cor.correct_realign_2d().correct_average_2d().analyze_snr_1d(peak_range)
-                        test_lw_list[i_prop_val] = this_s_cor.correct_realign_2d().correct_average_2d().analyze_linewidth_1d(peak_range)
+                        test_snr_list[i_prop_val], _, _ = this_s_cor.correct_realign_2d().correct_average_2d().analyze_snr_1d(peak_snr_range)
+                        test_lw_list[i_prop_val] = this_s_cor.correct_realign_2d().correct_average_2d().analyze_linewidth_1d(peak_lw_range)
                         log.resume()
                         test_nrej_list[i_prop_val] = this_mask_reject_data_sumup.sum()
 
@@ -1945,6 +1948,9 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
                 # analyze SNR curve
                 test_snr_initial = test_snr_list[-1]
+                if(initial_snr != test_snr_initial):
+                    log.error("let's fix this weird issue about snr")
+
                 test_snr_threshold = test_snr_initial + test_snr_initial * auto_adjust_allowed_snr_change / 100.0
                 test_snr_list_rel = test_snr_list / test_snr_initial * 100.0 - 100.0
 
@@ -2120,7 +2126,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         log.info("TOTAL data rejection = %d / %d (%.0f%%)" % (mask_reject_data_sumup.sum(), s_ma.shape[0], (mask_reject_data_sumup.sum() / s_ma.shape[0] * 100)))
 
         # perform post-correction measurements
-        peak_prop_abs, peak_prop_rel2mean, peak_prop_rel2firstpt = s_ma._analyze_peak_2d(peak_range, allowed_apodization)
+        peak_prop_abs, peak_prop_rel2mean, peak_prop_rel2firstpt = s_ma._analyze_peak_2d(peak_analyse_range, allowed_apodization)
 
         # first set the data according to relative option: this is a user option
         if(peak_properties_rel2mean):
@@ -2193,10 +2199,10 @@ class MRSData2(suspect.mrsobjects.MRSData):
                     plt.plot(ppm, s_ma[k, :].spectrum().real * ampfactor + ystep * k, 'g-', linewidth=1)
 
                 # build lineshape segment
-                _, _, _, peak_seg_ppm, peak_seg_val = s_ma[k, :]._analyze_peak_1d(peak_range)
+                _, _, _, peak_seg_ppm, peak_seg_val = s_ma[k, :]._analyze_peak_1d(peak_analyse_range)
                 plt.plot(peak_seg_ppm, np.real(peak_seg_val) * ampfactor + ystep * k, 'k-', linewidth=1)
 
-            plt.xlim(peak_range[1], peak_range[0])
+            plt.xlim(peak_analyse_range[1], peak_analyse_range[0])
             plt.xlabel('chemical shift (ppm)')
             plt.ylabel('individual spectra')
 
@@ -2243,9 +2249,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             ax.plot(s_rej_avg.frequency_axis_ppm(), s_rej_avg.spectrum().real, 'r-', linewidth=1, label=s_rej_avg.display_label)
             ax.plot(s_avg.frequency_axis_ppm(), s_avg.spectrum().real, 'k-', linewidth=1, label=s_avg.display_label)
             ax.plot(s_cor_avg.frequency_axis_ppm(), s_cor_avg.spectrum().real, 'b-', linewidth=1, label=s_cor_avg.display_label)
-
-            if any(display_range):
-                ax.set_xlim(display_range[1], display_range[0])
+            ax.set_xlim(display_range[1], display_range[0])
 
             ax.set_xlabel('chemical shift (ppm)')
             ax.set_ylabel('spectrum')
@@ -2257,8 +2261,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         # estimate final SNR and linewidth
         log.pause()
-        final_snr, _, _ = s_cor.correct_realign_2d().correct_average_2d().analyze_snr_1d(peak_range)
-        final_lw = s_cor.correct_realign_2d().correct_average_2d().analyze_linewidth_1d(peak_range)
+        final_snr, _, _ = s_cor.correct_realign_2d().correct_average_2d().analyze_snr_1d(peak_snr_range)
+        final_lw = s_cor.correct_realign_2d().correct_average_2d().analyze_linewidth_1d(peak_lw_range)
         log.resume()
         log.info("* Final post-data-rejection SNR = %.2f" % final_snr)
         log.info("* Final post-data-rejection linewidth = %.2f Hz" % final_lw)
@@ -2269,16 +2273,12 @@ class MRSData2(suspect.mrsobjects.MRSData):
         data_rej_dict["Pre-rejection"]["snr"] = initial_snr
         data_rej_dict["Pre-rejection"]["lw"] = initial_lw
         data_rej_dict["Pre-rejection"]["na"] = s.shape[0]
-        data_rej_dict["Pre-rejection"]["useful scantime"] = s.shape[0] * s._tr
         data_rej_dict["Pre-rejection"]["measurements"] = peak_prop_analyze
         data_rej_dict["Post-rejection"] = {}
         data_rej_dict["Post-rejection"]["snr"] = final_snr
         data_rej_dict["Post-rejection"]["lw"] = final_lw
         data_rej_dict["Post-rejection"]["na"] = s_cor.shape[0]
         data_rej_dict["Post-rejection"]["measurements"] = peak_prop_analyze_postcor
-        data_rej_dict["Pre-rejection"]["useful scantime"] = s_cor.shape[0] * s_cor._tr
-        # rejected spectrum
-        data_rej_dict["Rejected spectrum"] = s_rej_avg
         # final rejection bounds
         final_peak_properties_ranges = peak_properties_ranges.copy()
         final_peak_properties_ranges["amplitude (%)"] = np.abs(peak_prop_max[0])
@@ -2370,7 +2370,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
                     # zero-fill and apodize moving average signal if needed
                     # btw, I only do this in the case of the intercorrelation mode because it is done internally for the peak-picking mode by the the method _analyze_peak_1d
                     log.pause()
-                    s_ma_ic = s_ma.correct_zerofill_nd().correct_apodization(allowed_apodization)
+                    s_ma_ic = s_ma.correct_zerofill_nd().correct_apodization_nd(allowed_apodization)
                     log.resume()
 
                     # first spectrum as reference
@@ -3313,7 +3313,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         # add some specific private attributes I need
         df["display_label"] = self.display_label
         df["noise_level"] = self.noise_level
-        df["rejection"] = self.data_rejection
+        df["rejection"] = [self.data_rejection]  # can be a list
         df["file_hash"] = self.data_file_hash
         df["is_rawdata"] = self.is_rawdata
         df = pd.concat([df, pd.DataFrame.from_dict([self.patient])], axis=1)
@@ -3396,7 +3396,7 @@ class pipeline:
                                   # figure index
                                   "fig_index": 1,
                                   # ppm range used for display
-                                  "range_ppm": self.settings["display_range_ppm"],
+                                  "display_range_ppm": pipeline._get_setting,
                                   # apodization factor used for display (Hz)
                                   "apodization_factor": 5.0,
                                   # display spectrum in magnitude mode?
@@ -3411,7 +3411,7 @@ class pipeline:
                                # use reference data is available?
                                "using_ref_data": True,
                                # ppm range to look fo peak used to estimate phase
-                               "POI_range_ppm": self.settings["POI_range_ppm"],
+                               "POI_range_ppm": pipeline._get_setting,
                                # average all averages per channel
                                "average_per_channel_mode": False,
                                # measure phase from 1st time point
@@ -3422,7 +3422,7 @@ class pipeline:
                                "offset": 0.0,
                                # display all this process to check what the hell is going on
                                "display": False,
-                               "display_range_ppm": self.job["displaying"]["range_ppm"]
+                               "display_range_ppm": pipeline._get_setting
                                }
 
         # --- job: amplification ---
@@ -3441,7 +3441,7 @@ class pipeline:
                                      "time_shift_us": 375,
                                      # display all this process to check what the hell is going on
                                      "display": True,
-                                     "display_range_ppm": self.job["displaying"]["range_ppm"]
+                                     "display_range_ppm": pipeline._get_setting
                                      }
 
         # --- job: channel combination ---
@@ -3464,17 +3464,17 @@ class pipeline:
                                     "npts": 8192 * 2,
                                     # display all this process to check what the hell is going on
                                     "display": True,
-                                    "display_range_ppm": self.job["displaying"]["range_ppm"]
+                                    "display_range_ppm": pipeline._get_setting
                                     }
 
         # --- job: analyze physio signal ---
         self.job["physio_analysis"] = {"job_func": MRSData2.analyze_physio_2d, "job_name": "analyzing physio. signals",
                                        # ppm range to look for a peak to analyze
-                                       "POI_range_ppm": self.settings["POI_range_ppm"],
+                                       "POI_range_ppm": pipeline._get_setting,
                                        # time range in (ms) to look around timestamp for correlation physio/MRS
                                        "delta_time_ms": 1000.0,
                                        # apodization factor used during signal analysis stage
-                                       "allowed_apodization": self.settings["allowed_apodization"],
+                                       "allowed_apodization": pipeline._get_setting,
                                        # display all this process to check what the hell is going on
                                        "display": True
                                        }
@@ -3482,7 +3482,11 @@ class pipeline:
         # --- job: automatic data rejection based on criterias ---
         self.job["data_rejecting"] = {"job_func": MRSData2.correct_analyze_and_reject_2d, "job_name": "data rejecting",
                                       # ppm range to look for a peak to analyze
-                                      "POI_range_ppm": self.settings["POI_range_ppm"],
+                                      "POI_range_ppm": pipeline._get_setting,
+                                      # ppm range to estimate SNR
+                                      "POI_SNR_range_ppm": pipeline._get_setting,
+                                      # ppm range to estimate LW
+                                      "POI_LW_range_ppm": pipeline._get_setting,
                                       # size of moving average window
                                       "moving_averages": 1,
                                       # rejection criterias for
@@ -3501,24 +3505,25 @@ class pipeline:
                                       # minimum allowed SNR change (%) when adjusting the linewidth criteria, this can be positive (we want to increase SNR +10% by rejecting crappy dat) or negative (we are ok in decreasing the SNR -10% in order to get better resolved spectra)
                                       "auto_allowed_snr_change": 1.0,
                                       # apodization factor used during signal analysis stage
-                                      "allowed_apodization": self.settings["allowed_apodization"],
+                                      "allowed_apodization": pipeline._get_setting,
                                       # display all this process to check what the hell is going on
-                                      "display": True
+                                      "display": True,
+                                      "display_range_ppm": pipeline._get_setting
                                       }
 
         # --- job: automatic data frequency realignment ---
         self.job["realigning"] = {"job_func": MRSData2.correct_realign_2d, "job_name": "frequency realigning",
                                   # ppm range to look for a peak to analyze
-                                  "POI_range_ppm": self.settings["POI_range_ppm"],
+                                  "POI_range_ppm": pipeline._get_setting,
                                   # size of moving average window
                                   "moving_averages": 1,
                                   # use correlation mode
                                   "inter_corr_mode": False,
                                   # apodization factor used during signal analysis stage
-                                  "allowed_apodization": self.settings["allowed_apodization"],
+                                  "allowed_apodization": pipeline._get_setting,
                                   # display all this process to check what the hell is going on
                                   "display": True,
-                                  "display_range_ppm": self.job["displaying"]["range_ppm"]
+                                  "display_range_ppm": pipeline._get_setting
                                   }
 
         # --- job: spectral filtering ---
@@ -3529,7 +3534,7 @@ class pipeline:
                                  "window_func": signal.tukey,
                                  # display all this process to check what the hell is going on
                                  "display": True,
-                                 "display_range_ppm": self.job["displaying"]["range_ppm"]
+                                 "display_range_ppm": pipeline._get_setting
                                  }
 
         # --- job: data averaging ---
@@ -3538,7 +3543,7 @@ class pipeline:
                                  "na": None,
                                  # display all this process to check what the hell is going on
                                  "display": True,
-                                 "display_range_ppm": self.job["displaying"]["range_ppm"]
+                                 "display_range_ppm": pipeline._get_setting
                                  }
 
         # --- job: phasing using suspect ---
@@ -3548,10 +3553,10 @@ class pipeline:
                                          # ppm range to analyze phase
                                          "range_ppm": [1, 6],
                                          # apodization factor used during signal analysis stage
-                                         "allowed_apodization": self.settings["allowed_apodization"],
+                                         "allowed_apodization": pipeline._get_setting,
                                          # display all this process to check what the hell is going on
                                          "display": True,
-                                         "display_range_ppm": self.job["displaying"]["range_ppm"]
+                                         "display_range_ppm": pipeline._get_setting
                                          }
 
         # --- job: noise level analysis ---
@@ -3566,7 +3571,7 @@ class pipeline:
                                  "damping_hz": 5,
                                  # display all this process to check what the hell is going on
                                  "display": True,
-                                 "display_range_ppm": self.job["displaying"]["range_ppm"]
+                                 "display_range_ppm": pipeline._get_setting
                                  }
 
         # --- job: data cropping ---
@@ -3575,7 +3580,7 @@ class pipeline:
                                 "final_npts": 6144,
                                 # display all this process to check what the hell is going on
                                 "display": True,
-                                "display_range_ppm": self.job["displaying"]["range_ppm"]
+                                "display_range_ppm": pipeline._get_setting
                                 }
 
         # --- job: water post-acquisition removal ---
@@ -3583,29 +3588,29 @@ class pipeline:
                                      # number of components when running HSVD
                                      "hsvd_components": 5,
                                      # ppm range where all components will be remove
-                                     "hsvd_range": self.settings["POI_range_ppm"],
+                                     "POI_range_ppm": pipeline._get_setting,
                                      # display all this process to check what the hell is going on
                                      "display": True,
-                                     "display_range_ppm": self.job["displaying"]["range_ppm"]
+                                     "display_range_ppm": pipeline._get_setting
                                      }
 
         # --- job: spectrum chemical shift calibration ---
         self.job["calibrating"] = {"job_func": MRSData2.correct_freqshift_1d, "job_name": "frequency shifting",
                                    # ppm range to look for the peak of interest (NAA by default)
-                                   "POI_shift_range_ppm": self.settings["POI_shift_range_ppm"],
+                                   "POI_shift_range_ppm": pipeline._get_setting,
                                    # real ppm value for this peak
-                                   "POI_shift_true_ppm": self.settings["POI_shift_true_ppm"],
+                                   "POI_shift_true_ppm": pipeline._get_setting,
                                    # apodization factor used during signal analysis stage
-                                   "allowed_apodization": self.settings["allowed_apodization"],
+                                   "allowed_apodization": pipeline._get_setting,
                                    # display all this process to check what the hell is going on
                                    "display": True,
-                                   "display_range_ppm": self.job["displaying"]["range_ppm"]
+                                   "display_range_ppm": pipeline._get_setting
                                    }
 
         # --- job: SNR analysis ---
         self.job["analyzing_snr"] = {"job_func": MRSData2.analyze_snr_1d, "job_name": "analyzing SNR",
                                      # ppm range to look for a peak to analyze
-                                     "POI_SNR_range_ppm": self.settings["POI_SNR_range_ppm"],
+                                     "POI_SNR_range_ppm": pipeline._get_setting,
                                      # ppm range to look for pure noise
                                      "n_range_ppm": [-2, -1],
                                      # divide SNR by 2, like LCModel do
@@ -3614,25 +3619,25 @@ class pipeline:
                                      "magnitude_mode": False,
                                      # display all this process to check what the hell is going on
                                      "display": True,
-                                     "display_range_ppm": self.job["displaying"]["range_ppm"]
+                                     "display_range_ppm": pipeline._get_setting
                                      }
 
         # --- job: LW analysis ---
         self.job["analyzing_lw"] = {"job_func": MRSData2.analyze_linewidth_1d, "job_name": "analyzing peak-linewidth",
                                     # ppm range to look for a peak to analyze
-                                    "POI_LW_range_ppm": self.settings["POI_LW_range_ppm"],
+                                    "POI_LW_range_ppm": pipeline._get_setting,
                                     # should we look at the magnitude or real spectrum?
                                     "magnitude_mode": False,
                                     # display all this process to check what the hell is going on
                                     "display": True,
-                                    "display_range_ppm": self.job["displaying"]["range_ppm"]
+                                    "display_range_ppm": pipeline._get_setting
                                     }
 
         # --- job: ref data SNR analysis ---
         self.job["ref_data_analyzing_snr"] = {
                                     "job_func": MRSData2.analyze_snr_1d, "job_name": "analyzing ref. data SNR",
                                      # ppm range to look for a peak to analyze
-                                     "POI_ref_range_ppm": self.settings["POI_ref_range_ppm"],
+                                     "POI_ref_range_ppm": pipeline._get_setting,
                                      # ppm range to look for pure noise
                                      "n_range_ppm": [-2, -1],
                                      # divide SNR by 2, like LCModel do
@@ -3641,19 +3646,19 @@ class pipeline:
                                      "magnitude_mode": False,
                                      # display all this process to check what the hell is going on
                                      "display": False,
-                                     "display_range_ppm": self.job["displaying"]["range_ppm"]
+                                     "display_range_ppm": pipeline._get_setting
                                      }
 
         # --- job: ref data LW analysis ---
         self.job["ref_data_analyzing_lw"] = {
                                     "job_func": MRSData2.analyze_linewidth_1d, "job_name": "analyzing ref. data peak-linewidth",
                                     # ppm range to look for a peak to analyze
-                                    "POI_ref_range_ppm": self.settings["POI_ref_range_ppm"],
+                                    "POI_ref_range_ppm": pipeline._get_setting,
                                     # should we look at the magnitude or real spectrum?
                                     "magnitude_mode": False,
                                     # display all this process to check what the hell is going on
                                     "display": False,
-                                    "display_range_ppm": self.job["displaying"]["range_ppm"]
+                                    "display_range_ppm": pipeline._get_setting
                                     }
 
         # --- job list ---
@@ -3696,6 +3701,22 @@ class pipeline:
 
         # freeze the object and prevent the creation of new attributes
         self.__isfrozen = True
+
+    def _get_setting(self, setting_key):
+        """
+        Return value of setting from settings dict. Sounds like a stupid method but I use it to replace pointers. To make it a little easier for the user, a settings dict contains all the main parameters that I repeatably used during the reco, especially the ppm range to look for a peak of interest (POI). For each job defined above, the default parameter value are linked to this settings dict using this method.
+
+        Parameters
+        ----------
+        setting_key : dict key from self.settings
+            Name of the setting
+
+        Returns
+        -------
+        self.settings[setting_key] : ?
+            Value of the setting
+        """
+        return(self.settings[setting_key])
 
     def _run_job(self, job, data, default_args=False):
         """
@@ -3989,26 +4010,26 @@ class pipeline:
         log.info("reading your job list...")
         log.info_line________________________()
         # applying some global settings to jobs
-        # (BTW, PYTHON CANNOT HANDLE POINTERS -_-)
-        for this_setting_name, this_setting_value in self.settings.items():
-            for this_job in list(self.job.keys()):
-                if(this_setting_value is not None and this_setting_name in self.job[this_job]):
-                    if(this_setting_name == "display"):
-                        # exception for display setting
-                        # False False => False
-                        # False True => False
-                        # True True => True
-                        # True False => False
-                        # that's a "and mask"
-                        self.job[this_job][this_setting_name] &= this_setting_value
-                    else:
-                        self.job[this_job][this_setting_name] = this_setting_value
+        default_display_value = self._get_setting("display")
+        for this_job_name in self.job:
+            for this_setting_name, this_setting_value in self.job[this_job_name].items():
+                # should we use a default value for this parameter?
+                if(this_setting_value == pipeline._get_setting):
+                    self.job[this_job_name][this_setting_name] = self._get_setting(this_setting_name)
+                # with exception for display setting (mask) to control display per job
+                if(this_setting_name == "display"):
+                    # False False => False
+                    # False True => False
+                    # True True => True
+                    # True False => False
+                    # that's a "and mask"
+                    self.job[this_job_name][this_setting_name] &= default_display_value
 
         # remove display job if we don't want to display
         if(self.settings["display"] is False):
-            if(self.job["displaying"] in self.job_list):
+            while(self.job["displaying"] in self.job_list):
                 self.job_list.remove(self.job["displaying"])
-            if(self.job["displaying_anatomy"] in self.job_list):
+            while(self.job["displaying_anatomy"] in self.job_list):
                 self.job_list.remove(self.job["displaying_anatomy"])
 
         # for each job
@@ -4073,9 +4094,14 @@ class pipeline:
 
                                 # get job name, renaming if needed
                                 this_job_name = job["job_name"]
-                                if(this_job_name in list(self.dataset[i][dtype]["analysis_results"].keys())):
+                                # get list of job names already in analysis list
+                                analysis_results_job_names = list(self.dataset[i][dtype]["analysis_results"].keys())
+                                # check if any duplicates, meaning a job than was applied multiple times
+                                analysis_results_job_names_mask = [j.startswith(this_job_name) for j in analysis_results_job_names]
+                                this_job_already_applied_count = analysis_results_job_names_mask.count(True)
+                                if(this_job_already_applied_count > 0):
                                     # not the first time we apply this job?
-                                    this_job_name = this_job_name + " (#2)"
+                                    this_job_name = this_job_name + " (#%d)" % (this_job_already_applied_count + 1)
 
                                 # get SNR and LW estimations
                                 this_data_snr, this_data_lw, _, _ = self._analyze(this_data, job, jobs_done_stack)
