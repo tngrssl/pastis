@@ -17,7 +17,7 @@ get_ipython().magic("matplotlib auto")
 plt.rcParams['figure.dpi'] = 100
 plt.rcParams['figure.max_open_warning'] = 1000
 plt.rcParams['font.size'] = 9
-log.setLevel(log.DEBUG)
+log.setLevel(log.INFO)
 
 # display stuff?
 display_stuff = True
@@ -26,7 +26,7 @@ display_stuff = True
 raise_error_on_bad_reco = True
 
 # template to use here (see definitions below)
-reco_template = "sc"
+reco_template = "sc_rea_intercorr"
 
 # %% "sc" reconstruction template
 template_name = "sc"
@@ -52,6 +52,8 @@ p.job_list = [  # p.job["displaying_anatomy"],
                 p.job["realigning"],
                 p.job["data_rejecting"],
                 p.job["data_rejecting"],
+                p.job["data_rejecting"],
+                p.job["data_rejecting"],
                 p.job["averaging"],
                 p.job["calibrating"],
                 # p.job["water_removal"],
@@ -64,13 +66,35 @@ p.job["data_rejecting"]["auto_method_list"] = [reco.data_rejection_method.AUTO_A
                                                 reco.data_rejection_method.AUTO_FREQUENCY,
                                                 reco.data_rejection_method.AUTO_PHASE]
 
+p.job["data_rejecting"]["auto_allowed_snr_change"] = 5.0
+
 p.job["cropping"]["final_npts"] = 2048
 p.job["displaying"]["apodization_factor"] = 5.0
+
+# dicard data based only on a water peak (not NAA, too unreliable)
+p.job["data_rejecting"]["POI_SNR_range_ppm"] = p.settings["POI_range_ppm"]
+p.job["data_rejecting"]["POI_LW_range_ppm"] = p.settings["POI_range_ppm"]
 
 # SNR like LCModel...
 p.job["analyzing_snr"]["half_factor"] = True
 p.job["ref_data_analyzing_snr"]["half_factor"] = True
 
+p.save_template(template_name)
+
+# create corresponding "*_concatenate" reconstruction template (for the first 2 crappy datasets)
+p.job_list.insert(4, p.job["concatenate"])
+p.settings["storage_file"] = "/home/tangir/crmbm/acq_db/%s.pkl" % (template_name + "_concatenate")
+p.save_template(template_name + "_concatenate")
+
+# %% "sc_rea_intercorr" reconstruction template
+# remove data rejection to estimate its gain in SNR/LW
+template_name = "sc_rea_intercorr"
+
+p = reco.pipeline("sc")
+p.settings["storage_file"] = "/home/tangir/crmbm/acq_db/%s.pkl" % template_name
+p.settings["display"] = display_stuff
+
+p.job["realigning"]["inter_corr_mode"] = True
 p.save_template(template_name)
 
 # create corresponding "*_concatenate" reconstruction template (for the first 2 crappy datasets)
@@ -436,8 +460,8 @@ p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/316-ap-p1-moelle/me
                                 "/home/tangir/crmbm/acq_twix/316-ap-p1-moelle/meas_MID47_slaser_R_N=5_5+_shortTE_SNR++_FID42206.dat"]
 p.dataset[1]["physio-file"] = "/home/tangir/crmbm/acq_physio/316_AP_P1_MOELLE.resp"
 
-p.settings["POI_range_ppm"] = [4.5, 4.8]
 p.settings["POI_shift_range_ppm"] = [4.5, 4.8]
+p.settings["POI_shift_true_ppm"] = 4.7
 p.settings["POI_LW_range_ppm"] = [4.5, 4.8]
 
 p.run()

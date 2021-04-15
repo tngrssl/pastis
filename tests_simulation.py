@@ -24,7 +24,7 @@ get_ipython().magic("matplotlib auto")
 plt.rcParams['figure.dpi'] = 100
 plt.rcParams['figure.max_open_warning'] = 1000
 plt.rcParams['font.size'] = 9
-log.setLevel(log.DEBUG)
+log.setLevel(log.INFO)
 
 # %% generate sequence database
 

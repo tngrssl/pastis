@@ -17,7 +17,7 @@ get_ipython().magic("matplotlib auto")
 plt.rcParams['figure.dpi'] = 100
 plt.rcParams['figure.max_open_warning'] = 1000
 plt.rcParams['font.size'] = 9
-log.setLevel(log.DEBUG)
+log.setLevel(log.INFO)
 
 # %% 27/08/2019 - 308-rs-p1-moelle - Ocha - short TR resp test
 get_ipython().magic("clear")
