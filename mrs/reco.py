@@ -43,6 +43,7 @@ DATA_REJECTION_PHASE_STEP = 0.1
 # spectral resolution for peak realignment using inter-correlation mode (experimental) (ppm)
 RECO_CORRECT_REALIGN_INTER_CORR_MODE_DF = 0.1
 
+
 class suspect_phasing_method(Enum):
     """The enum suspect_phasing_method describes the type of phasing method to use (phasing method from the suspect package."""
 
@@ -957,7 +958,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         # find maximum peak in range
         sf = s.spectrum()
-        # analyse peak WITHOUT ANY apodization (important)
+        # analyze peak WITHOUT ANY apodization (important)
         ppm_peak, peak_val, _, _, _ = s._analyze_peak_1d(peak_range, False)
         if(magnitude_mode):
             log.debug("measuring the MAGNITUDE intensity at %0.2fppm!" % ppm_peak)
@@ -1318,7 +1319,6 @@ class MRSData2(suspect.mrsobjects.MRSData):
             s_shifted.data_ref = s_shifted.data_ref.correct_time_shift_nd(time_shift_us)
 
         return(s_shifted)
-
 
     def correct_phase_3d(self, use_ref_data=True, peak_range=[4.5, 5], average_per_channel_mode=False, first_point_fid_mode=False, phase_order=0, phase_offset=0.0, display=False, display_range=[1, 6]):
         """
@@ -1709,30 +1709,30 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         # build moving averaged data
         s_ma = s.copy()
-        moving_Naverages_half = int((nAvgWindow - 1) / 2)
+        moving_averages_half = int((nAvgWindow - 1) / 2)
         for a in range(0, s.shape[0]):
-            ia = max(0, a - moving_Naverages_half)
-            ib = min(s.shape[0], a + moving_Naverages_half + 1)
+            ia = max(0, a - moving_averages_half)
+            ib = min(s.shape[0], a + moving_averages_half + 1)
             s_ma[a, :] = np.mean(s[ia:ib, :], axis=0)
 
         return(s_ma)
 
-    def correct_analyze_and_reject_2d(self, peak_analyse_range=[4.5, 5], peak_snr_range=[1.8, 2.2], peak_lw_range=[4.5, 5], moving_Naverages=1, peak_properties_ranges={"amplitude (%)": None, "linewidth (Hz)": [5.0, 30.0], "chemical shift (ppm)": 0.5, "phase std. factor (%)": 60.0}, peak_properties_rel2mean=True, auto_method_list=None, auto_adjust_allowed_snr_change=0.0, allowed_apodization=1.0, display=False, display_range=[1, 6]):
+    def correct_analyze_and_reject_2d(self, peak_analyze_range=[4.5, 5], peak_snr_range=[1.8, 2.2], peak_lw_range=[4.5, 5], moving_averages=1, peak_properties_ranges={"amplitude (%)": None, "linewidth (Hz)": [5.0, 30.0], "chemical shift (ppm)": 0.5, "phase std. factor (%)": 60.0}, peak_properties_rel2mean=True, auto_method_list=None, auto_adjust_allowed_snr_change=1.0, allowed_apodization=0.0, display=False, display_range=[1, 6]):
         """
-        Analyze peak in each average in terms intensity, linewidth, chemical shift and phase and reject data if one of these parameters goes out of the min / max bounds. Usefull to understand what the hell went wrong during your acquisition when you have the raw data and to try to improve things a little. You can choose to set the bounds manually or automatically based on a peak property (amplitude, linewidth, frequency, phase). And you can run several automatic adjusment methods, the one giving the highest SNR and/or the lowest peak linewidth will be selected. All this is very experimental and the code is long and not optimized, sorry ;)
+        Analyze peak in each average in terms intensity, linewidth, chemical shift and phase and reject data if one of these parameters goes out of the min / max bounds. Usefull to understand what the hell went wrong during your acquisition when you have the raw data and to try to improve things a little. You can choose to set the bounds manually or automatically based on a peak property (amplitude, linewidth, frequency, phase). And you can run several automatic adjusment methods, the one giving the highest SNR and/or the lowest peak linewidth will be selected. All this is very experimental and the code is long and not optimized, sorry ;).
 
         * Works only with a 2D [averages,timepoints] signal.
         * Returns a 2D [averages,timepoints] signal.
 
         Parameters
         ----------
-        peak_analyse_range : list
+        peak_analyze_range : list
             Range in ppm used to analyze peak properties (amplitude, linewidth, chemical shift, phase)
         peak_snr_range : list
             Range in ppm used to estimate SNR
         peak_lw_range : list
             Range in ppm used to estimate linewidth
-        moving_Naverages : int
+        moving_averages : int
             Number of averages to perform when using moving average, need to be an odd number
         peak_properties_ranges : dict
             Dictionnary that contains 4 entries, 4 rejection criterias for
@@ -1772,25 +1772,25 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         # check if we did data rejection before
         if(self.data_rejection is None):
-            log.info("This is the 1st time we perform data rejection on this signal!")
             iround_data_rej = 1
         else:
             iround_data_rej = len(self.data_rejection) + 1
-            log.info("This is the %dth time we perform data rejection on this signal!" % iround_data_rej)
+            log.info("%dth round of data rejection!" % iround_data_rej)
 
         # estimate initial SNR and linewidth
         log.pause()
-        initial_snr, _, _ = s.correct_realign_2d().correct_average_2d().analyze_snr_1d(peak_snr_range)
-        initial_lw = s.correct_realign_2d().correct_average_2d().analyze_linewidth_1d(peak_lw_range)
+        s_avg = s.correct_average_2d()
+        initial_snr, _, _ = s_avg.analyze_snr_1d(peak_snr_range)
+        initial_lw = s_avg.analyze_linewidth_1d(peak_lw_range)
         log.resume()
         log.info("* Pre-data-rejection SNR = %.2f" % initial_snr)
         log.info("* Pre-data-rejection linewidth = %.2f Hz" % initial_lw)
 
         # build moving averaged data
-        s_ma = self._build_moving_average_data_2d(moving_Naverages)
+        s_ma = self._build_moving_average_data_2d(moving_averages)
 
         # perform peak analysis (possibly with apodization to stabilize things)
-        peak_prop_abs, peak_prop_rel2mean, peak_prop_rel2firstpt = s_ma._analyze_peak_2d(peak_analyse_range, allowed_apodization)
+        peak_prop_abs, peak_prop_rel2mean, peak_prop_rel2firstpt = s_ma._analyze_peak_2d(peak_analyze_range, allowed_apodization)
 
         # first set the data according to relative option: this is a user option
         if(peak_properties_rel2mean):
@@ -1909,6 +1909,9 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 # iterate and test the resulting data
                 pbar = log.progressbar("adjusting rejection threshold for [" + properties_names[this_auto_method.value] + "] in range [%.3f;%.3f] (n=%d)" % (this_prop_range.min(), this_prop_range.max(), this_prop_range.size), this_prop_range.shape[0])
 
+                # add inf to be sure that we try without any thresholds
+                this_prop_range = np.hstack((this_prop_range, +np.inf))
+
                 test_snr_list = np.zeros(this_prop_range.shape)
                 test_lw_list = np.zeros(this_prop_range.shape)
                 test_nrej_list = np.zeros(this_prop_range.shape)
@@ -1936,8 +1939,9 @@ class MRSData2(suspect.mrsobjects.MRSData):
                     # analyze snr / lw and number of rejections
                     if(this_mask_reject_data_sumup.sum() < s_ma.shape[0]):
                         log.pause()
-                        test_snr_list[i_prop_val], _, _ = this_s_cor.correct_realign_2d().correct_average_2d().analyze_snr_1d(peak_snr_range)
-                        test_lw_list[i_prop_val] = this_s_cor.correct_realign_2d().correct_average_2d().analyze_linewidth_1d(peak_lw_range)
+                        this_s_cor_avg = this_s_cor.correct_average_2d()
+                        test_snr_list[i_prop_val], _, _ = this_s_cor_avg.analyze_snr_1d(peak_snr_range)
+                        test_lw_list[i_prop_val] = this_s_cor_avg.analyze_linewidth_1d(peak_lw_range)
                         log.resume()
                         test_nrej_list[i_prop_val] = this_mask_reject_data_sumup.sum()
 
@@ -1946,13 +1950,12 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
                 pbar.finish("done")
 
-                # analyze SNR curve
-                test_snr_initial = test_snr_list[-1]
-                if(initial_snr != test_snr_initial):
-                    log.error("let's fix this weird issue about snr")
+                # relative SNR and minimum acceptable relative SNR change
+                test_snr_threshold = initial_snr + initial_snr * auto_adjust_allowed_snr_change / 100.0
+                test_snr_list_rel = test_snr_list / initial_snr * 100.0 - 100.0
 
-                test_snr_threshold = test_snr_initial + test_snr_initial * auto_adjust_allowed_snr_change / 100.0
-                test_snr_list_rel = test_snr_list / test_snr_initial * 100.0 - 100.0
+                # relative LW change
+                test_lw_list_rel = test_lw_list - initial_lw
 
                 # first, try and find a higher SNR than the initial one (best case, we reject crappy data and improved final SNR)
                 if(test_snr_list_rel.max() > auto_adjust_allowed_snr_change):
@@ -1967,22 +1970,32 @@ class MRSData2(suspect.mrsobjects.MRSData):
                     # check that we have a segment of the curve above the initial SNR
                     test_snr_list_mask = (test_snr_list_rel >= 0.0)
                     if(not test_snr_list_mask.any()):
-                        # that was a bit ambitious
+                        # that was a bit ambitious, there was absolutely no SNR enhancement
                         log.info("sorry, this is only making your SNR worse...")
                         log.debug("the best SNR change we found was %.2f%% compared to initial :(" % test_snr_list_rel.max())
-                        # set optimal LW to max
+                        # set optimal LW to max (inf)
                         optim_prop = this_prop_max
                         optim_res_snr = test_snr_list[-1]
                         optim_res_lw = test_lw_list[-1]
                     else:
-                        # we found SNR values which matches our request
+                        # we found relative SNR changes equal (no change) or above 0 (little SNR enchancement, still below expectation)
                         # let's choose the one with the lowest LW
-                        log.info("could not improve SNR above threshold but will reduce peak linewidth! :)")
+                        min_lw_snr_masked = np.min(test_lw_list[test_snr_list_mask])
                         ind_min_lw_snr_masked = np.argmin(test_lw_list[test_snr_list_mask])
-                        optim_prop = this_prop_range[test_snr_list_mask][ind_min_lw_snr_masked]
-                        optim_res_snr = test_snr_list[test_snr_list_mask][ind_min_lw_snr_masked]
-                        optim_res_lw = test_lw_list[test_snr_list_mask][ind_min_lw_snr_masked]
-                        log.info("optimal [" + properties_names[this_auto_method.value] + "] = %.1f" % optim_prop)
+                        # if LW was actually reduced
+                        if(min_lw_snr_masked < 0):
+                            log.info("could not improve SNR above threshold but reduced peak linewidth! :)")
+                            optim_prop = this_prop_range[test_snr_list_mask][ind_min_lw_snr_masked]
+                            optim_res_snr = test_snr_list[test_snr_list_mask][ind_min_lw_snr_masked]
+                            optim_res_lw = test_lw_list[test_snr_list_mask][ind_min_lw_snr_masked]
+                            log.info("optimal [" + properties_names[this_auto_method.value] + "] = %.1f" % optim_prop)
+                        else:
+                            # that was a bit ambitious, there was absolutly no SNR enhancement and no LW enhancement too! :(
+                            log.info("sorry, this is only making your SNR and LW worse...")
+                            # set optimal LW to max (inf)
+                            optim_prop = this_prop_max
+                            optim_res_snr = test_snr_list[-1]
+                            optim_res_lw = test_lw_list[-1]
 
                 # display and save the final snr and lw
                 log.info("* Post-data-rejection based on [" + properties_names[this_auto_method.value] + "] SNR = %.2f" % optim_res_snr)
@@ -2054,7 +2067,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
             # the final bounds are in peak_prop_min_auto_res and peak_prop_max_auto_res
 
             # relative SNR change
-            auto_method_final_snr_list_rel = auto_method_final_snr_list / test_snr_initial * 100.0 - 100.0
+            auto_method_final_snr_list_rel = auto_method_final_snr_list / initial_snr * 100.0 - 100.0
+            auto_method_final_lw_list_rel = auto_method_final_lw_list - initial_lw
 
             # is this higher than the initial snr?
             if(auto_method_final_snr_list_rel.max() > auto_adjust_allowed_snr_change):
@@ -2063,7 +2077,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 optim_auto_method = data_rejection_method(ind_max_snr_auto_method)
                 log.info("best adjustment done with " + str(optim_auto_method) + " regarding SNR! (round #%d)" % iround_data_rej)
             else:
-                # check that we have a segment of the curve above the initial SNR
+                # no methods could give a SNR above threshold
+                # so let's try to find at least a method that does not reduce SNR and gives a lower linewidth (intermediate case)
                 auto_method_final_snr_list_mask = (auto_method_final_snr_list_rel >= 0.0)
                 if(not auto_method_final_snr_list_mask.any()):
                     # that was a bit ambitious
@@ -2073,15 +2088,21 @@ class MRSData2(suspect.mrsobjects.MRSData):
                     # no optimal method!
                     optim_auto_method = None
                 else:
-                    # we found SNR values which matches our request
-                    # let's choose the one with the lowest LW
-                    log.info("could not find a method that improves SNR above threshold but will reduce the peak linewidth! :)")
+                    # we found relative SNR changes equal (no change) or above 0 (little SNR enchancement, still below expectation)
+                    # let's choose the method that gives the the lowest LW
+                    min_lw_auto_method = np.min(auto_method_final_lw_list_rel[auto_method_final_snr_list_mask])
+                    ind_min_lw_auto_method = np.argmin(auto_method_final_lw_list_rel[auto_method_final_snr_list_mask])
 
-                    # could not find a method giving a higher SNR than the initial SNR
-                    # let's find a method that gives a lower linewidth ?
-                    ind_min_lw_auto_method = np.argmin(auto_method_final_lw_list[auto_method_final_snr_list_mask])
-                    optim_auto_method = data_rejection_method(ind_min_lw_auto_method)
-                    log.info("best adjustment done with " + str(optim_auto_method) + " regarding linewidth! (round #%d)" % iround_data_rej)
+                    # if LW was actually reduced
+                    if(min_lw_auto_method < 0):
+                        log.info("could not find a method that improves SNR above threshold, only reduces the peak linewidth! :)")
+                        optim_auto_method = data_rejection_method(ind_min_lw_auto_method)
+                        log.info("best adjustment done with " + str(optim_auto_method) + " regarding linewidth! (round #%d)" % iround_data_rej)
+                    else:
+                        # that was a bit ambitious, there was absolutly no SNR enhancement and no LW enhancement too! :(
+                        log.info("automatic data rejection failed, no optimal method found, sorry! :(")
+                        # no optimal method!
+                        optim_auto_method = None
 
             if(optim_auto_method is not None):
                 log.info("* Post-data-rejection SNR = %.2f" % auto_method_final_snr_list[optim_auto_method.value])
@@ -2121,12 +2142,14 @@ class MRSData2(suspect.mrsobjects.MRSData):
         s_cor = s[(mask_reject_data_sumup == False), :]
         # build rejected spectrum
         s_rej = s[(mask_reject_data_sumup == True), :]
-        s_rej_avg = s_rej.correct_realign_2d().correct_average_2d()
+        log.pause()
+        s_rej_avg = s_rej.correct_average_2d()
+        log.resume()
 
         log.info("TOTAL data rejection = %d / %d (%.0f%%)" % (mask_reject_data_sumup.sum(), s_ma.shape[0], (mask_reject_data_sumup.sum() / s_ma.shape[0] * 100)))
 
         # perform post-correction measurements
-        peak_prop_abs, peak_prop_rel2mean, peak_prop_rel2firstpt = s_ma._analyze_peak_2d(peak_analyse_range, allowed_apodization)
+        peak_prop_abs, peak_prop_rel2mean, peak_prop_rel2firstpt = s_ma._analyze_peak_2d(peak_analyze_range, allowed_apodization)
 
         # first set the data according to relative option: this is a user option
         if(peak_properties_rel2mean):
@@ -2199,10 +2222,10 @@ class MRSData2(suspect.mrsobjects.MRSData):
                     plt.plot(ppm, s_ma[k, :].spectrum().real * ampfactor + ystep * k, 'g-', linewidth=1)
 
                 # build lineshape segment
-                _, _, _, peak_seg_ppm, peak_seg_val = s_ma[k, :]._analyze_peak_1d(peak_analyse_range)
+                _, _, _, peak_seg_ppm, peak_seg_val = s_ma[k, :]._analyze_peak_1d(peak_analyze_range)
                 plt.plot(peak_seg_ppm, np.real(peak_seg_val) * ampfactor + ystep * k, 'k-', linewidth=1)
 
-            plt.xlim(peak_analyse_range[1], peak_analyse_range[0])
+            plt.xlim(peak_analyze_range[1], peak_analyze_range[0])
             plt.xlabel('chemical shift (ppm)')
             plt.ylabel('individual spectra')
 
@@ -2230,10 +2253,20 @@ class MRSData2(suspect.mrsobjects.MRSData):
         if(mask_reject_data_sumup.sum() == s.shape[0]):
             log.error("all data is rejected! You need to readjust your rejection bounds...")
 
+        # estimate final SNR and linewidth
+        log.pause()
+        s_cor_avg = s_cor.correct_average_2d()
+        final_snr, _, _ = s_cor_avg.analyze_snr_1d(peak_snr_range)
+        final_lw = s_cor_avg.analyze_linewidth_1d(peak_lw_range)
+        log.resume()
+        log.info("* Final post-data-rejection SNR = %.2f" % final_snr)
+        log.info("* Final post-data-rejection linewidth = %.2f Hz" % final_lw)
+
         # display corected and rejected spectra
         if(display):
-            s_avg = s.correct_realign_2d().correct_average_2d()
-            s_cor_avg = s_cor.correct_realign_2d().correct_average_2d()
+            log.pause()
+            s_avg = s.correct_average_2d()
+            log.resume()
 
             # change legends
             s_avg.set_display_label("original spectrum")
@@ -2258,14 +2291,6 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
             fig.subplots_adjust()
             fig.show()
-
-        # estimate final SNR and linewidth
-        log.pause()
-        final_snr, _, _ = s_cor.correct_realign_2d().correct_average_2d().analyze_snr_1d(peak_snr_range)
-        final_lw = s_cor.correct_realign_2d().correct_average_2d().analyze_linewidth_1d(peak_lw_range)
-        log.resume()
-        log.info("* Final post-data-rejection SNR = %.2f" % final_snr)
-        log.info("* Final post-data-rejection linewidth = %.2f Hz" % final_lw)
 
         # fill up dict about this data rejection
         data_rej_dict = {}
@@ -2300,7 +2325,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         return(s_cor)
 
-    def correct_realign_2d(self, peak_range=[4.5, 5], moving_Naverages=1, inter_corr_mode=False, allowed_apodization=1.0, display=False, display_range=[1, 6]):
+    def correct_realign_2d(self, peak_range=[4.5, 5], moving_averages=1, inter_corr_mode=False, freq_shift_max=50, allowed_apodization=5.0, display=False, display_range=[1, 6]):
         """
         Realign each signal of interest in frequency by taking as a reference the first spectra in absolute mode using pick-picking or inter-correlation (experimental).
 
@@ -2311,10 +2336,12 @@ class MRSData2(suspect.mrsobjects.MRSData):
         ----------
         peak_range : list [2]
             Range in ppm used to analyze peak phase
-        moving_Naverages : int
+        moving_averages : int
             Number of averages to perform when using moving average, need to be an odd number
         inter_corr_mode : boolean
             Use inter-correlation technique to adjust frequency shifts. Could be more robust when SNR is low.
+        freq_shift_max : float
+            Max allowed frequency shift during realignment (Hz).
         allowed_apodization : float/boolean
             If >0 or !=False, apodize signal during correction process. However, the final corrected signal will not be apodized.
         display : boolean
@@ -2341,7 +2368,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             log.warning("single-shot signal, cannot realign this!")
         else:
             # build moving averaged data
-            s_ma = self._build_moving_average_data_2d(moving_Naverages)
+            s_ma = self._build_moving_average_data_2d(moving_averages)
 
             # init
             s_avg = np.mean(s, axis=0)
@@ -2394,9 +2421,13 @@ class MRSData2(suspect.mrsobjects.MRSData):
                     dppm = -(ppm_peak_avg - ppm_peak)
                     df_trace[a] = dppm * s_ma.f0
 
+                # check max shift
+                if(np.abs(df_trace[a]) > freq_shift_max):
+                    # that is too much, do not realign this spectrum
+                    df_trace[a] = 0.0
+
                 # correct moving averaged data (for display only, less heavy)
                 s_realigned_ma[a, :] = s_ma[a, :].adjust_frequency(df_trace[a])
-
                 # correct original data
                 s_realigned[a, :] = s[a, :].adjust_frequency(df_trace[a])
 
@@ -3377,17 +3408,19 @@ class pipeline:
                             # ppm range to search for peak for FWHM estimation
                             "POI_LW_range_ppm": [4.5, 5.2],
                             # ppm range to for SNR/LW estimation in ref. data
-                            "POI_ref_range_ppm" : [4.5, 5.2],
+                            "POI_ref_range_ppm": [4.5, 5.2],
                             # apodization factor used during signal analysis, never actually applied for signal correction
-                            "allowed_apodization" : 5.0,
+                            "allowed_apodization": 1.0,
                             # path to pkl file to store processed data
-                            "storage_file" : None,
+                            "storage_file": None,
                             # force display off if needed
                             "display": None,
                             # ppm range used for display
                             "display_range_ppm": [1, 6],
                             # y offset used for display
-                            "display_offset": 0.0}
+                            "display_offset": 0.0,
+                            # raise error if raw data looks worse than dcm
+                            "raise_error_on_badreco": True}
 
         # --- available jobs and their parameters ---
         self.job = {}
@@ -3398,7 +3431,7 @@ class pipeline:
                                   # ppm range used for display
                                   "display_range_ppm": pipeline._get_setting,
                                   # apodization factor used for display (Hz)
-                                  "apodization_factor": 5.0,
+                                  "apodization_factor": pipeline._get_setting,
                                   # display spectrum in magnitude mode?
                                   "magnitude_mode": False
                                   }
@@ -3506,7 +3539,7 @@ class pipeline:
                                       "auto_allowed_snr_change": 1.0,
                                       # apodization factor used during signal analysis stage
                                       "allowed_apodization": pipeline._get_setting,
-                                      # display all this process to check what the hell is going on
+                                      # intercorrelation mode for realignment?
                                       "display": True,
                                       "display_range_ppm": pipeline._get_setting
                                       }
@@ -3519,6 +3552,8 @@ class pipeline:
                                   "moving_averages": 1,
                                   # use correlation mode
                                   "inter_corr_mode": False,
+                                  # maximum frequency shift allowed in Hz
+                                  "freq_shift_max": 50,
                                   # apodization factor used during signal analysis stage
                                   "allowed_apodization": pipeline._get_setting,
                                   # display all this process to check what the hell is going on
@@ -3686,7 +3721,6 @@ class pipeline:
         # --- analyze job list ---
         # SNR/LW analysis job list
         self.analyze_job_list = [self.job["channel_combining"],
-                                 self.job["zero_filling"],
                                  self.job["averaging"],
                                  self.job["calibrating"]]
 
@@ -4131,7 +4165,7 @@ class pipeline:
         if(self.job["concatenate"] in self.job_list):
             self.dataset = [self.dataset[0]]
 
-        # before leaving, analyse ref data if available
+        # before leaving, analyze ref data if available
         for i, d in enumerate(self.dataset):
             for dtype in ["raw", "dcm"]:
                 this_data = d[dtype]["data"]
@@ -4151,7 +4185,7 @@ class pipeline:
         return(self.dataset)
 
     def get_analyze_results(self):
-        """Return analyse results as several numpy vectors eassy to plot.Dataset and job names will be padded to ease terminal output.
+        """Return analyze results as several numpy vectors eassy to plot.Dataset and job names will be padded to ease terminal output.
 
         Returns
         -------
@@ -4252,7 +4286,7 @@ class pipeline:
         return(data_label_list, job_label_list, snr_raw_list, lw_raw_list, snr_dcm_list, lw_dcm_list, snr_ref_raw_list, lw_ref_raw_list, snr_ref_dcm_list, lw_ref_dcm_list)
 
     def get_final_analyze_results(self):
-        """Return final analyse results for each dataset.
+        """Return final analyze results for each dataset.
 
         Returns
         -------
@@ -4284,13 +4318,13 @@ class pipeline:
 
         return(data_label_list, snr_raw_list, lw_raw_list, lw_ref_raw_list)
 
-    def check_analyze_results(self, raise_error=True):
+    def check_analyze_results(self, ignore_error=False):
         """Check for each dataset that we got a beter reconstruction with raw data than dicom.
 
         Returns
         -------
-        raise_error : boolean
-            Raise error if raw data reconstruction gave worst results than DICOM in terms of SNR and /or LW. If (False), just raise a warning.
+        ignore_error : boolean
+            Do not raise error if raw data reconstruction gave worst results than DICOM in terms of SNR and /or LW. If (False), just raise a warning.
         """
         log.info("quality checking analyze results...")
 
@@ -4313,7 +4347,7 @@ class pipeline:
                     error_str = error_str + ("[%s], " % this_dataset_label)
 
         if(n_bad_reco > 0):
-            if(raise_error):
+            if(self.settings["raise_error_on_badreco"] and not ignore_error):
                 log.error(error_str[:-2])
             else:
                 log.warning(error_str[:-2])
@@ -4322,7 +4356,7 @@ class pipeline:
         """Print final SNR and peak-linewidth for each dataset. Plot bargraph showing evolution of SNR and linewidth during data processing (to check that a job did not destroy the data for example!) and compare with dicom when possible."""
         log.info("displaying SNR and linewidth final results...")
 
-        # get analyse data as list and np arrays
+        # get analyze data as list and np arrays
         data_label_list, job_label_list, snr_raw_list, lw_raw_list, snr_dcm_list, lw_dcm_list, snr_ref_raw_list, lw_ref_raw_list, snr_ref_dcm_list, lw_ref_dcm_list = self.get_analyze_results()
 
         # terminal output

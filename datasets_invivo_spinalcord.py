@@ -22,11 +22,8 @@ log.setLevel(log.INFO)
 # display stuff?
 display_stuff = True
 
-# stop pipeline if the reco went bad
-raise_error_on_bad_reco = True
-
 # template to use here (see definitions below)
-reco_template = "sc_rea_intercorr"
+reco_template = "sc"
 
 # %% "sc" reconstruction template
 template_name = "sc"
@@ -36,7 +33,9 @@ p.settings["storage_file"] = "/home/tangir/crmbm/acq_db/%s.pkl" % template_name
 p.settings["POI_range_ppm"] = [4.5, 5.2]
 p.settings["POI_shift_range_ppm"] = [1.8, 2.2]
 p.settings["POI_shift_true_ppm"] = 2.008
+p.settings["POI_LW_range_ppm"] = [1.8, 2.2]
 p.settings["POI_LW_range_ppm"] = [4.5, 5.2]
+p.settings["allowed_apodization"] = 1.0
 p.settings["display"] = display_stuff
 
 p.job_list = [  # p.job["displaying_anatomy"],
@@ -51,9 +50,6 @@ p.job_list = [  # p.job["displaying_anatomy"],
                 # p.job["apodizing"],
                 p.job["realigning"],
                 p.job["data_rejecting"],
-                p.job["data_rejecting"],
-                p.job["data_rejecting"],
-                p.job["data_rejecting"],
                 p.job["averaging"],
                 p.job["calibrating"],
                 # p.job["water_removal"],
@@ -62,39 +58,17 @@ p.job_list = [  # p.job["displaying_anatomy"],
                 ]
 
 p.job["data_rejecting"]["auto_method_list"] = [reco.data_rejection_method.AUTO_AMPLITUDE,
-                                                reco.data_rejection_method.AUTO_LINEWIDTH,
-                                                reco.data_rejection_method.AUTO_FREQUENCY,
-                                                reco.data_rejection_method.AUTO_PHASE]
-
-p.job["data_rejecting"]["auto_allowed_snr_change"] = 5.0
+                                               reco.data_rejection_method.AUTO_LINEWIDTH,
+                                               reco.data_rejection_method.AUTO_FREQUENCY,
+                                               reco.data_rejection_method.AUTO_PHASE]
 
 p.job["cropping"]["final_npts"] = 2048
 p.job["displaying"]["apodization_factor"] = 5.0
-
-# dicard data based only on a water peak (not NAA, too unreliable)
-p.job["data_rejecting"]["POI_SNR_range_ppm"] = p.settings["POI_range_ppm"]
-p.job["data_rejecting"]["POI_LW_range_ppm"] = p.settings["POI_range_ppm"]
 
 # SNR like LCModel...
 p.job["analyzing_snr"]["half_factor"] = True
 p.job["ref_data_analyzing_snr"]["half_factor"] = True
 
-p.save_template(template_name)
-
-# create corresponding "*_concatenate" reconstruction template (for the first 2 crappy datasets)
-p.job_list.insert(4, p.job["concatenate"])
-p.settings["storage_file"] = "/home/tangir/crmbm/acq_db/%s.pkl" % (template_name + "_concatenate")
-p.save_template(template_name + "_concatenate")
-
-# %% "sc_rea_intercorr" reconstruction template
-# remove data rejection to estimate its gain in SNR/LW
-template_name = "sc_rea_intercorr"
-
-p = reco.pipeline("sc")
-p.settings["storage_file"] = "/home/tangir/crmbm/acq_db/%s.pkl" % template_name
-p.settings["display"] = display_stuff
-
-p.job["realigning"]["inter_corr_mode"] = True
 p.save_template(template_name)
 
 # create corresponding "*_concatenate" reconstruction template (for the first 2 crappy datasets)
@@ -159,7 +133,7 @@ p.dataset[3]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/291-vs-moelle-spect
                                 "/home/tangir/crmbm/acq_twix/291-vs-moelle-spectro-p1/meas_MID109_svs_st_vapor_643_optim_trig_FID29472.dat"]
 
 # p.run()
-# p.check_analyze_results(raise_error_on_bad_reco)
+# p.check_analyze_results()
 # p.save_datasets()
 
 # %% 15/03/2019 - 291-vs-moelle-spectro-p1 - concatenated sLASER #1 :(
@@ -186,7 +160,7 @@ p.dataset[3]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/291-vs-moelle-spect
                                 "/home/tangir/crmbm/acq_twix/291-vs-moelle-spectro-p1/meas_MID121_eja_svs_slaser_optim_trig_FID29484.dat"]
 
 # p.run()
-# p.check_analyze_results(raise_error_on_bad_reco)
+# p.check_analyze_results()
 # p.save_datasets()
 
 # %% 15/03/2019 - 291-vs-moelle-spectro-p1 - sLASER #2 :(
@@ -203,7 +177,7 @@ p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/291-vs-moelle-spectro-p1
                                 "/home/tangir/crmbm/acq/291-vs-moelle-spectro-p1/20190315/01_0042_eja-svs-slaser-optim-trig"]
 
 # p.run()
-# p.check_analyze_results(raise_error_on_bad_reco)
+# p.check_analyze_results()
 # p.save_datasets()
 
 # %% 26/06/2019 - 296_ym_p1_brainmoelle - Yasmin :)
@@ -255,7 +229,7 @@ p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/300-pm-p1-moelle/me
 p.job["phasing"]["using_ref_data"] = False
 p.job["channel_combining"]["using_ref_data"] = False
 p.run()
-p.check_analyze_results(raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 # %% 14/08/2019 - 304-ka-p1-moelle - Karen :(
@@ -271,7 +245,7 @@ p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/304-ka-p1-moelle/2019081
 p.job["phasing"]["using_ref_data"] = False
 p.job["channel_combining"]["using_ref_data"] = False
 p.run()
-p.check_analyze_results(raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 # %% 21/08/2019 - 307-ap-p1-moelle - Ariane :)
@@ -315,7 +289,7 @@ p.dataset[3]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/307-AP-P1-MOELLE/me
 p.job["realigning"]["moving_averages"] = 2
 p.job["data_rejecting"]["moving_averages"] = 2
 p.run()
-p.check_analyze_results(False and raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 # %% 27/08/2019 - 308-rs-p1-moelle - Ocha :)
@@ -339,7 +313,7 @@ p.job["data_rejecting"]["auto_method_list"] = [reco.data_rejection_method.AUTO_A
                                                reco.data_rejection_method.AUTO_FREQUENCY]
 
 p.run()
-p.check_analyze_results(raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 # %% 29/08/2019 - 310-mg-p1-moelle - Maxime :s
@@ -363,7 +337,7 @@ if(p.job["realigning"] in p.job_list):
 p.job["data_rejecting"]["moving_averages"] = 8
 
 p.run()
-p.check_analyze_results(False and raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 # %% 05/09/2019 - 311-sl-p1-moelle - Simon :))
@@ -381,7 +355,7 @@ p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/311-sl-p1-moelle/me
                                 "/home/tangir/crmbm/acq_twix/311-sl-p1-moelle/meas_MID124_slaser_R_N=20+_1_longTE_SNR++++_FID39736.dat"]
 
 p.run()
-p.check_analyze_results(False and raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 # %% 23/09/2019 - 313-ft-p1-moelle - Fransiska :|
@@ -397,11 +371,8 @@ p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/313-ft-p1-moelle/2019092
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/313-ft-p1-moelle/meas_MID68_slaser_R_N=20+_1_longTE_SNR++++_FID41500.dat",
                                 "/home/tangir/crmbm/acq_twix/313-ft-p1-moelle/meas_MID65_slaser_R_N=20+_1_longTE_SNR++++_FID41497.dat"]
 
-p.job["realigning"]["moving_averages"] = 2
-p.job["data_rejecting"]["moving_averages"] = 2
-
 p.run()
-p.check_analyze_results(False and raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 # %% 25/09/2019 - 314-yt-p1-moelle - Yolanda :)))
@@ -428,11 +399,8 @@ p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/314-yt-p1-moelle/2019092
 p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/314-yt-p1-moelle/meas_MID88_slaser_R_N=5_5+_shortTE_SNR++_FID41686.dat",
                                 "/home/tangir/crmbm/acq_twix/314-yt-p1-moelle/meas_MID86_slaser_R_N=5_5+_shortTE_SNR++_FID41684.dat"]
 
-p.job["realigning"]["moving_averages"] = 2
-p.job["data_rejecting"]["moving_averages"] = 2
-
 p.run()
-p.check_analyze_results(False and raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 # %% 03/10/2019 - 316-ap-p1-moelle - Anissa :)
@@ -465,7 +433,7 @@ p.settings["POI_shift_true_ppm"] = 4.7
 p.settings["POI_LW_range_ppm"] = [4.5, 4.8]
 
 p.run()
-p.check_analyze_results(False and raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 # %% 17/10/2019 - 319-fc-p1-moelle - Fernando :)
@@ -492,7 +460,7 @@ p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/319-fc-p1-moelle/me
                                 "/home/tangir/crmbm/acq_twix/319-fc-p1-moelle/meas_MID145_slaser_R_N=10_2_longTE_SNR+++_FID43723.dat"]
 
 p.run()
-p.check_analyze_results(False and raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 # %% 05/11/2019 - 328-af-p1-moelle - Anne :)
@@ -510,11 +478,8 @@ p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/328-af-p1-moelle/2019110
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/328-af-p1-moelle/meas_MID64_slaser_R_N=20+_1_longTE_SNR++++_FID45771.dat",
                                 "/home/tangir/crmbm/acq_twix/328-af-p1-moelle/meas_MID66_slaser_R_N=20+_1_longTE_SNR++++_FID45773.dat"]
 
-p.job["realigning"]["moving_averages"] = 4
-p.job["data_rejecting"]["moving_averages"] = 1
-
 p.run()
-p.check_analyze_results(False and raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 # %% 08/11/2019 - 329-pi-p1-moelle - Pujalina :)
@@ -542,7 +507,7 @@ p.job["realigning"]["moving_averages"] = 2
 p.job["data_rejecting"]["moving_averages"] = 2
 
 p.run()
-p.check_analyze_results(False and raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 # %% 26/11/2019 - 333-sc-p1-moelle - Shirley :(
@@ -575,7 +540,7 @@ p.job["phasing"]["offset"] = 3.1416
 
 p.settings["datasets_indexes"] = 0
 p.run()
-p.check_analyze_results(raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 # %% 09/12/2019 - 336-nb-p1-moelle - Naouelle :s
@@ -610,7 +575,7 @@ p.job["data_rejecting"]["moving_averages"] = 2
 
 p.settings["datasets_indexes"] = 0
 p.run()
-p.check_analyze_results(False and raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 # %% 10/12/2019 - 338-ro-p1-moelle - Rischa :)
@@ -641,7 +606,7 @@ p.dataset[2]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/338-ro-p1-moelle/me
 
 p.settings["datasets_indexes"] = 0
 p.run()
-p.check_analyze_results(False and raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 # %% 28/01/2019 - 300-pm-p2-moelle - Pelayo P2 :)
@@ -675,7 +640,7 @@ p.dataset[2]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/300-pm-p2-moelle/me
 
 p.settings["datasets_indexes"] = 0
 p.run()
-p.check_analyze_results(raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 # %% 06/02/2019 - 349-ap-p1-moelle - Ahmad Fajar :|
@@ -706,7 +671,7 @@ p.job["data_rejecting"]["moving_averages"] = 2
 
 p.settings["datasets_indexes"] = 0
 p.run()
-p.check_analyze_results(False and raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 # %% 24/02/2019 - 355-st-p1-moelle - Steven :)
@@ -728,7 +693,7 @@ p.job["realigning"]["moving_averages"] = 7
 p.job["data_rejecting"]["moving_averages"] = 2
 
 p.run()
-p.check_analyze_results(raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 # %% 04/03/2020 - 304-ka-p2-moelle - Karen P2 :(
@@ -774,7 +739,7 @@ p.job["data_rejecting"]["auto_method_list"] = [reco.data_rejection_method.AUTO_A
                                                reco.data_rejection_method.AUTO_LINEWIDTH]
 
 p.run()
-p.check_analyze_results(False and raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 # %% 30/05/2020 - 311-sl-p2-moelle - Simon P2 :)
@@ -799,10 +764,8 @@ p.dataset[1]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/311-sl-p2-moelle/me
 p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/311-sl-p2-moelle/20200529/01_0011_slaser-r-n/original-primary_e09_0001.dcm",
                                 "/home/tangir/crmbm/acq/311-sl-p2-moelle/20200529/01_0012_slaser-r-n/original-primary_e09_0001.dcm"]
 
-p.job["realigning"]["moving_averages"] = 2
-p.job["data_rejecting"]["moving_averages"] = 2
 p.run()
-p.check_analyze_results(False and raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 # %% 09/06/2020 - 336-nb-p2-moelle - Naouelle P2 :)
@@ -825,7 +788,7 @@ p.job["realigning"]["inter_corr_mode"] = True
 p.job["data_rejecting"]["moving_averages"] = 2
 
 p.run()
-p.check_analyze_results(False and raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 p = reco.pipeline(reco_template)
@@ -859,7 +822,7 @@ p.job["realigning"]["inter_corr_mode"] = False
 p.job["data_rejecting"]["moving_averages"] = 2
 
 p.run()
-p.check_analyze_results(False and raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 # %% 11/06/2020 - 319-fc-p2-moelle - Fernando P2 :)
@@ -877,7 +840,7 @@ p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/319-fc-p2-moelle/2020061
                                 "/home/tangir/crmbm/acq/319-fc-p2-moelle/20200611/01_0013_slaser-r-n/original-primary_e09_0001.dcm"]
 
 p.run()
-p.check_analyze_results(raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 # %% 15/06/2020 - 313-ft-p2-moelle - Fransiska P2 :|
@@ -898,7 +861,7 @@ p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/313-ft-p2-moelle/2020061
 p.job["realigning"]["moving_averages"] = 2
 p.job["data_rejecting"]["moving_averages"] = 4
 p.run()
-p.check_analyze_results(False and raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 # %% 19/06/2020 - 333-sc-p2-moelle - Shirley P2 :|
@@ -915,13 +878,8 @@ p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/333-sc-p2-moelle/me
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/333-sc-p2-moelle/20200619/01_0008_slaser-r-n/original-primary_e09_0001.dcm",
                                 "/home/tangir/crmbm/acq/333-sc-p2-moelle/20200619/01_0009_slaser-r-n/original-primary_e09_0001.dcm"]
 
-# water peak very small and close to 5ppm artefact
-p.job["analyzing-lw"]["POI_range_ppm"] = [4.5, 4.8]
-p.job["phasing"]["POI_range_ppm"] = [4.5, 4.8]
-p.job["data_rejecting"]["POI_range_ppm"] = [4.5, 4.8]
-
 p.run()
-p.check_analyze_results(False and raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 # %% 25/06/2020 - 314-yt-p2-moelle - Yolanda P2 :)))
@@ -939,7 +897,7 @@ p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/314-yt-p2-moelle/2020062
 "/home/tangir/crmbm/acq/314-yt-p2-moelle/20200625/01_0009_slaser-r-n"]
 
 p.run()
-p.check_analyze_results(raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 # %% 25/09/2020 - 349-ap-p2-moelle - Admah Fajar P2 :)))
@@ -970,5 +928,5 @@ p.job["realigning"]["moving_averages"] = 4
 p.job["data_rejecting"]["moving_averages"] = 4
 
 p.run()
-p.check_analyze_results(raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
