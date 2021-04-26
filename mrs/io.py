@@ -87,15 +87,15 @@ class data_file_reader(metaclass=ABCMeta):
         """Return the patient height field."""
         pass
 
-    def get_sequence_name(self, file_index=0):
+    def _get_sequence_name(self, file_index=0):
         """Return the acquisition sequence name."""
         pass
 
-    def get_gating_mode(self):
+    def _get_gating_mode(self):
         """Return the gating signal source."""
         pass
 
-    def get_timestamp(self):
+    def _get_sequence_timestamp(self):
         """Return the acquisition start timestamp."""
         pass
 
@@ -622,7 +622,7 @@ class SIEMENS_data_file_reader(data_file_reader):
         # check we did not find a long garbage string
         if(len(sequence_name) > 16):
             # if so, go on searching in file
-            sequence_name = self.get_sequence_name(b)
+            sequence_name = self._get_sequence_name(b)
 
         return(sequence_name)
 
