@@ -33,10 +33,12 @@ template_name = "brain"
 
 p = reco.pipeline()
 p.settings["storage_file"] = "/home/tangir/crmbm/acq_db/%s.pkl" % template_name
-p.settings["POI_range_ppm"] = [1.8, 2.2]
+p.settings["POI_range_ppm"] = [4.5, 5.2]
 p.settings["POI_shift_range_ppm"] = [1.8, 2.2]
 p.settings["POI_shift_true_ppm"] = 2.008
 p.settings["POI_LW_range_ppm"] = [1.8, 2.2]
+p.settings["POI_LW_range_ppm"] = [4.5, 5.2]
+p.settings["allowed_apodization"] = 1.0
 p.settings["display"] = display_stuff
 
 p.job_list = [  # p.job["displaying_anatomy"],
@@ -94,7 +96,7 @@ p.dataset[2]["dcm"]["files"] = ["/home/tangir/crmbm/acq/296_ym_p1_brainmoelle/29
 
 p.settings["datasets_indexes"] = [0, 1]
 p.run()
-p.check_analyze_results(False and raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 # %% 25/06/2019 - 296_ym_p1_brainmoelle - FID modulus tests
@@ -134,7 +136,7 @@ p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/308-rs-p1-moelle/2019082
                                 "/home/tangir/crmbm/acq/308-rs-p1-moelle/20190827/01_0025_slaser-r-n/original-primary_e09_0001.dcm"]
 
 p.run()
-p.check_analyze_results(False and raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
 
 # %% 23/01/2019 - 347-re-p1-moelle - Renaud
@@ -163,5 +165,5 @@ p.dataset[3]["dcm"]["files"] = ["/home/tangir/crmbm/acq/347-re-p1-moelle/2020012
 
 p.settings["datasets_indexes"] = 3
 p.run()
-p.check_analyze_results(raise_error_on_bad_reco)
+p.check_analyze_results()
 p.save_datasets()
