@@ -3117,7 +3117,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         plt.yticks([])
         plt.show()
 
-    def display_spectrum_1d(self, ifig=1, display_range=[1, 6], apodization_factor=5.0, magnitude_mode=False):
+    def display_spectrum_1d(self, ifig=1, display_range=[1, 6], allowed_apodization=5.0, magnitude_mode=False):
         """
         Display spectrum in figure 'ifig', overlaying if needed.
 
@@ -3131,7 +3131,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             MRS data to display
         display_range : list [2]
             Range in ppm used for display
-        apodization_factor : float
+        allowed_apodization : float
             Apodization factor used for display (Hz)
         magnitude_mode : boolean
             Displays in magnitude mode (True) or the real part (False)
@@ -3147,7 +3147,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
             log.error("this method only works for 1D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
 
         # init
-        s = self.correct_apodization_nd(apodization_factor)
+        s = self.correct_apodization_nd(allowed_apodization)
         log.debug("displaying stuff!")
 
         plt.figure(ifig).canvas.set_window_title("display_spectrum_1d (mrs.reco.MRSData2)")
@@ -3431,10 +3431,11 @@ class pipeline:
                                   # ppm range used for display
                                   "display_range_ppm": pipeline._get_setting,
                                   # apodization factor used for display (Hz)
-                                  "apodization_factor": pipeline._get_setting,
+                                  "allowed_apodization": pipeline._get_setting,
                                   # display spectrum in magnitude mode?
                                   "magnitude_mode": False
                                   }
+
         # --- job: VOI display on anatomical images ---
         self.job["displaying_anatomy"] = {"job_func": MRSData2.display_voi_anatomy_nd, "job_name": "overlaying VOI on anatomical image"
                                   }
