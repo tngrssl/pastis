@@ -173,7 +173,23 @@ class SIEMENS_data_file_reader(data_file_reader):
 
         elif(self.file_ext == '.dcm'):
             log.debug("reading DICOM file...")
-            MRSData_obj = suspect.io.load_siemens_dicom(self.fullfilepath)
+            if('B17' in self.dcm_header.SoftwareVersions):
+                MRSData_obj = suspect.io.load_siemens_dicom(self.fullfilepath)
+            elif('XA20' in self.dcm_header.SoftwareVersions):
+                # both suspect's dicom reader fails for new SIEMENS XA20 dicom
+                data_real_imag = np.frombuffer(self.dcm_header.SpectroscopyData, np.float32)
+                data_real_imag_reshaped = np.reshape(np.frombuffer(self.dcm_header.SpectroscopyData, np.float32), [int(len(data_real_imag) / 2), 2])
+                data_cmplx = data_real_imag_reshaped[:, 1] + 1j *data_real_imag_reshaped[:, 0]
+
+                # reading bw from dicom header
+                sbw = self.dcm_header.SpectralWidth
+                dt = 1 / sbw
+
+                # building suspect object
+                MRSData_obj = suspect.MRSData(data_cmplx, dt, self.dcm_header.TransmitterFrequency, transform=np.diag([10, 10, 10, 1]))
+            else:
+                log.error("cannot read this version of SIEMENS dicom files!")
+
         else:
             log.error("unknown data file format!?")
 
@@ -559,7 +575,7 @@ class SIEMENS_data_file_reader(data_file_reader):
         elif(sequence_name == "svs_se"):
             sequence_obj = sim.mrs_seq_svs_se(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
 
-        elif(sequence_name == "svs_st"):
+        elif(sequence_name == "svs_st" or sequence_name == "svs_st_histo"):
             sequence_obj = sim.mrs_seq_svs_st(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
 
         elif(sequence_name == "svs_st_vapor_643"):
@@ -689,7 +705,13 @@ class SIEMENS_data_file_reader(data_file_reader):
             except:
                 return(np.nan)
             # the dicom header includes a Acquisition Time string that contains the time of the end of the acquisition
-            AcquisitionTime_datetime = datetime.strptime(self.dcm_header.AcquisitionTime[0:6], '%H%M%S')
+            if('B17' in self.dcm_header.SoftwareVersions):
+                AcquisitionTime_datetime = datetime.strptime(self.dcm_header.AcquisitionTime[0:6], '%H%M%S')
+            elif('XA20' in self.dcm_header.SoftwareVersions):
+                AcquisitionTime_datetime = datetime.strptime(self.dcm_header.AcquisitionDateTime[0:6], '%H%M%S')
+            else:
+                log.error("cannot read this version of SIEMENS dicom files!")
+
             # this should work except if we were scanning for several days or over midnight, ahah
             AcquisitionTime_datetime = AcquisitionTime_datetime.replace(day=SeriesInstanceUID_datetime.day)
             AcquisitionTime_datetime = AcquisitionTime_datetime.replace(month=SeriesInstanceUID_datetime.month)

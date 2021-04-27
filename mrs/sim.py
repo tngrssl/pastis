@@ -2347,7 +2347,6 @@ class mrs_seq_eja_svs_steam(mrs_seq_steam):
         # name of sequence
         self.name = "eja_svs_steam"
 
-
 class mrs_seq_fid(mrs_sequence):
     """A class that represents the pulse-acquire sequence (fid), which is actually a clone of the super class."""
 
