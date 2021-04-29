@@ -10,6 +10,7 @@ from IPython import get_ipython
 import matplotlib.pylab as plt
 import mrs.reco as reco
 import mrs.log as log
+
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -44,7 +45,7 @@ p.job_list = [  p.job["phasing"],
                 p.job["calibrating"],
                 # p.job["water_removal"],
                 # p.job["cropping"],
-                # p.job["apodizing"],
+                p.job["apodizing"],
                 p.job["displaying"]
                 ]
 
