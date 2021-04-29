@@ -27,8 +27,50 @@ except ImportError:
 import pdb
 
 
+def get_data_file_reader(data_fullfilepath):
+    """
+    Find what class to use to read data from file and extract parameters.
+
+    Parameters
+    ----------
+    data_fullfilepath : string
+        Full path to the data file
+
+    Returns
+    -------
+    data_file_reader_class : data_file_reader subclass
+        Class to use to read this data file
+    """
+    log.debug("checking data file path and extension...")
+    data_filename, data_file_extension = os.path.splitext(data_fullfilepath)
+
+    if(len(data_file_extension) == 0):
+        # if empty extension, assuming the filename is not present in the path
+        # lasy-mode where I copy-pasted only the folder paths
+        # therefore, I will complete the path with the dicom name
+        # which has always been "original-primary_e09_0001.dcm" for me up to now
+        data_fullfilepath = data_fullfilepath + "/original-primary_e09_0001.dcm"
+
+    data_filename, data_file_extension = os.path.splitext(data_fullfilepath)
+    file_ext = data_file_extension.lower()
+
+    if(file_ext == '.dcm'):
+        # dicom? get header and read soft version
+        log.debug("reading DICOM header...")
+        dcm_header = pydicom.dcmread(data_fullfilepath)
+        if(dcm_header.SoftwareVersions == "syngo MR B17"):
+            return(SIEMENS_DICOM_reader_syngo_MR_B17(data_fullfilepath))
+        elif(dcm_header.SoftwareVersions == "syngo MR XA20"):
+            return(SIEMENS_DICOM_reader_syngo_XA20(data_fullfilepath))
+        else:
+            log.error("sorry, I am not sure I can read this kind of DICOM files... :/")
+    elif(file_ext == '.dat'):
+        # twix?
+        return(SIEMENS_TWIX_reader_syngo_MR_B17(data_fullfilepath))
+
+
 class data_file_reader(metaclass=ABCMeta):
-    """A virtual class used to read data and acquisition parameters from files. Subclasses depending on MRI constructors."""
+    """A class used to read data and acquisition parameters from files. Subclasses depending on MRI constructors."""
 
     # frozen stuff: a technique to prevent creating new attributes
     # (https://stackoverflow.com/questions/3603502/prevent-creating-new-attributes-outside-init)
@@ -41,7 +83,21 @@ class data_file_reader(metaclass=ABCMeta):
         object.__setattr__(self, key, value)
 
     def __init__(self, data_fullfilepath):
-        pass
+        """
+        Initialize by reading the data file in text mode.
+
+        Parameters
+        ----------
+        data_fullfilepath : string
+            Full path to the data file
+        """
+        self.fullfilepath = data_fullfilepath
+
+        # open file in text mode and save content
+        log.debug("dumping file in ASCII mode...")
+        f = open(self.fullfilepath, "r", encoding="ISO-8859-1")
+        self.file_content_str = f.read()
+        f.close()
 
     def is_rawdata(self):
         """Return true if data is read from a raw data file."""
@@ -60,8 +116,19 @@ class data_file_reader(metaclass=ABCMeta):
         pass
 
     def get_md5_hash(self):
-        """Return a MD5 hash code of the whole binary data file content."""
-        pass
+        """
+        Return a MD5 hash code of the whole binary data file content.
+
+        Returns
+        -------
+        h : string
+            MD5 hexadecimal hash code
+        """
+        hasher = hashlib.md5()
+        with open(self.fullfilepath, 'rb') as f:
+            buf = f.read()
+            hasher.update(buf)
+        return(hasher.hexdigest())
 
     def get_nucleus(self):
         """Return the nucleus setting used to acquire the MRS data."""
@@ -87,6 +154,10 @@ class data_file_reader(metaclass=ABCMeta):
         """Return the patient height field."""
         pass
 
+    def get_sequence(self):
+        """Return the sequence object."""
+        pass
+
     def _get_sequence_name(self, file_index=0):
         """Return the acquisition sequence name."""
         pass
@@ -100,49 +171,24 @@ class data_file_reader(metaclass=ABCMeta):
         pass
 
 
-class SIEMENS_data_file_reader(data_file_reader):
-    """A class used to scrap parameters out of SIEMENS DICOM and TWIX files, sometimes in a very dirty way."""
+class SIEMENS_TWIX_reader_syngo_MR_B17(data_file_reader):
+    """A class used to scrap parameters out of SIEMENS MR Syngo VB17 TWIX files, sometimes in a very dirty way."""
 
     def __init__(self, data_fullfilepath):
         """
-        Initialize by reading a DICOM or TWIX file in text mode and extracting the DICOM header with pydicom, if required.
+        Initialize by reading a TWIX file in text mode.
 
         Parameters
         ----------
         data_fullfilepath : string
-            Full path to the DICOM/TWIX file
+            Full path to the TWIX file
         """
         super().__init__(data_fullfilepath)
 
-        log.debug("checking data file path and extension...")
-        data_filename, data_file_extension = os.path.splitext(data_fullfilepath)
-        if(len(data_file_extension) == 0):
-            # if empty extension, assuming the filename is not present in the path
-            # lasy-mode where I copy-pasted only the folder paths
-            # therefore, I will complete the path with the dicom name
-            # which has always been "original-primary_e09_0001.dcm" for me up to now
-            self.fullfilepath = data_fullfilepath + "/original-primary_e09_0001.dcm"
-        else:
-            self.fullfilepath = data_fullfilepath
+        # no DICOM header
+        self.dcm_header = None
 
-        # detect DICOM or TWIX?
-        data_filename, data_file_extension = os.path.splitext(self.fullfilepath)
-        self.file_ext = data_file_extension.lower()
-
-        # open file in text mode and save content
-        log.debug("dumping file in ASCII mode...")
-        f = open(self.fullfilepath, "r", encoding="ISO-8859-1")
-        self.file_content_str = f.read()
-        f.close()
-
-        # if DICOM, use pydicom to extract basic header (SIEMENS hidden header not extracted)
-        if(self.is_rawdata()):
-            self.dcm_header = None
-        else:
-            log.debug("reading DICOM header...")
-            self.dcm_header = pydicom.dcmread(self.fullfilepath)
-
-        # and read data and store it
+        # read data and store it
         self.data = self._read_data()
 
         # freeze
@@ -155,56 +201,26 @@ class SIEMENS_data_file_reader(data_file_reader):
         Returns
         -------
         MRSData_obj : MRSData object
-            MRS data read from DICOM/TWIX file
+            MRS data read from TWIX file
         """
-        if(self.is_rawdata()):
-            # try and read this TWIX file
-            try:
-                log.debug("reading TWIX file...")
-                MRSData_obj = suspect.io.load_twix(self.fullfilepath)
-            except:
-                if(MAPVBVD_LIB_LOADED):
-                    # well maybe it is broken, maybe the acquisition was interrupted
-                    # let's try to read it using this modified verion of suspect.io.load_twix
-                    log.debug("reading broken TWIX file...")
-                    MRSData_obj = self._load_broken_twix()
-                else:
-                    log.error("the TWIX file looks broken and the pymapvdvb library could not be loaded (probably due to your old python version?).")
-
-        elif(self.file_ext == '.dcm'):
-            log.debug("reading DICOM file...")
-            if('B17' in self.dcm_header.SoftwareVersions):
-                MRSData_obj = suspect.io.load_siemens_dicom(self.fullfilepath)
-            elif('XA20' in self.dcm_header.SoftwareVersions):
-                # both suspect's dicom reader fails for new SIEMENS XA20 dicom
-                data_real_imag = np.frombuffer(self.dcm_header.SpectroscopyData, np.float32)
-                data_real_imag_reshaped = np.reshape(np.frombuffer(self.dcm_header.SpectroscopyData, np.float32), [int(len(data_real_imag) / 2), 2])
-                data_cmplx = data_real_imag_reshaped[:, 1] + 1j *data_real_imag_reshaped[:, 0]
-
-                # reading bw from dicom header
-                sbw = self.dcm_header.SpectralWidth
-                dt = 1 / sbw
-
-                # building suspect object
-                MRSData_obj = suspect.MRSData(data_cmplx, dt, self.dcm_header.TransmitterFrequency, transform=np.diag([10, 10, 10, 1]))
+        # try and read this TWIX file
+        try:
+            log.debug("reading TWIX file...")
+            MRSData_obj = suspect.io.load_twix(self.fullfilepath)
+        except:
+            if(MAPVBVD_LIB_LOADED):
+                # well maybe it is broken, maybe the acquisition was interrupted
+                # let's try to read it using this modified verion of suspect.io.load_twix
+                log.debug("reading broken TWIX file...")
+                MRSData_obj = self._load_broken_twix()
             else:
-                log.error("cannot read this version of SIEMENS dicom files!")
-
-        else:
-            log.error("unknown data file format!?")
+                log.error("the TWIX file looks broken and the pymapvdvb library could not be loaded (probably due to your old python version?).")
 
         return(MRSData_obj)
 
     def is_rawdata(self):
-        """
-        Return true if data is read from a TWIX file.
-
-        Returns
-        -------
-        self.file_ext == '.dat' : boolean
-            True if TWIX file
-        """
-        return(self.file_ext == '.dat')
+        """Return true if data is read from a TWIX file."""
+        return(True)
 
     def get_number_rx_channels(self):
         """
@@ -220,7 +236,7 @@ class SIEMENS_data_file_reader(data_file_reader):
 
     def read_param_num(self, param_name, file_index=0):
         """
-        Look for parameter in TWIX/DICOM data headers and return its float value.
+        Look for parameter in data headers and return its float value.
 
         Parameters
         ----------
@@ -266,21 +282,6 @@ class SIEMENS_data_file_reader(data_file_reader):
         # return it
         return(param_val_float)
 
-    def get_md5_hash(self):
-        """
-        Return a MD5 hash code of the whole binary data file content.
-
-        Returns
-        -------
-        h : string
-            MD5 hexadecimal hash code
-        """
-        hasher = hashlib.md5()
-        with open(self.fullfilepath, 'rb') as f:
-            buf = f.read()
-            hasher.update(buf)
-        return(hasher.hexdigest())
-
     def get_nucleus(self):
         """
         Return the nucleus setting used to acquire the MRS data.
@@ -308,19 +309,13 @@ class SIEMENS_data_file_reader(data_file_reader):
         patient_name_str : string
             Patient name
         """
-        if(self.is_rawdata()):
-            # find patient name dirty way
-            a = self.file_content_str.find("tPatientName")
-            a = self.file_content_str.find("{", a)
-            a = self.file_content_str.find("\"", a)
-            b = self.file_content_str.find("\"", a + 1)
-            patient_name_str = self.file_content_str[(a + 1):b]
-            patient_name_str = patient_name_str.strip()
-        elif(self.file_ext == '.dcm'):
-            patient_name_str = str(self.dcm_header.PatientName)
-        else:
-            log.error("unknown file extension!")
-
+        # find patient name dirty way
+        a = self.file_content_str.find("tPatientName")
+        a = self.file_content_str.find("{", a)
+        a = self.file_content_str.find("\"", a)
+        b = self.file_content_str.find("\"", a + 1)
+        patient_name_str = self.file_content_str[(a + 1):b]
+        patient_name_str = patient_name_str.strip()
         return(patient_name_str)
 
     def get_patient_birthday(self):
@@ -332,20 +327,14 @@ class SIEMENS_data_file_reader(data_file_reader):
         patient_birthday_datetime : datetime
             Patient birthday
         """
-        if(self.is_rawdata()):
-            # find patient birthday dirty way
-            a = self.file_content_str.find("PatientBirthDay")
-            a = self.file_content_str.find("{", a)
-            a = self.file_content_str.find("\"", a)
-            birthday_str = self.file_content_str[(a + 1):(a + 9)]
-            birthday_str = birthday_str.strip()
-            if(birthday_str):
-                patient_birthday_datetime = datetime.strptime(birthday_str, '%Y%m%d')
-        elif(self.file_ext == '.dcm'):
-            patient_birthday_datetime = datetime.strptime(str(self.dcm_header.PatientBirthDate), '%Y%m%d')
-        else:
-            log.error("unknown file extension!")
-
+        # find patient birthday dirty way
+        a = self.file_content_str.find("PatientBirthDay")
+        a = self.file_content_str.find("{", a)
+        a = self.file_content_str.find("\"", a)
+        birthday_str = self.file_content_str[(a + 1):(a + 9)]
+        birthday_str = birthday_str.strip()
+        if(birthday_str):
+            patient_birthday_datetime = datetime.strptime(birthday_str, '%Y%m%d')
         return(patient_birthday_datetime)
 
     def get_patient_sex(self):
@@ -357,25 +346,19 @@ class SIEMENS_data_file_reader(data_file_reader):
         patient_sex_str : string
             Patient sex ('M', 'F' or 'O')
         """
-        if(self.is_rawdata()):
-            # find patient sex dirty way
-            a = self.file_content_str.find("PatientSex")
-            a = self.file_content_str.find("{", a)
-            patient_sex_str = self.file_content_str[(a + 2):(a + 3)]
-            patient_sex_int = int(patient_sex_str.strip())
-            if(patient_sex_int == 2):
-                patient_sex_str = 'M'
-            elif(patient_sex_int == 1):
-                patient_sex_str = 'F'
-            elif(patient_sex_int == 3):
-                patient_sex_str = 'O'
-            else:
-                log.error("unknown patient sex!")
-        elif(self.file_ext == '.dcm'):
-            patient_sex_str = str(self.dcm_header.PatientSex)
+        # find patient sex dirty way
+        a = self.file_content_str.find("PatientSex")
+        a = self.file_content_str.find("{", a)
+        patient_sex_str = self.file_content_str[(a + 2):(a + 3)]
+        patient_sex_int = int(patient_sex_str.strip())
+        if(patient_sex_int == 2):
+            patient_sex_str = 'M'
+        elif(patient_sex_int == 1):
+            patient_sex_str = 'F'
+        elif(patient_sex_int == 3):
+            patient_sex_str = 'O'
         else:
-            log.error("unknown file extension!")
-
+            log.error("unknown patient sex!")
         return(patient_sex_str)
 
     def get_patient_weight(self):
@@ -387,19 +370,13 @@ class SIEMENS_data_file_reader(data_file_reader):
         patient_weight_kgs : float
             Patient weight in kg
         """
-        if(self.is_rawdata()):
-            # find patient weight dirty way
-            a = self.file_content_str.find("flUsedPatientWeight")
-            a = self.file_content_str.find("{", a)
-            a = self.file_content_str.find(">", a)
-            b = self.file_content_str.find("}", a + 1)
-            patient_weight_str = self.file_content_str[(a + 5):(b - 2)]
-            patient_weight_kgs = float(patient_weight_str.strip())
-        elif(self.file_ext == '.dcm'):
-            patient_weight_kgs = float(self.dcm_header.PatientWeight)
-        else:
-            log.error("unknown file extension!")
-
+        # find patient weight dirty way
+        a = self.file_content_str.find("flUsedPatientWeight")
+        a = self.file_content_str.find("{", a)
+        a = self.file_content_str.find(">", a)
+        b = self.file_content_str.find("}", a + 1)
+        patient_weight_str = self.file_content_str[(a + 5):(b - 2)]
+        patient_weight_kgs = float(patient_weight_str.strip())
         return(patient_weight_kgs)
 
     def get_patient_height(self):
@@ -411,25 +388,17 @@ class SIEMENS_data_file_reader(data_file_reader):
         patient_height_m : float
             Patient height in meters
         """
-        if(self.is_rawdata()):
-            # find patient height dirty way
-            a = self.file_content_str.find("flPatientHeight")
-            a = self.file_content_str.find("{", a)
-            a = self.file_content_str.find(">", a)
-            a = self.file_content_str.find(">", a + 1)
-            b = self.file_content_str.find("}", a + 1)
-            patient_height_str = self.file_content_str[(a + 6):(b - 3)]
-            try:
-                patient_height_m = float(patient_height_str.strip()) / 1000.0
-            except:
-                patient_height_m = np.nan
-        elif(self.file_ext == '.dcm'):
-            try:
-                patient_height_m = float(self.dcm_header.PatientSize)
-            except:
-                patient_height_m = np.nan
-        else:
-            log.error("unknown file extension!")
+        # find patient height dirty way
+        a = self.file_content_str.find("flPatientHeight")
+        a = self.file_content_str.find("{", a)
+        a = self.file_content_str.find(">", a)
+        a = self.file_content_str.find(">", a + 1)
+        b = self.file_content_str.find("}", a + 1)
+        patient_height_str = self.file_content_str[(a + 6):(b - 3)]
+        try:
+            patient_height_m = float(patient_height_str.strip()) / 1000.0
+        except:
+            patient_height_m = np.nan
 
         return(patient_height_m)
 
@@ -442,6 +411,8 @@ class SIEMENS_data_file_reader(data_file_reader):
         seq : mrs.sim.mrs_sequence
             Sequence object
         """
+        log.debug("reading sequence parameters...")
+
         # echo time (btw already extracted within suspect, this is a bit redandent)
         te = self.read_param_num("alTE") / 1000.0
         log.debug("extracted echo time (%.2f)" % te)
@@ -692,36 +663,8 @@ class SIEMENS_data_file_reader(data_file_reader):
         acq_time : float
             Acquisition effective duration (s)
         """
-        if(self.is_rawdata()):
-            log.warning("cannot extract effective acquisition time from a TWIX file :(")
-            acq_time = np.nan
-        elif(self.file_ext == '.dcm'):
-            # the dicom header includes a SeriesInstanceUID string that contains the date and time of the start of the acquisition
-            SeriesInstanceUID_splitted = self.dcm_header.SeriesInstanceUID.split('.')
-            SeriesInstanceUID_str = max(SeriesInstanceUID_splitted, key=len)
-            try:
-                # so for some reason, I get very very rarely malformed SeriesInstanceUID where the data/time is placed at a different index...
-                SeriesInstanceUID_datetime = datetime.strptime(SeriesInstanceUID_str[0:13], '%Y%m%d%H%M%S')
-            except:
-                return(np.nan)
-            # the dicom header includes a Acquisition Time string that contains the time of the end of the acquisition
-            if('B17' in self.dcm_header.SoftwareVersions):
-                AcquisitionTime_datetime = datetime.strptime(self.dcm_header.AcquisitionTime[0:6], '%H%M%S')
-            elif('XA20' in self.dcm_header.SoftwareVersions):
-                AcquisitionTime_datetime = datetime.strptime(self.dcm_header.AcquisitionDateTime[0:6], '%H%M%S')
-            else:
-                log.error("cannot read this version of SIEMENS dicom files!")
-
-            # this should work except if we were scanning for several days or over midnight, ahah
-            AcquisitionTime_datetime = AcquisitionTime_datetime.replace(day=SeriesInstanceUID_datetime.day)
-            AcquisitionTime_datetime = AcquisitionTime_datetime.replace(month=SeriesInstanceUID_datetime.month)
-            AcquisitionTime_datetime = AcquisitionTime_datetime.replace(year=SeriesInstanceUID_datetime.year)
-
-            # et voila, difference to get real acquisition time
-            acq_time = float((AcquisitionTime_datetime - SeriesInstanceUID_datetime).seconds)
-        else:
-            log.error("unknown file extension!")
-
+        log.warning("cannot extract effective acquisition time from a TWIX file :(")
+        acq_time = np.nan
         return(acq_time)
 
     def _load_broken_twix(self):
@@ -899,6 +842,670 @@ class SIEMENS_data_file_reader(data_file_reader):
                 fin.seek(start_position + DMA_length)
 
         return(builder.build_mrsdata())
+
+
+class SIEMENS_DICOM_reader_syngo_MR_B17(data_file_reader):
+    """A class used to scrap parameters out of SIEMENS MR Syngo VB17 DICOM files, sometimes in a very dirty way."""
+
+    def __init__(self, data_fullfilepath):
+        """
+        Initialize by reading a DICOM or TWIX file in text mode and extracting the DICOM header with pydicom, if required.
+
+        Parameters
+        ----------
+        data_fullfilepath : string
+            Full path to the DICOM/TWIX file
+        """
+        super().__init__(data_fullfilepath)
+
+        # use pydicom to extract basic header (SIEMENS hidden header not extracted)
+        log.debug("reading DICOM header...")
+        self.dcm_header = pydicom.dcmread(self.fullfilepath)
+
+        # and read data and store it
+        self.data = self._read_data()
+
+        # freeze
+        self.__isfrozen = True
+
+    def _read_data(self):
+        """
+        Read MRS data from file and return a suspect's MRSData object.
+
+        Returns
+        -------
+        MRSData_obj : MRSData object
+            MRS data read from DICOM/TWIX file
+        """
+        log.debug("reading SIEMENS MR Syngo VB17 DICOM file...")
+        MRSData_obj = suspect.io.load_siemens_dicom(self.fullfilepath)
+        return(MRSData_obj)
+
+    def is_rawdata(self):
+        """Return true if data is read from a TWIX file."""
+        return(False)
+
+    def get_number_rx_channels(self):
+        """
+        Return the number of channels.
+
+        Returns
+        -------
+        nchan : int
+            Number of channels
+        """
+        nchan = self.read_param_num("iMaxNoOfRxChannels")
+        return(int(nchan))
+
+    def read_param_num(self, param_name, file_index=0):
+        """
+        Look for parameter in TWIX/DICOM data headers and return its float value.
+
+        Parameters
+        ----------
+        param_name : string
+            Name of parameter to extract
+        file_index : int
+            Index in file from where we should start searching
+
+        Returns
+        -------
+        param_val : float
+            Value of parameter
+        """
+        # scrap out parameter value
+        aa = self.file_content_str.find(param_name, file_index)
+        # could not find it?
+        if(aa < 0):
+            log.warning("could not find parameter [%s]! :(" % param_name)
+            return(np.nan)
+
+        a = self.file_content_str.find("=", aa + 1)
+        b = self.file_content_str.find("\n", a + 1)
+        param_val_str = self.file_content_str[(a + 1):b]
+        param_val_str = param_val_str.strip()
+
+        # try to convert to float
+        try:
+            param_val_float = float(param_val_str)
+        except:
+            # that did not work, try with brackets
+            a = self.file_content_str.find("{", aa + 1)
+            b = self.file_content_str.find("}", a + 1)
+            param_val_str = self.file_content_str[(a + 1):b]
+            param_val_str = param_val_str.strip()
+
+            # try to convert to float
+            try:
+                param_val_float = float(param_val_str)
+            except:
+                # that did not work, look for next occurence
+                param_val_float = self.read_param_num(param_name, b)
+
+        # return it
+        return(param_val_float)
+
+    def get_nucleus(self):
+        """
+        Return the nucleus setting used to acquire the MRS data.
+
+        Returns
+        -------
+        nucleus_str : string
+            String representing nucleus. Example: "1H"
+        """
+        a = self.file_content_str.find("Info[0].tNucleus")
+        a = self.file_content_str.find("=", a + 1)
+        b = self.file_content_str.find("\n", a + 1)
+        nucleus_str = self.file_content_str[(a + 1):b]
+        nucleus_str = nucleus_str.replace('"', '')
+        nucleus_str = nucleus_str.strip()
+
+        return(nucleus_str)
+
+    def get_patient_name(self):
+        """
+        Return the patient name field.
+
+        Returns
+        -------
+        patient_name_str : string
+            Patient name
+        """
+        patient_name_str = str(self.dcm_header.PatientName)
+        return(patient_name_str)
+
+    def get_patient_birthday(self):
+        """
+        Return the patient birthday field.
+
+        Returns
+        -------
+        patient_birthday_datetime : datetime
+            Patient birthday
+        """
+        patient_birthday_datetime = datetime.strptime(str(self.dcm_header.PatientBirthDate), '%Y%m%d')
+        return(patient_birthday_datetime)
+
+    def get_patient_sex(self):
+        """
+        Return the patient sex field.
+
+        Returns
+        -------
+        patient_sex_str : string
+            Patient sex ('M', 'F' or 'O')
+        """
+        patient_sex_str = str(self.dcm_header.PatientSex)
+        return(patient_sex_str)
+
+    def get_patient_weight(self):
+        """
+        Return the patient weight field.
+
+        Returns
+        -------
+        patient_weight_kgs : float
+            Patient weight in kg
+        """
+        patient_weight_kgs = float(self.dcm_header.PatientWeight)
+        return(patient_weight_kgs)
+
+    def get_patient_height(self):
+        """
+        Return the patient height field.
+
+        Returns
+        -------
+        patient_height_m : float
+            Patient height in meters
+        """
+        try:
+            patient_height_m = float(self.dcm_header.PatientSize)
+        except:
+            patient_height_m = np.nan
+        return(patient_height_m)
+
+    def get_sequence(self):
+        """
+        Extract all parameters related to acquisition and sequence and return it as a sequence object.
+
+        Returns
+        -------
+        seq : mrs.sim.mrs_sequence
+            Sequence object
+        """
+        log.debug("reading sequence parameters...")
+
+        # echo time (btw already extracted within suspect, this is a bit redandent)
+        te = self.data.te
+        log.debug("extracted echo time (%.2f)" % te)
+
+        # repetion time (btw already extracted within suspect, this is a bit redandent)
+        tr = self.data.tr
+        log.debug("extracted repetition time (%.2f)" % tr)
+
+        # averages
+        na = int(self.read_param_num("lAverages"))
+        log.debug("extracted number of averages (%d)" % na)
+
+        # dummy scans
+        # for some reason, lPreparingScans is sometimes not set in the header...
+        ds = self.read_param_num("lPreparingScans")
+        if(np.isnan(ds)):
+            ds = 0 # I know, that is bad
+        else:
+            ds = int(ds)
+        log.debug("extracted number of dummy scans (%d)" % ds)
+
+        # reference voltage
+        vref = self.read_param_num("flReferenceAmplitude")
+        log.debug("extracted reference voltage (%.2fV)" % vref)
+
+        # 1st order shim X
+        shim_1st_X = self.read_param_num("lOffsetX")
+        log.debug("extracted 1st order shim value for X (%.2f)" % shim_1st_X)
+
+        # 1st order shim Y
+        shim_1st_Y = self.read_param_num("lOffsetY")
+        log.debug("extracted 1st order shim value for Y (%.2f)" % shim_1st_Y)
+
+        # 1st order shim Z
+        shim_1st_Z = self.read_param_num("lOffsetZ")
+        log.debug("extracted 1st order shim value for Z (%.2f)" % shim_1st_Z)
+
+        # 2nd / 3rd shims
+        shims_2nd_3rd_list = []
+        for i_shim in range(5):
+            this_shim_val = self.read_param_num("alShimCurrent[%d]" % i_shim)
+            shims_2nd_3rd_list.append(this_shim_val)
+        log.debug("extracted 2nd/3rd shims (" + str(shims_2nd_3rd_list) + ")")
+
+        # merge shims values into one vector
+        shims_values = [shim_1st_X, shim_1st_Y, shim_1st_Z] + shims_2nd_3rd_list
+
+        # nucleus (used for sequence object)
+        nucleus = self.get_nucleus()
+        log.debug("extracted nuclei (%s)" % nucleus)
+
+        # number of points
+        npts = int(self.read_param_num("lVectorSize"))
+        log.debug("extracted number of points (%d)" % npts)
+
+        # voxel size (job alraedy done by suspect, grab it from MRSData object)
+        voxel_size = self.data.voxel_size
+        log.debug("extracted voxel size (%.2f x %.2f x %.2f mm3)" % (voxel_size[0], voxel_size[1], voxel_size[2]))
+
+        # dwell time (btw already extracted within suspect, this is a bit redandent)
+        dt = self.read_param_num("DwellTime") * 1e-9
+        log.debug("extracted dwell time (%.2f)" % dt)
+
+        # f0 frequency (btw already extracted within suspect, this is a bit redandent)
+        f0 = self.read_param_num("Frequency") * 1e-6
+        log.debug("extracted f0 (%.6f)" % f0)
+
+        # special timestamp
+        ulTimeStamp_ms = self._get_sequence_timestamp()
+        log.debug("found a timestamp (%.0f)" % ulTimeStamp_ms)
+
+        # gating mode
+        gss = self._get_gating_mode()
+        log.debug("extracted gating mode (%d)" % gss.value)
+
+        # effective acquisition time
+        eff_acq_time = self._get_sequence_acquisition_time_effective()
+        log.debug("extracted effective acquisition time (%.0f)" % eff_acq_time)
+
+        # --- sequence-specific parameters ---
+        sequence_name = self._get_sequence_name()
+        log.debug("extracted sequence name (%s)" % sequence_name)
+
+        if(sequence_name == "eja_svs_slaser"):
+            log.debug("this a semi-LASER acquisition, let's extract some specific parameters!")
+
+            # afp pulse (fake) flip angle
+            pulse_laser_rfc_fa = self.read_param_num("adFlipAngleDegree[1]")
+            log.debug("extracted LASER AFP refocussing pulse flip angle (%.2f)" % pulse_laser_rfc_fa)
+
+            # afp pulse length
+            pulse_laser_rfc_length = self.read_param_num("sWiPMemBlock.alFree[1]")
+            log.debug("extracted LASER AFP refocussing pulse duration (%.2f)" % pulse_laser_rfc_length)
+
+            # afp pulse R
+            pulse_laser_rfc_r = self.read_param_num("sWiPMemBlock.alFree[49]")
+            log.debug("extracted LASER AFP refocussing pulse R (%.2f)" % pulse_laser_rfc_r)
+
+            # afp pulse N
+            pulse_laser_rfc_n = self.read_param_num("sWiPMemBlock.alFree[48]")
+            log.debug("extracted LASER AFP refocussing pulse N (%.2f)" % pulse_laser_rfc_n)
+
+            # afp pulse voltage
+            pulse_laser_rfc_voltage = self.read_param_num("aRFPULSE[1].flAmplitude")
+            log.debug("extracted LASER AFP refocussing pulse voltage (%.2f)" % pulse_laser_rfc_voltage)
+
+            # exc pulse duration
+            pulse_laser_exc_length = self.read_param_num("sWiPMemBlock.alFree[24]")
+            log.debug("extracted LASER exc. pulse length (%.2f)" % pulse_laser_exc_length)
+
+            # exc pulse voltage
+            pulse_laser_exc_voltage = self.read_param_num("aRFPULSE[0].flAmplitude")
+            log.debug("extracted LASER excitation pulse voltage (%.2f)" % pulse_laser_exc_voltage)
+
+            # spoiler length
+            spoiler_length = self.read_param_num("sWiPMemBlock.alFree[12]")
+            log.debug("extracted LASER spoiler length (%.2f)" % spoiler_length)
+
+            # build sequence object
+            sequence_obj = sim.mrs_seq_eja_svs_slaser(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0, pulse_laser_exc_length / 1000.0, pulse_laser_exc_voltage, pulse_laser_rfc_length / 1000.0, pulse_laser_rfc_fa, pulse_laser_rfc_r, pulse_laser_rfc_n, pulse_laser_rfc_voltage, spoiler_length / 1000.0)
+
+        elif(sequence_name == "eja_svs_press"):
+            sequence_obj = sim.mrs_seq_eja_svs_press(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
+
+        elif(sequence_name == "eja_svs_steam"):
+            sequence_obj = sim.mrs_seq_eja_svs_steam(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
+
+        elif(sequence_name == "fid"):
+            sequence_obj = sim.mrs_seq_fid(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
+
+        elif(sequence_name == "svs_se"):
+            sequence_obj = sim.mrs_seq_svs_se(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
+
+        elif(sequence_name == "svs_st" or sequence_name == "svs_st_histo"):
+            sequence_obj = sim.mrs_seq_svs_st(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
+
+        elif(sequence_name == "svs_st_vapor_643"):
+            log.debug("this is CMRR's STEAM sequence, let's extract some specific parameters!")
+
+            # TM value
+            TM_ms = self.read_param_num("alTD[0]") / 1000.0
+            log.debug("extracted TM value (%.0fms)" % TM_ms)
+
+            # build sequence object
+            sequence_obj = sim.mrs_seq_svs_st_vapor_643(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0, TM_ms)
+
+        elif(sequence_name == "bow_isis_15"):
+            # TODO : create a sequence implementation for ISIS?
+            sequence_obj = sim.mrs_seq_fid(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
+
+        elif(sequence_name == "svs_DW_slaser_b"):
+            # TODO : read DW parameters such as bvalues, directions and number b0 from file and input it when creating sequence object
+            sequence_obj = sim.mrs_seq_svs_DW_slaser_b(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
+
+        elif(sequence_name is None):
+            sequence_obj = None
+
+        else:
+            # unknown!
+            log.error("ouch unknown sequence (%s) !" % sequence_name)
+
+        return(sequence_obj)
+
+    def _get_sequence_name(self, file_index=0):
+        """
+        Return the acquisition sequence name.
+
+        Parameters
+        ----------
+        file_index : int
+            Index in file from where we should start searching
+
+        Returns
+        -------
+        sequence_name : string
+            Sequence used for the acquisition
+        """
+        # now some sequence-specific parameters
+        a = self.file_content_str.find('%' + "CustomerSeq" + '%', file_index)
+        # could not find it?
+        if(a < 0):
+            # maybe a siemens seq then ?
+            a = self.file_content_str.find('%' + "SiemensSeq" + '%', file_index)
+            # could not find it?
+            if(a < 0):
+                log.warning("could not find sequence name! :(")
+                return(None)
+
+        a = self.file_content_str.find('\\', a)
+        b = self.file_content_str.find('"', a + 1)
+        sequence_name = self.file_content_str[(a + 1):b]
+        sequence_name = sequence_name.strip()
+
+        # check we did not find a long garbage string
+        if(len(sequence_name) > 16):
+            # if so, go on searching in file
+            sequence_name = self._get_sequence_name(b)
+
+        return(sequence_name)
+
+    def _get_sequence_timestamp(self):
+        """
+        Return the acquisition start timestamp.
+
+        Returns
+        -------
+        ulTimeStamp_ms : float
+            Acquisition start timestamp
+        """
+        # open TWIX file in binary mode to get MDH header
+        # we do it here and not in the __init__ because we only do that once
+        f = open(self.fullfilepath, "rb")
+        binaryDump = f.read()
+        hdr_len = struct.unpack("i", binaryDump[:4])
+        sMDH = struct.unpack("iiiii", binaryDump[hdr_len[0]:hdr_len[0] + 20])
+        # and extract timestamp
+        ulTimeStamp = sMDH[3]
+        ulTimeStamp_ms = float(ulTimeStamp * 2.5)
+        return(ulTimeStamp_ms)
+
+    def _get_gating_mode(self):
+        """
+        Return the gating signal source.
+
+        Returns
+        -------
+        gts : gating_signal_source
+            Type of signal used during gated acquisition
+        """
+        lsig1 = self.read_param_num("lSignal1")
+        if(lsig1 == 1):
+            return(sim.gating_signal_source.NO_GATING)
+        elif(lsig1 == 16):
+            return(sim.gating_signal_source.RESP_GATING)
+        elif(lsig1 == 4):
+            return(sim.gating_signal_source.CARDIAC_GATING)
+        elif(lsig1 == 2):
+            return(sim.gating_signal_source.CARDIAC_ECG)
+        else:
+            log.error("Sorry, I don't recognize what type of gating you used! :(")
+
+    def _get_sequence_acquisition_time_effective(self):
+        """
+        Return the real acquisition duration, usefull especially when using gating. Works only on dicom files.
+
+        Returns
+        -------
+        acq_time : float
+            Acquisition effective duration (s)
+        """
+        # the dicom header includes a SeriesInstanceUID string that contains the date and time of the start of the acquisition
+        SeriesInstanceUID_splitted = self.dcm_header.SeriesInstanceUID.split('.')
+        SeriesInstanceUID_str = max(SeriesInstanceUID_splitted, key=len)
+        try:
+            # so for some reason, I get very very rarely malformed SeriesInstanceUID where the data/time is placed at a different index...
+            SeriesInstanceUID_datetime = datetime.strptime(SeriesInstanceUID_str[0:13], '%Y%m%d%H%M%S')
+        except:
+            return(np.nan)
+
+        # the dicom header includes a Acquisition Time string that contains the time of the end of the acquisition
+        AcquisitionTime_datetime = datetime.strptime(self.dcm_header.AcquisitionTime[0:6], '%H%M%S')
+
+        # this should work except if we were scanning for several days or over midnight, ahah
+        AcquisitionTime_datetime = AcquisitionTime_datetime.replace(day=SeriesInstanceUID_datetime.day)
+        AcquisitionTime_datetime = AcquisitionTime_datetime.replace(month=SeriesInstanceUID_datetime.month)
+        AcquisitionTime_datetime = AcquisitionTime_datetime.replace(year=SeriesInstanceUID_datetime.year)
+
+        # et voila, difference to get real acquisition time
+        acq_time = float((AcquisitionTime_datetime - SeriesInstanceUID_datetime).seconds)
+
+        return(acq_time)
+
+
+class SIEMENS_DICOM_reader_syngo_XA20(SIEMENS_DICOM_reader_syngo_MR_B17):
+    """A class used to scrap parameters out of SIEMENS MR Syngo XA20 DICOM files, sometimes in a very dirty way."""
+
+    def __init__(self, data_fullfilepath):
+        """
+        Initialize by reading a DICOM file in text mode and extracting the DICOM header with pydicom.
+
+        Parameters
+        ----------
+        data_fullfilepath : string
+            Full path to the DICOM file
+        """
+        super().__init__(data_fullfilepath)
+
+        # freeze
+        self.__isfrozen = True
+
+    def _read_data(self):
+        """
+        Read MRS data from file and return a suspect's MRSData object.
+
+        Returns
+        -------
+        MRSData_obj : MRSData object
+            MRS data read from DICOM/TWIX file
+        """
+        log.debug("reading SIEMENS MR Syngo XA20 DICOM file...")
+        # new SIEMENS XA20 dicom
+        data_real_imag = np.frombuffer(self.dcm_header.SpectroscopyData, np.float32)
+        data_real_imag_reshaped = np.reshape(data_real_imag, [int(len(data_real_imag) / 2), 2])
+        data_cmplx = data_real_imag_reshaped[:, 1] + 1j * data_real_imag_reshaped[:, 0]
+
+        # reading bw from dicom header
+        sbw = self.dcm_header.SpectralWidth
+        log.debug("extracted spectral width (%.2f)" % sbw)
+        dt = 1 / sbw
+
+        # reading te, tr, etc.
+        f0 = self.dcm_header.TransmitterFrequency
+        log.debug("extracted transmitter frequency (%.2f)" % f0)
+
+        te = int(self.dcm_header.SharedFunctionalGroupsSequence[0].MREchoSequence[0].EffectiveEchoTime)
+        log.debug("extracted echo time (%.2f)" % te)
+
+        tr = int(self.dcm_header.SharedFunctionalGroupsSequence[0].MRTimingAndRelatedParametersSequence[0].RepetitionTime)
+        log.debug("extracted repetition time (%.2f)" % tr)
+
+        ppm0 = self.dcm_header.ChemicalShiftReference
+        log.debug("extracted chemical shift ref. (%.2f)" % ppm0)
+
+        voxel_dimensions = (self.dcm_header.VolumeLocalizationSequence[0].SlabThickness,
+                            self.dcm_header.VolumeLocalizationSequence[1].SlabThickness,
+                            self.dcm_header.VolumeLocalizationSequence[2].SlabThickness)
+        log.debug("extracted voxel dimensions (%.2f x %.2f x %.2f)" % voxel_dimensions)
+
+        # building suspect object
+        MRSData_obj = suspect.MRSData(data_cmplx, dt, f0, te, tr, ppm0, voxel_dimensions)  # np.diag([10, 10, 10, 1])
+
+        return(MRSData_obj)
+
+    def get_nucleus(self):
+        """Return the nucleus setting used to acquire the MRS data."""
+        return(self.dcm_header.ResonantNucleus)
+
+    def get_sequence(self):
+        """
+        Extract all parameters related to acquisition and sequence and return it as a sequence object.
+
+        Returns
+        -------
+        seq : mrs.sim.mrs_sequence
+            Sequence object
+        """
+        log.debug("reading sequence parameters...")
+
+        # echo time (btw already extracted within suspect, this is a bit redandent)
+        te = self.data.te
+
+        # repetion time (btw already extracted within suspect, this is a bit redandent)
+        tr = self.data.tr
+
+        # averages
+        na = int(self.dcm_header.SharedFunctionalGroupsSequence[0].MRAveragesSequence[0].NumberOfAverages)
+        log.debug("extracted number of averages (%d)" % na)
+
+        # dummy scans
+        # for some reason, lPreparingScans is sometimes not set in the header...
+        ds = self.read_param_num("lPreparingScans")
+        if(np.isnan(ds)):
+            ds = 0 # I know, that is bad
+        else:
+            ds = int(ds)
+        log.debug("extracted number of dummy scans (%d)" % ds)
+
+        # reference voltage
+        vref = self.read_param_num("flReferenceAmplitude")
+        log.debug("extracted reference voltage (%.2fV)" % vref)
+
+        # 1st order shim X
+        shim_1st_X = self.read_param_num("lOffsetX")
+        log.debug("extracted 1st order shim value for X (%.2f)" % shim_1st_X)
+
+        # 1st order shim Y
+        shim_1st_Y = self.read_param_num("lOffsetY")
+        log.debug("extracted 1st order shim value for Y (%.2f)" % shim_1st_Y)
+
+        # 1st order shim Z
+        shim_1st_Z = self.read_param_num("lOffsetZ")
+        log.debug("extracted 1st order shim value for Z (%.2f)" % shim_1st_Z)
+
+        # 2nd / 3rd shims
+        shims_2nd_3rd_list = []
+        for i_shim in range(5):
+            this_shim_val = self.read_param_num("alShimCurrent[%d]" % i_shim)
+            shims_2nd_3rd_list.append(this_shim_val)
+        log.debug("extracted 2nd/3rd shims (" + str(shims_2nd_3rd_list) + ")")
+
+        # merge shims values into one vector
+        shims_values = [shim_1st_X, shim_1st_Y, shim_1st_Z] + shims_2nd_3rd_list
+
+        # nucleus (used for sequence object)
+        nucleus = self.get_nucleus()
+        log.debug("extracted nuclei (%s)" % nucleus)
+
+        # number of points
+        npts = int(self.dcm_header.SharedFunctionalGroupsSequence[0].MRSpectroscopyFOVGeometrySequence[0].SpectroscopyAcquisitionDataColumns)
+        log.debug("extracted number of points (%d)" % npts)
+
+        # voxel size (job alraedy done by suspect, grab it from MRSData object)
+        voxel_size = list(self.data.voxel_dimensions)
+        log.debug("extracted voxel size (%.2f x %.2f x %.2f mm3)" % (voxel_size[0], voxel_size[1], voxel_size[2]))
+
+        # dwell time (btw already extracted within suspect, this is a bit redandent)
+        dt = self.data.dt
+        log.debug("extracted dwell time (%.6f)" % dt)
+
+        # f0 frequency (btw already extracted within suspect, this is a bit redandent)
+        f0 = self.data.f0
+        log.debug("extracted f0 (%.6f)" % f0)
+
+        # special timestamp
+        ulTimeStamp_ms = self._get_sequence_timestamp()
+        log.debug("found a timestamp (%.0f)" % ulTimeStamp_ms)
+
+        # gating mode
+        gss = self._get_gating_mode()
+        log.debug("extracted gating mode (%d)" % gss.value)
+
+        # effective acquisition time
+        eff_acq_time = self._get_sequence_acquisition_time_effective()
+        log.debug("extracted effective acquisition time (%.0f)" % eff_acq_time)
+
+        # --- sequence-specific parameters ---
+        sequence_name = self.dcm_header.PulseSequenceName.replace("*", "")
+        log.debug("extracted sequence name (%s)" % sequence_name)
+
+        if(sequence_name == "svs_st" or sequence_name == "svs_st_histo"):
+            sequence_obj = sim.mrs_seq_svs_st(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
+
+        elif(sequence_name is None):
+            sequence_obj = None
+
+        else:
+            # unknown!
+            log.error("ouch unknown sequence (%s) !" % sequence_name)
+
+        return(sequence_obj)
+
+    def _get_sequence_acquisition_time_effective(self):
+        """
+        Return the real acquisition duration, usefull especially when using gating.
+
+        Returns
+        -------
+        acq_time : float
+            Acquisition effective duration (s)
+        """
+        SeriesInstanceUID_splitted = self.dcm_header.SeriesInstanceUID.split('.')
+        SeriesInstanceUID_str = max(SeriesInstanceUID_splitted, key=len)
+        try:
+            # so for some reason, I get very very rarely malformed SeriesInstanceUID where the data/time is placed at a different index...
+            SeriesInstanceUID_datetime = datetime.strptime(SeriesInstanceUID_str[0:13], '%Y%m%d%H%M%S')
+        except:
+            return(np.nan)
+        # the dicom header includes a Acquisition Time string that contains the time of the end of the acquisition
+        AcquisitionTime_datetime = datetime.strptime(self.dcm_header.AcquisitionDateTime[0:6], '%H%M%S')
+
+        # this should work except if we were scanning for several days or over midnight, ahah
+        AcquisitionTime_datetime = AcquisitionTime_datetime.replace(day=SeriesInstanceUID_datetime.day)
+        AcquisitionTime_datetime = AcquisitionTime_datetime.replace(month=SeriesInstanceUID_datetime.month)
+        AcquisitionTime_datetime = AcquisitionTime_datetime.replace(year=SeriesInstanceUID_datetime.year)
+
+        # et voila, difference to get real acquisition time
+        acq_time = float((AcquisitionTime_datetime - SeriesInstanceUID_datetime).seconds)
+
+        return(acq_time)
 
 
 def read_physio_file(physio_filepath):

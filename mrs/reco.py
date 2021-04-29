@@ -128,8 +128,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
         # open data file
         log.info("reading data file...")
         log.info(data_filepath)
-        # read header
-        mfr = io.SIEMENS_data_file_reader(data_filepath)
+        # read data and header
+        mfr = io.get_data_file_reader(data_filepath)
         # read data and get a suspect MRSData object
         MRSData_obj = mfr.data
         # get hash code
@@ -4528,21 +4528,36 @@ class pipeline:
         del df_p["dataset"]
 
         # and need a specific call for the MRSData2 types
-        df_dataset_raw_data_list = [s.to_dataframe(True, "dataset_raw_data_") for s in df_dataset["dataset_raw_data"]]
-        df_dataset_dcm_data_list = [s.to_dataframe(True, "dataset_dcm_data_") for s in df_dataset["dataset_dcm_data"]]
-        df_dataset_raw_data = pd.concat(df_dataset_raw_data_list, axis=0)
-        df_dataset_dcm_data = pd.concat(df_dataset_dcm_data_list, axis=0)
-        del df_dataset["dataset_raw_data"]
-        del df_dataset["dataset_dcm_data"]
+        df_dataset_raw_data_list = [s.to_dataframe(True, "dataset_raw_data_") if(s is not None) else None for s in df_dataset["dataset_raw_data"]]
+        df_dataset_dcm_data_list = [s.to_dataframe(True, "dataset_dcm_data_") if(s is not None) else None for s in df_dataset["dataset_dcm_data"]]
+
+        df = df_dataset.reset_index()
+
+        if(np.any(df_dataset_raw_data_list) is not None):
+            df_dataset_raw_data = pd.concat(df_dataset_raw_data_list, axis=0)
+            del df_dataset["dataset_raw_data"]
+            # append columns
+            df = pd.concat([df,
+                            df_dataset_raw_data.reset_index()], axis=1)
+        if(np.any(df_dataset_dcm_data_list) is not None):
+            df_dataset_dcm_data = pd.concat(df_dataset_dcm_data_list, axis=0)
+            del df_dataset["dataset_dcm_data"]
+            # append columns
+            df = pd.concat([df,
+                            df_dataset_dcm_data.reset_index()], axis=1)
 
         # append columns
-        df = pd.concat([df_dataset.reset_index(),
-                        df_dataset_raw_data.reset_index(),
-                        df_dataset_dcm_data.reset_index(),
+        df = pd.concat([df,
                         df_p.loc[df_p.index.repeat(len(df_dataset))].reset_index()], axis=1)
 
-        # set index
-        df = df.set_index("dataset_raw_data_file_hash")
+        # set index (prefer raw data if available)
+        if("dataset_raw_data_file_hash" in df):
+            df = df.set_index("dataset_raw_data_file_hash")
+        elif("dataset_dcm_data_file_hash" in df):
+            df = df.set_index("dataset_dcm_data_file_hash")
+        else:
+            log.error("no data file hash found in datasets! :(")
+
         del df["index"]
 
         # prefix

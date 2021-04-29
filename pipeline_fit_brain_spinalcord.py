@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-A user script to be called once some data was processed using the MRSData2 class and is is currently in memory.
+A user script to fit data previously processed with pastis and stored in a pkl file.
 
 @author: Tangi Roussel
 """
