@@ -506,6 +506,10 @@ class fit_pastis(fit_tool):
         self._peak_areas = []
         self._peak_areas_norm = []
 
+        # check and fix area_integration_peak_ranges
+        if(len(self.area_integration_peak_ranges) == 1):
+            self.area_integration_peak_ranges = self.area_integration_peak_ranges * len(self.metabolites_area_integration)
+
         # first find chemical shifts for those peaks
         meta_keys = list(self.meta_bs.keys())
         integration_metagroup_keys = [meta_keys[ind] for ind in self.metabolites_area_integration]

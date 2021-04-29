@@ -1157,6 +1157,8 @@ class mrs_sequence:
         # want to use a custom metabolite db?
         if(meta_bs is not None):
             self._meta_bs = meta_bs
+            # force update header file aliases.py
+            self._meta_bs._write_header_file()
 
         # wait, was the GAMMA library imported ok?
         if(GAMMA_LIB_LOADED):
@@ -2346,6 +2348,7 @@ class mrs_seq_eja_svs_steam(mrs_seq_steam):
         super().__init__(te, tr, na, ds, nuclei, npts, voxel_size, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor, tm)
         # name of sequence
         self.name = "eja_svs_steam"
+
 
 class mrs_seq_fid(mrs_sequence):
     """A class that represents the pulse-acquire sequence (fid), which is actually a clone of the super class."""

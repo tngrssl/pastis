@@ -108,3 +108,166 @@ ax = fig.subplots()
 fig.canvas.set_window_title("sim_datasets")
 ax.set_title("pyGAMMA simulation of MR spectrum\nTemplate=" + meta_bs.basis_set_name + " | Sequence=" + seq.name + " | TE=" + str(seq.te) + "ms")
 fit.disp_fit(ax, ss_mod, p_human, seq, True, True)
+
+# %% lipid spectrum: simple model with individual lipid components
+
+# acquisition parameters
+te = 12.0
+scaling_factor = 1.0
+
+# lipid parameters
+CL = 17.5
+ndb = 2.7
+nmidb = 0.7
+
+# load lipids metabolite basis set template
+meta_bs = sim.metabolite_basis_set("Lipids")
+
+# create a steam sequence
+seq = sim.mrs_seq_steam(te)
+seq.initialize(meta_bs)
+
+# create a simulation parameter set
+p = sim.params(meta_bs)
+# null all concentrations
+p[:, xxx.p_cm] = 0.0
+# linewidth damping factor (Hz) for all
+p[:, xxx.p_dd] = 200.0
+# frequency shift (Hz) for all
+p[:, xxx.p_df] = 0.0
+# phase shift (rd) for all
+p[:, xxx.p_dp] = 0.0
+
+# add a strong water peak
+p[xxx.m_Water, xxx.p_cm] = 50
+
+# add the lipid amplitudes
+p[xxx.m_LipA, xxx.p_cm] = 9
+p[xxx.m_LipB, xxx.p_cm] = 6 * (CL - 4) - 8 * ndb + 2 * nmidb
+p[xxx.m_LipC, xxx.p_cm] = 6
+p[xxx.m_LipD, xxx.p_cm] = 4 * (ndb - nmidb)
+p[xxx.m_LipE, xxx.p_cm] = 6
+p[xxx.m_LipF, xxx.p_cm] = 2 * nmidb
+p[xxx.m_LipG, xxx.p_cm] = 2
+p[xxx.m_LipH, xxx.p_cm] = 2
+p[xxx.m_LipI, xxx.p_cm] = 1
+p[xxx.m_LipJ, xxx.p_cm] = 2 * ndb
+
+# scale everything if needed
+p[:, xxx.p_cm] = p[:, xxx.p_cm] * scaling_factor
+
+# show final simulation parameter set
+p.print()
+
+# run simulation
+s = seq.simulate_signal(p)
+
+# display and break down model into individual lipids
+#fig = plt.figure(100)
+#fig.clf()
+#ax = fig.subplots()
+#fit.disp_fit(ax, s, p, seq, display_range=[0, 6])
+
+s.display_spectrum_1d(display_range=[0, 6])
+
+# %% lipid spectrum: amplitude-linked model
+
+# acquisition parameters
+te = 12.0
+scaling_factor = 1.0
+
+# lipid parameters
+CL = 17.5
+ndb = 2.7
+nmidb = 0.7
+
+# load lipids metabolite basis set template
+meta_bs = sim.metabolite_basis_set("Lipids")
+
+# create a steam sequence
+seq = sim.mrs_seq_steam(te)
+seq.initialize(meta_bs)
+
+# create a simulation parameter set
+p = sim.params(meta_bs)
+# null all concentrations
+p[:, xxx.p_cm] = 0.0
+# linewidth damping factor (Hz) for all
+p[:, xxx.p_dd] = 20.0
+# frequency shift (Hz) for all
+p[:, xxx.p_df] = 0.0
+# phase shift (rd) for all
+p[:, xxx.p_dp] = 0.0
+
+# add a strong water peak
+p[xxx.m_Water, xxx.p_cm] = 50
+
+# add the lipid amplitudes
+p[xxx.m_LipA1, xxx.p_cm] = 1
+
+p[xxx.m_LipB1, xxx.p_cm] = CL - 4
+p[xxx.m_LipB2, xxx.p_cm] = 2 * ndb
+p[xxx.m_LipB2, xxx.p_dp] = np.pi
+p[xxx.m_LipB3, xxx.p_cm] = 2 * nmidb
+
+p[xxx.m_LipC1, xxx.p_cm] = 1
+
+p[xxx.m_LipD1, xxx.p_cm] = 2 * ndb
+p[xxx.m_LipD2, xxx.p_cm] = 2 * nmidb
+p[xxx.m_LipD2, xxx.p_dp] = np.pi
+
+p[xxx.m_LipE1, xxx.p_cm] = 1
+p[xxx.m_LipF1, xxx.p_cm] = 2 * nmidb
+p[xxx.m_LipG1, xxx.p_cm] = 1
+p[xxx.m_LipH1, xxx.p_cm] = 1
+p[xxx.m_LipI1, xxx.p_cm] = 1
+p[xxx.m_LipJ1, xxx.p_cm] = 2 * ndb
+
+# scale everything if needed
+p[:, xxx.p_cm] = p[:, xxx.p_cm] * scaling_factor
+
+# forbid phase changes
+p._linklock[:, xxx.p_dp] = 1
+
+# same frequency shift for all
+p._linklock[:, xxx.p_df] = 10
+p._linklock[xxx.m_LipA1, xxx.p_df] = -10
+
+# same damping for all
+p._linklock[:, xxx.p_dd] = 20
+p._linklock[xxx.m_LipA1, xxx.p_dd] = -20
+
+# link the 2ndb amplitudes
+p._linklock[[xxx.m_LipD1, xxx.m_LipJ1], xxx.p_cm] = 30
+p._linklock[xxx.m_LipB2, xxx.p_cm] = -30
+
+# link the 2nmib amplitudes
+p._linklock[[xxx.m_LipD2, xxx.m_LipF1], xxx.p_cm] = 40
+p._linklock[xxx.m_LipB3, xxx.p_cm] = -40
+
+# link the other amplitudes
+p._linklock[[xxx.m_LipC1, xxx.m_LipE1, xxx.m_LipG1, xxx.m_LipH1, xxx.m_LipI1], xxx.p_cm] = 50
+p._linklock[xxx.m_LipA1, xxx.p_cm] = -50
+
+# lock the simple lipids
+p._linklock[[xxx.m_LipA, xxx.m_LipB, xxx.m_LipC, xxx.m_LipD, xxx.m_LipE, xxx.m_LipF, xxx.m_LipG, xxx.m_LipH, xxx.m_LipI, xxx.m_LipJ], xxx.p_cm] = 1
+
+# check if the linklock looks good
+p.check()
+
+# unlink/link everything
+p = p.toFullParams(p.toFreeParams())
+
+# show final simulation parameter set
+p.print()
+
+# run simulation
+s = seq.simulate_signal(p)
+
+# display and break down model into individual lipids
+#fig = plt.figure(101)
+#fig.clf()
+#ax = fig.subplots()
+#fit.disp_fit(ax, s, p, seq, display_range=[0, 6])
+
+s.display_spectrum_1d(display_range=[0, 6])

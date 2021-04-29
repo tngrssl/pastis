@@ -33,6 +33,7 @@ p.settings["storage_file"] = "/home/tangir/crmbm/acq_db/%s.pkl" % template_name
 p.settings["POI_range_ppm"] = [4.5, 4.8]
 p.settings["POI_shift_range_ppm"] = [1.8, 2.2]
 p.settings["POI_shift_true_ppm"] = 2.008
+p.settings["POI_SNR_range_ppm"] = [1.8, 2.2]
 p.settings["POI_LW_range_ppm"] = [4.5, 4.8]
 p.settings["allowed_apodization"] = 1.0
 p.settings["display"] = display_stuff
@@ -360,6 +361,8 @@ p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/313-ft-p1-moelle/2019092
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/313-ft-p1-moelle/meas_MID68_slaser_R_N=20+_1_longTE_SNR++++_FID41500.dat",
                                 "/home/tangir/crmbm/acq_twix/313-ft-p1-moelle/meas_MID65_slaser_R_N=20+_1_longTE_SNR++++_FID41497.dat"]
 
+
+#p.job["data_rejecting"]["POI_SNR_range_ppm"] = [5, 6]
 p.run()
 p.check_analyze_results()
 p.save_datasets()
