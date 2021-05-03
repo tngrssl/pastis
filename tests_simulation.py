@@ -132,7 +132,7 @@ p = sim.params(meta_bs)
 # null all concentrations
 p[:, xxx.p_cm] = 0.0
 # linewidth damping factor (Hz) for all
-p[:, xxx.p_dd] = 200.0
+p[:, xxx.p_dd] = 100.0
 # frequency shift (Hz) for all
 p[:, xxx.p_df] = 0.0
 # phase shift (rd) for all
@@ -193,7 +193,7 @@ p = sim.params(meta_bs)
 # null all concentrations
 p[:, xxx.p_cm] = 0.0
 # linewidth damping factor (Hz) for all
-p[:, xxx.p_dd] = 20.0
+p[:, xxx.p_dd] = 40.0
 # frequency shift (Hz) for all
 p[:, xxx.p_df] = 0.0
 # phase shift (rd) for all
