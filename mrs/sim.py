@@ -718,8 +718,8 @@ class params(np.ndarray):
 
         for im, m in enumerate(meta_names):
             for ip, p in enumerate(par_names):
-                df[p + "_" + m + "_val"] = self[im, ip]
-                df[p + "_" + m + "_err"] = self._errors[im, ip]
+                df[p + "|" + m + "|val"] = self[im, ip]
+                df[p + "|" + m + "|err"] = self._errors[im, ip]
 
         # add prefix
         df = df.add_prefix(prefix_str)

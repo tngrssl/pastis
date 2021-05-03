@@ -1315,12 +1315,32 @@ class fit_pastis(fit_tool):
         del df_attr["params_max"]
         del df_attr["params_init"]
 
-        # append columns
-        df = pd.concat([df_attr.reset_index(),
-                        df_data.reset_index(),
-                        df_params_min.reset_index(),
-                        df_params_max.reset_index(),
-                        df_params_init.reset_index()], axis=1)
+        # if any results, do them too
+        if((self.params_fit is not None) and (self.params_area is not None) and (self.params_area_pnorm is not None)):
+            df_params_fit = self.params_fit.to_dataframe("params_fit_")
+            df_params_area = self.params_area.to_dataframe("params_area_")
+            df_params_area_pnorm = self.params_area_pnorm.to_dataframe("params_area_pnorm_")
+            del df_attr["params_fit"]
+            del df_attr["params_area"]
+            del df_attr["params_area_pnorm"]
+
+            # append columns
+            df = pd.concat([df_attr.reset_index(),
+                            df_data.reset_index(),
+                            df_params_min.reset_index(),
+                            df_params_max.reset_index(),
+                            df_params_init.reset_index(),
+                            df_params_fit.reset_index(),
+                            df_params_area.reset_index(),
+                            df_params_area_pnorm.reset_index()], axis=1)
+        else:
+            # append columns
+            df = pd.concat([df_attr.reset_index(),
+                            df_data.reset_index(),
+                            df_params_min.reset_index(),
+                            df_params_max.reset_index(),
+                            df_params_init.reset_index()], axis=1)
+
 
         # add fit hash
         df["fit_hash"] = self.get_hash()
@@ -1328,6 +1348,9 @@ class fit_pastis(fit_tool):
         # remove index column
         df = df.reset_index()
         del df["index"]
+
+        # remove this weird column
+        del df["level_0"]
 
         # add prefix
         df = df.add_prefix(prefix_str)
