@@ -770,6 +770,14 @@ class fit_pastis(fit_tool):
         # calling jacobian model
         j_full = self.sequence._jac(params)
 
+
+        # linlock the jacobian vector
+        # for each master parameter, sum the slave derivates
+        LL_list = np.unique(params.linklock)
+        LL_list = LL_list[LL_list >= +2]
+        for this_LL in LL_list:
+            j_full[params.linklock == -this_LL, :] += np.sum(j_full[params.linklock == +this_LL, :], 0)
+
         # reducing it to free params
         j_free = j_full[params.linklock <= 0, :]
         j_free = np.real(j_free)

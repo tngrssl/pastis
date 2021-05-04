@@ -114,6 +114,7 @@ fit.disp_fit(ax, ss_mod, p_human, seq, True, True)
 # acquisition parameters
 te = 12.0
 scaling_factor = 1.0
+noise_level = 0.1
 
 # lipid parameters
 CL = 17.5
@@ -160,7 +161,7 @@ p[:, xxx.p_cm] = p[:, xxx.p_cm] * scaling_factor
 p.print()
 
 # run simulation
-s = seq.simulate_signal(p)
+s = seq.simulate_signal(p, noise_level)
 
 # display and break down model into individual lipids
 #fig = plt.figure(100)
@@ -174,7 +175,8 @@ s.display_spectrum_1d(display_range=[0, 6])
 
 # acquisition parameters
 te = 12.0
-scaling_factor = 1.0
+scaling_factor = 13.0
+noise_level = 3
 
 # lipid parameters
 CL = 17.5
@@ -262,7 +264,7 @@ p = p.toFullParams(p.toFreeParams())
 p.print()
 
 # run simulation
-s = seq.simulate_signal(p)
+s = seq.simulate_signal(p, noise_level)
 
 # display and break down model into individual lipids
 #fig = plt.figure(101)

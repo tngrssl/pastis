@@ -37,6 +37,10 @@ df = df.loc[df["reco_dataset_legend"].str.contains("T2 estimation 23/04/2021")]
 # keep the shortest TE dataset
 df = df.loc[df["reco_dataset_dcm_data_sequence_te"] == df["reco_dataset_dcm_data_sequence_te"].min()]
 
+# test fitting simulation
+s._noise_level = 0.01
+df["reco_dataset_dcm_data_obj"] = [s]
+
 # %% fit each dataset using independant lipid component model (simple)
 
 # follow templates Lipids from xls file
@@ -158,7 +162,7 @@ for this_data in df["reco_dataset_dcm_data_obj"].to_list():
     fittool.params_min[:, xxx.p_cm] = -1
     fittool.params_min[metabolites_list, xxx.p_cm] = 0
     fittool.params_max[:, xxx.p_cm] = 1000.0
-    fittool.params_max[xxx.m_Water, xxx.p_cm] = 10000.0
+    fittool.params_max[xxx.m_Water, xxx.p_cm] = 1000.0
     # initial concentrations
     fittool.params_init[:, xxx.p_cm] = 0
     fittool.params_init[metabolites_list, xxx.p_cm] = 0.1
@@ -173,9 +177,9 @@ for this_data in df["reco_dataset_dcm_data_obj"].to_list():
     fittool.params_min[:, xxx.p_df] = -5.0
     fittool.params_max[:, xxx.p_df] = 5.0
     # water
-    fittool.params_min[xxx.m_Water, xxx.p_df] = 10.0
-    fittool.params_max[xxx.m_Water, xxx.p_df] = 20.0
-    fittool.params_init[xxx.m_Water, xxx.p_df] = +13
+    #fittool.params_min[xxx.m_Water, xxx.p_df] = 10.0
+    #fittool.params_max[xxx.m_Water, xxx.p_df] = 20.0
+    #fittool.params_init[xxx.m_Water, xxx.p_df] = +13
 
     # phase shifts
     fittool.params_min[:, xxx.p_dp] = -0.1
@@ -201,9 +205,9 @@ for this_data in df["reco_dataset_dcm_data_obj"].to_list():
     ## (CL-4) is alone and free
     fittool.params_linklock[xxx.m_LipB1, xxx.p_cm] = 0
     ## 2ndb group
-    fittool.params_linklock[xxx.m_LipB2, xxx.p_cm] = 30
+    fittool.params_linklock[xxx.m_LipB2, xxx.p_cm] = -30
     fittool.params_linklock[xxx.m_LipD1, xxx.p_cm] = 30
-    fittool.params_linklock[xxx.m_LipJ1, xxx.p_cm] = -30
+    fittool.params_linklock[xxx.m_LipJ1, xxx.p_cm] = 30
     ## 2nmidb group
     fittool.params_linklock[xxx.m_LipB3, xxx.p_cm] = 40
     fittool.params_linklock[xxx.m_LipD2, xxx.p_cm] = 40
