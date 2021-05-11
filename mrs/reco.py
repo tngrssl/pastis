@@ -4052,7 +4052,7 @@ class pipeline:
                 if(this_setting_value == pipeline._get_setting):
                     self.job[this_job_name][this_setting_name] = self._get_setting(this_setting_name)
                 # with exception for display setting (mask) to control display per job
-                if(this_setting_name == "display"):
+                if(this_setting_name == "display" and default_display_value is not None):
                     # False False => False
                     # False True => False
                     # True True => True

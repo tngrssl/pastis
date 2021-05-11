@@ -43,7 +43,7 @@ p.job_list = [  p.job["phasing"],
                 p.job["noise_estimation"],
                 p.job["averaging"],
                 p.job["calibrating"],
-                # p.job["water_removal"],
+                p.job["water_removal"],
                 # p.job["cropping"],
                 p.job["apodizing"],
                 p.job["displaying"]
@@ -53,7 +53,22 @@ p.analyze_enable = False
 p.job["scaling"]["scaling_factor_dcm"] = 1 / 100
 p.job["cropping"]["final_npts"] = 1024
 
+p.job["water_removal"]["POI_range_ppm"] = [3, 6]
+p.job["water_removal"]["hsvd_components"] = 10
+
 p.save_template(template_name)
+
+# %% 23/04/2021 steam test on foie gras sample
+get_ipython().magic("clear")
+plt.close("all")
+
+p = reco.pipeline(reco_template)
+
+p.dataset[0]["legend"] = "Steam 23/04/2021"
+p.dataset[0]["dcm"]["files"] = ["/crmbm/data_cemerem/data/users/pdaude/vida/vat-test-1-mrs/20210423/9286_0025_svs-st-20/original-primary-spectroscopy-none_e09_0001.dcm"]
+
+p.run()
+p.save_datasets()
 
 # %% 23/04/2021 steam / histo tests on foie gras sample
 get_ipython().magic("clear")
@@ -61,25 +76,21 @@ plt.close("all")
 
 p = reco.pipeline(reco_template)
 
-# replaced
-# /crmbm/data_cemerem/data
-# by
-# /run/user/12000/gvfs/smb-share:server=139.124.150.244,share=data_cemerem/data
-
 p.dataset[0]["legend"] = "Histo T2 estimation 23/04/2021"
-p.dataset[0]["dcm"]["files"] = ["/run/user/12000/gvfs/smb-share:server=139.124.150.244,share=data_cemerem/data/users/pdaude/vida/vat-test-1-mrs/20210423/9286_0027_histo-bh/original-primary-spectroscopy-none_e09_0001.dcm"]
+p.dataset[0]["dcm"]["files"] = ["/crmbm/data_cemerem/data/users/pdaude/vida/vat-test-1-mrs/20210423/9286_0027_histo-bh/original-primary-spectroscopy-none_e09_0001.dcm"]
 
 p.dataset[1]["legend"] = "Histo T2 estimation 23/04/2021"
-p.dataset[1]["dcm"]["files"] = ["/run/user/12000/gvfs/smb-share:server=139.124.150.244,share=data_cemerem/data/users/pdaude/vida/vat-test-1-mrs/20210423/9286_0027_histo-bh/original-primary-spectroscopy-none_e09_0002.dcm"]
+p.dataset[1]["dcm"]["files"] = ["/crmbm/data_cemerem/data/users/pdaude/vida/vat-test-1-mrs/20210423/9286_0027_histo-bh/original-primary-spectroscopy-none_e09_0002.dcm"]
 
 p.dataset[2]["legend"] = "Histo T2 estimation 23/04/2021"
-p.dataset[2]["dcm"]["files"] = ["/run/user/12000/gvfs/smb-share:server=139.124.150.244,share=data_cemerem/data/users/pdaude/vida/vat-test-1-mrs/20210423/9286_0027_histo-bh/original-primary-spectroscopy-none_e09_0003.dcm"]
+p.dataset[2]["dcm"]["files"] = ["/crmbm/data_cemerem/data/users/pdaude/vida/vat-test-1-mrs/20210423/9286_0027_histo-bh/original-primary-spectroscopy-none_e09_0003.dcm"]
 
 p.dataset[3]["legend"] = "Histo T2 estimation 23/04/2021"
-p.dataset[3]["dcm"]["files"] = ["/run/user/12000/gvfs/smb-share:server=139.124.150.244,share=data_cemerem/data/users/pdaude/vida/vat-test-1-mrs/20210423/9286_0027_histo-bh/original-primary-spectroscopy-none_e09_0004.dcm"]
+p.dataset[3]["dcm"]["files"] = ["/crmbm/data_cemerem/data/users/pdaude/vida/vat-test-1-mrs/20210423/9286_0027_histo-bh/original-primary-spectroscopy-none_e09_0004.dcm"]
 
 p.dataset[4]["legend"] = "Histo T2 estimation 23/04/2021"
-p.dataset[4]["dcm"]["files"] = ["/run/user/12000/gvfs/smb-share:server=139.124.150.244,share=data_cemerem/data/users/pdaude/vida/vat-test-1-mrs/20210423/9286_0027_histo-bh/original-primary-spectroscopy-none_e09_0005.dcm"]
+p.dataset[4]["dcm"]["files"] = ["/crmbm/data_cemerem/data/users/pdaude/vida/vat-test-1-mrs/20210423/9286_0027_histo-bh/original-primary-spectroscopy-none_e09_0005.dcm"]
+
 
 p.run()
 p.save_datasets()
