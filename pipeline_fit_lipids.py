@@ -32,14 +32,18 @@ db_filepath = "/home/tangir/crmbm/acq_db/lipids.pkl"
 # %% retrieve data to fit
 
 df = pd.read_pickle(db_filepath)
-df = df.loc[df["reco_dataset_legend"].str.contains("T2 estimation 23/04/2021")]
 
-# keep the shortest TE dataset
-df = df.loc[df["reco_dataset_dcm_data_sequence_te"] == df["reco_dataset_dcm_data_sequence_te"].min()]
+# 23/04/2021 steam / histo tests on foie gras sample
+# df = df.loc[df["reco_dataset_legend"].str.contains("T2 estimation 23/04/2021")]
+
+# 23/04/2021 steam test on foie gras sample
+df = df.loc[df["reco_dataset_legend"].str.contains("Steam 23/04/2021")]
 
 # test fitting simulation
-s._noise_level = 0.01
-df["reco_dataset_dcm_data_obj"] = [s]
+# s._noise_level = 0.01
+# df["reco_dataset_dcm_data_obj"] = [s]
+
+print(df)
 
 # %% fit each dataset using independant lipid component model (simple)
 
@@ -84,7 +88,7 @@ for this_data in df["reco_dataset_dcm_data_obj"].to_list():
     fittool.params_init[metabolites_list, xxx.p_cm] = 0.1
 
     # linewidth bounds for metabolites
-    fittool.params_min[:, xxx.p_dd] = 10.0
+    fittool.params_min[:, xxx.p_dd] = 5.0
     fittool.params_max[:, xxx.p_dd] = 300.0
     # initial damping
     fittool.params_init[:, xxx.p_dd] = 100
@@ -93,9 +97,9 @@ for this_data in df["reco_dataset_dcm_data_obj"].to_list():
     fittool.params_min[:, xxx.p_df] = -5.0
     fittool.params_max[:, xxx.p_df] = 5.0
     # water
-    fittool.params_min[xxx.m_Water, xxx.p_df] = 10.0
-    fittool.params_max[xxx.m_Water, xxx.p_df] = 20.0
-    fittool.params_init[xxx.m_Water, xxx.p_df] = +13
+    #fittool.params_min[xxx.m_Water, xxx.p_df] = 10.0
+    #fittool.params_max[xxx.m_Water, xxx.p_df] = 20.0
+    #fittool.params_init[xxx.m_Water, xxx.p_df] = +13
 
     # phase shifts
     fittool.params_min[:, xxx.p_dp] = -0.1
@@ -137,11 +141,12 @@ metabolites_list = np.sort([
                     xxx.m_LipD1,
                     xxx.m_LipD2,
                     xxx.m_LipE1,
-                    xxx.m_LipF1,
-                    xxx.m_LipG1,
-                    xxx.m_LipH1,
-                    xxx.m_LipI1,
-                    xxx.m_LipJ1])
+                    xxx.m_LipF1 ])
+
+                    # xxx.m_LipG1,
+                    # xxx.m_LipH1,
+                    # xxx.m_LipI1,
+                    # xxx.m_LipJ1])
 
 fit_results_list = []
 
@@ -162,7 +167,7 @@ for this_data in df["reco_dataset_dcm_data_obj"].to_list():
     fittool.params_min[:, xxx.p_cm] = -1
     fittool.params_min[metabolites_list, xxx.p_cm] = 0
     fittool.params_max[:, xxx.p_cm] = 1000.0
-    fittool.params_max[xxx.m_Water, xxx.p_cm] = 1000.0
+    fittool.params_max[xxx.m_Water, xxx.p_cm] = 10000.0
     # initial concentrations
     fittool.params_init[:, xxx.p_cm] = 0
     fittool.params_init[metabolites_list, xxx.p_cm] = 0.1
@@ -177,9 +182,9 @@ for this_data in df["reco_dataset_dcm_data_obj"].to_list():
     fittool.params_min[:, xxx.p_df] = -5.0
     fittool.params_max[:, xxx.p_df] = 5.0
     # water
-    #fittool.params_min[xxx.m_Water, xxx.p_df] = 10.0
-    #fittool.params_max[xxx.m_Water, xxx.p_df] = 20.0
-    #fittool.params_init[xxx.m_Water, xxx.p_df] = +13
+    fittool.params_min[xxx.m_Water, xxx.p_df] = 10.0
+    fittool.params_max[xxx.m_Water, xxx.p_df] = 20.0
+    fittool.params_init[xxx.m_Water, xxx.p_df] = +13
 
     # phase shifts
     fittool.params_min[:, xxx.p_dp] = -0.1
@@ -199,15 +204,15 @@ for this_data in df["reco_dataset_dcm_data_obj"].to_list():
     fittool.params_linklock[xxx.m_LipA1, xxx.p_cm] = -50
     fittool.params_linklock[xxx.m_LipC1, xxx.p_cm] = 50
     fittool.params_linklock[xxx.m_LipE1, xxx.p_cm] = 50
-    fittool.params_linklock[xxx.m_LipG1, xxx.p_cm] = 50
-    fittool.params_linklock[xxx.m_LipH1, xxx.p_cm] = 50
-    fittool.params_linklock[xxx.m_LipI1, xxx.p_cm] = 50
+    # fittool.params_linklock[xxx.m_LipG1, xxx.p_cm] = 50
+    # fittool.params_linklock[xxx.m_LipH1, xxx.p_cm] = 50
+    # fittool.params_linklock[xxx.m_LipI1, xxx.p_cm] = 50
     ## (CL-4) is alone and free
     fittool.params_linklock[xxx.m_LipB1, xxx.p_cm] = 0
     ## 2ndb group
     fittool.params_linklock[xxx.m_LipB2, xxx.p_cm] = -30
     fittool.params_linklock[xxx.m_LipD1, xxx.p_cm] = 30
-    fittool.params_linklock[xxx.m_LipJ1, xxx.p_cm] = 30
+    # fittool.params_linklock[xxx.m_LipJ1, xxx.p_cm] = 30
     ## 2nmidb group
     fittool.params_linklock[xxx.m_LipB3, xxx.p_cm] = 40
     fittool.params_linklock[xxx.m_LipD2, xxx.p_cm] = 40
@@ -228,15 +233,27 @@ for this_data in df["reco_dataset_dcm_data_obj"].to_list():
     fittool.run()
 
     # quick test (should be done in notebook)
+    print("--- Lipid fit results ---")
 
     # normalize concentrations using a estimated concentration known to be 1
     param_fit_res = fittool.params_fit.copy()
-    param_fit_res[:, xxx.p_cm] = fittool.params_fit[:, xxx.p_cm] / fittool.params_fit[xxx.m_LipA1, xxx.p_cm]
+    param_fit_res[:, xxx.p_cm] = param_fit_res[:, xxx.p_cm] / param_fit_res[xxx.m_LipA1, xxx.p_cm]
 
     # CL, ndb, nmidb from normalized concentrations
     print("CL = %.2f" % (param_fit_res[xxx.m_LipB1, xxx.p_cm] + 4.0))
     print("ndb = %.2f" % (param_fit_res[xxx.m_LipB2, xxx.p_cm] / 2.0))
     print("nmidb = %.2f" % (param_fit_res[xxx.m_LipB3, xxx.p_cm] / 2.0))
+
+    print("--- Lipid fit results, T2-corrected ---")
+
+    # normalize concentrations using a estimated concentration known to be 1
+    param_fit_res_T2c = fittool.params_fit.correct_T2s(this_data.te)
+    param_fit_res_T2c[:, xxx.p_cm] = param_fit_res_T2c[:, xxx.p_cm] / param_fit_res_T2c[xxx.m_LipA1, xxx.p_cm]
+
+    # CL, ndb, nmidb from normalized concentrations
+    print("CL = %.2f" % (param_fit_res_T2c[xxx.m_LipB1, xxx.p_cm] + 4.0))
+    print("ndb = %.2f" % (param_fit_res_T2c[xxx.m_LipB2, xxx.p_cm] / 2.0))
+    print("nmidb = %.2f" % (param_fit_res_T2c[xxx.m_LipB3, xxx.p_cm] / 2.0))
 
     # --- save the fit results ---
     fittool_df = fittool.to_dataframe('fit_')

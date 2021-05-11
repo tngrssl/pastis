@@ -9,8 +9,8 @@ A file to list all the default file paths used in this package. :)
 # used in sim.py for simulation
 # full file path to metabolite database file
 # it contains all the chemical shifts, J-couplings, etc. for each metabolite
-# and the metabolite basis set templates
-DEFAULT_META_DB_FILE = "./mrs/metabolites_db.xls"
+# and the metabolite basis set templates (proton by default)
+DEFAULT_META_DB_FILE = "./mrs/metabolites_1H.xls"
 
 # default metabolite basis set
 # metabolite basis set are configured in the "Template_*" tabs of the above excel file

@@ -113,13 +113,13 @@ fit.disp_fit(ax, ss_mod, p_human, seq, True, True)
 
 # acquisition parameters
 te = 12.0
-scaling_factor = 1.0
-noise_level = 0.1
+scaling_factor = 1
+noise_level = 0
 
 # lipid parameters
-CL = 17.5
-ndb = 2.7
-nmidb = 0.7
+CL = 20
+ndb = 2
+nmidb = 1
 
 # load lipids metabolite basis set template
 meta_bs = sim.metabolite_basis_set("Lipids")
@@ -133,7 +133,7 @@ p = sim.params(meta_bs)
 # null all concentrations
 p[:, xxx.p_cm] = 0.0
 # linewidth damping factor (Hz) for all
-p[:, xxx.p_dd] = 100.0
+p[:, xxx.p_dd] = 10
 # frequency shift (Hz) for all
 p[:, xxx.p_df] = 0.0
 # phase shift (rd) for all
@@ -169,14 +169,14 @@ s = seq.simulate_signal(p, noise_level)
 #ax = fig.subplots()
 #fit.disp_fit(ax, s, p, seq, display_range=[0, 6])
 
-s.display_spectrum_1d(display_range=[0, 6])
+s.display_spectrum_1d(display_range=[0, 6], allowed_apodization=0)
 
 # %% lipid spectrum: amplitude-linked model
 
 # acquisition parameters
 te = 12.0
-scaling_factor = 13.0
-noise_level = 3
+scaling_factor = 1.0
+noise_level = 0
 
 # lipid parameters
 CL = 17.5
@@ -195,7 +195,7 @@ p = sim.params(meta_bs)
 # null all concentrations
 p[:, xxx.p_cm] = 0.0
 # linewidth damping factor (Hz) for all
-p[:, xxx.p_dd] = 40.0
+p[:, xxx.p_dd] = 100.0
 # frequency shift (Hz) for all
 p[:, xxx.p_df] = 0.0
 # phase shift (rd) for all

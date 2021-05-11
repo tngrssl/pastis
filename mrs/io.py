@@ -60,6 +60,8 @@ def get_data_file_reader(data_fullfilepath):
         dcm_header = pydicom.dcmread(data_fullfilepath)
         if(dcm_header.SoftwareVersions == "syngo MR B17"):
             return(SIEMENS_DICOM_reader_syngo_MR_B17(data_fullfilepath))
+        if(dcm_header.SoftwareVersions == "syngo MR E12"):
+            return(SIEMENS_DICOM_reader_syngo_MR_E12(data_fullfilepath))
         elif(dcm_header.SoftwareVersions == "syngo MR XA20"):
             return(SIEMENS_DICOM_reader_syngo_XA20(data_fullfilepath))
         else:
@@ -1308,6 +1310,10 @@ class SIEMENS_DICOM_reader_syngo_MR_B17(data_file_reader):
         acq_time = float((AcquisitionTime_datetime - SeriesInstanceUID_datetime).seconds)
 
         return(acq_time)
+
+
+class SIEMENS_DICOM_reader_syngo_MR_E12(SIEMENS_DICOM_reader_syngo_MR_B17):
+    """A class used to scrap parameters out of SIEMENS MR Syngo VE12 DICOM files, sometimes in a very dirty way."""
 
 
 class SIEMENS_DICOM_reader_syngo_XA20(SIEMENS_DICOM_reader_syngo_MR_B17):
