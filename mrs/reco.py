@@ -959,7 +959,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         # find maximum peak in range
         sf = s.spectrum()
         # analyze peak WITHOUT ANY apodization (important)
-        ppm_peak, peak_val, _, _, _ = s._analyze_peak_1d(peak_range, False)
+        ppm_peak, peak_val, _, _, _ = s._analyze_peak_1d(peak_range, 0.0)
         if(magnitude_mode):
             log.debug("measuring the MAGNITUDE intensity at %0.2fppm!" % ppm_peak)
             snr_signal = np.abs(peak_val)
@@ -1717,9 +1717,10 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         return(s_ma)
 
-    def correct_analyze_and_reject_2d(self, peak_analyze_range=[4.5, 5], peak_snr_range=[1.8, 2.2], peak_lw_range=[4.5, 5], moving_averages=1, peak_properties_ranges={"amplitude (%)": None, "linewidth (Hz)": [5.0, 30.0], "chemical shift (ppm)": 0.5, "phase std. factor (%)": 60.0}, peak_properties_rel2mean=True, auto_method_list=None, auto_adjust_allowed_snr_change=1.0, allowed_apodization=0.0, display=False, display_range=[1, 6]):
+    def correct_analyze_and_reject_2d(self, peak_analyze_range=[4.5, 5], peak_snr_range=[1.8, 2.2], peak_lw_range=[4.5, 5], moving_averages=1, reject_when_linewidth_fails=True, peak_properties_ranges={"amplitude (%)": None, "linewidth (Hz)": [5.0, 30.0], "chemical shift (ppm)": 0.5, "phase std. factor (%)": 60.0}, peak_properties_rel2mean=True, auto_method_list=None, auto_adjust_allowed_snr_change=1.0, allowed_apodization=0.0, display=False, display_range=[1, 6]):
         """
         Analyze peak in each average in terms intensity, linewidth, chemical shift and phase and reject data if one of these parameters goes out of the min / max bounds. Usefull to understand what the hell went wrong during your acquisition when you have the raw data and to try to improve things a little. You can choose to set the bounds manually or automatically based on a peak property (amplitude, linewidth, frequency, phase). And you can run several automatic adjusment methods, the one giving the highest SNR and/or the lowest peak linewidth will be selected. All this is very experimental and the code is long and not optimized, sorry ;).
+    Special note about the optimization: when does it stop? First, the algorithm tries to optimize the data rejection to get a SNR higher than the (initial SNR * auto_adjust_allowed_snr_change). If the latter is not possible, then the algorithm tries to reduce the linewidth without reducing SNR compared to the initial SNR. If nothing works out, no data rejection is performed except maybe based on peak detection (see reject_when_linewidth_fails).
 
         * Works only with a 2D [averages,timepoints] signal.
         * Returns a 2D [averages,timepoints] signal.
@@ -1734,6 +1735,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
             Range in ppm used to estimate linewidth
         moving_averages : int
             Number of averages to perform when using moving average, need to be an odd number
+        reject_when_linewidth_fails : boolean
+            Reject data if linewidth estimatiopn fails (=0Hz). Usually when the peak looks so bad that the peak width cannot be measured...
         peak_properties_ranges : dict
             Dictionnary that contains 4 entries, 4 rejection criterias for
                 "amplitude (%)": amplitude relative changes: keep data if within +/-val % range
@@ -1837,6 +1840,12 @@ class MRSData2(suspect.mrsobjects.MRSData):
         # special for linewidth: can be a max linewidth or a list
         if(type(peak_properties_ranges_list[1]) != list):
             peak_properties_ranges_list[1] = [1.0, peak_properties_ranges_list[1]]
+
+        # reject when peak linewidth fails
+        if(reject_when_linewidth_fails):
+            peak_properties_ranges_list[1][0] = 1.0
+        else:
+            peak_properties_ranges_list[1][0] = -1.0
 
         # special for phase: rejection range is a factor of std
         phase_std = peak_prop_analyze[:, 3].std()
@@ -2325,7 +2334,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         return(s_cor)
 
-    def correct_realign_2d(self, peak_range=[4.5, 5], moving_averages=1, inter_corr_mode=False, freq_shift_max=50, allowed_apodization=5.0, display=False, display_range=[1, 6]):
+    def correct_realign_2d(self, peak_range=[4.5, 5], moving_averages=1, inter_corr_mode=False, freq_shift_max=25, allowed_apodization=5.0, display=False, display_range=[1, 6]):
         """
         Realign each signal of interest in frequency by taking as a reference the first spectra in absolute mode using pick-picking or inter-correlation (experimental).
 
@@ -3523,6 +3532,8 @@ class pipeline:
                                       "POI_LW_range_ppm": pipeline._get_setting,
                                       # size of moving average window
                                       "moving_averages": 1,
+                                      # if True, rejects if linewidth could not be estimated
+                                      "reject_when_linewidth_fails": True,
                                       # rejection criterias for
                                       # amplitude relative changes: keep data if within +/-val % range
                                       # linewidth changes: keep data is below val Hz
@@ -3535,7 +3546,10 @@ class pipeline:
                                       # for amplitude, chemical shift and phase, the rejection of data is based on ranges of relative changes of those metrics. Relative to what? The man value over the whole acquisition (True) or the first acquired point (False)
                                       "rel2mean": True,
                                       # method for automatic adjustement
-                                      "auto_method_list": None,
+                                      "auto_method_list": [data_rejection_method.AUTO_AMPLITUDE,
+                                                           data_rejection_method.AUTO_LINEWIDTH,
+                                                           data_rejection_method.AUTO_FREQUENCY,
+                                                           data_rejection_method.AUTO_PHASE],
                                       # minimum allowed SNR change (%) when adjusting the linewidth criteria, this can be positive (we want to increase SNR +10% by rejecting crappy dat) or negative (we are ok in decreasing the SNR -10% in order to get better resolved spectra)
                                       "auto_allowed_snr_change": 1.0,
                                       # apodization factor used during signal analysis stage
@@ -3554,7 +3568,7 @@ class pipeline:
                                   # use correlation mode
                                   "inter_corr_mode": False,
                                   # maximum frequency shift allowed in Hz
-                                  "freq_shift_max": 50,
+                                  "freq_shift_max": 25,
                                   # apodization factor used during signal analysis stage
                                   "allowed_apodization": pipeline._get_setting,
                                   # display all this process to check what the hell is going on
@@ -4528,27 +4542,24 @@ class pipeline:
         del df_p["dataset"]
 
         # and need a specific call for the MRSData2 types
-        df_dataset_raw_data_list = [s.to_dataframe(True, "dataset_raw_data_") if(s is not None) else None for s in df_dataset["dataset_raw_data"]]
-        df_dataset_dcm_data_list = [s.to_dataframe(True, "dataset_dcm_data_") if(s is not None) else None for s in df_dataset["dataset_dcm_data"]]
+        df_dataset_raw_data_list = [s.to_dataframe(True, "dataset_raw_data_")for s in df_dataset["dataset_raw_data"] if(s is not None)]
+        df_dataset_dcm_data_list = [s.to_dataframe(True, "dataset_dcm_data_") for s in df_dataset["dataset_dcm_data"] if(s is not None)]
 
         df = df_dataset.reset_index()
 
-        if(np.any(df_dataset_raw_data_list) is not None):
+        if(len(df_dataset_raw_data_list) > 0):
             df_dataset_raw_data = pd.concat(df_dataset_raw_data_list, axis=0)
             del df_dataset["dataset_raw_data"]
             # append columns
-            df = pd.concat([df,
-                            df_dataset_raw_data.reset_index()], axis=1)
-        if(np.any(df_dataset_dcm_data_list) is not None):
+            df = pd.concat([df, df_dataset_raw_data.reset_index()], axis=1)
+        if(len(df_dataset_dcm_data_list) > 0):
             df_dataset_dcm_data = pd.concat(df_dataset_dcm_data_list, axis=0)
             del df_dataset["dataset_dcm_data"]
             # append columns
-            df = pd.concat([df,
-                            df_dataset_dcm_data.reset_index()], axis=1)
+            df = pd.concat([df, df_dataset_dcm_data.reset_index()], axis=1)
 
         # append columns
-        df = pd.concat([df,
-                        df_p.loc[df_p.index.repeat(len(df_dataset))].reset_index()], axis=1)
+        df = pd.concat([df, df_p.loc[df_p.index.repeat(len(df_dataset))].reset_index()], axis=1)
 
         # set index (prefer raw data if available)
         if("dataset_raw_data_file_hash" in df):

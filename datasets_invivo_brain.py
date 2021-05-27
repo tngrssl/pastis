@@ -20,7 +20,7 @@ plt.rcParams['font.size'] = 9
 log.setLevel(log.INFO)
 
 # display stuff?
-display_stuff = True
+display_stuff = False
 
 # stop pipeline if the reco went bad
 raise_error_on_bad_reco = True
@@ -30,14 +30,21 @@ reco_template = "brain"
 
 # %% "brain" reconstruction template
 template_name = "brain"
-
 p = reco.pipeline()
+
+# global settings
 p.settings["storage_file"] = "/home/tangir/crmbm/acq_db/%s.pkl" % template_name
-p.settings["POI_range_ppm"] = [4.5, 5.2]
+
+# in general, use water peak for processing (phasing, realigning, etc.)
+p.settings["POI_range_ppm"] = [4.5, 4.8]
+# calibrate spectrum using the NAA peak
 p.settings["POI_shift_range_ppm"] = [1.8, 2.2]
 p.settings["POI_shift_true_ppm"] = 2.008
-p.settings["POI_LW_range_ppm"] = [1.8, 2.2]
-p.settings["POI_LW_range_ppm"] = [4.5, 5.2]
+# measure SNR on NAA peak
+p.settings["POI_SNR_range_ppm"] = [1.8, 2.2]
+# measure linewidth on water
+p.settings["POI_LW_range_ppm"] = [4.5, 4.8]
+# 1Hz apodization during signal analysis (realignement, etc.)
 p.settings["allowed_apodization"] = 1.0
 p.settings["display"] = display_stuff
 
@@ -60,8 +67,13 @@ p.job_list = [  # p.job["displaying_anatomy"],
                 p.job["displaying"]
                 ]
 
+# allow stronger apodization during realignment (shown to be more efficient)
+p.job["realigning"]["allowed_apodization"] = 5.0
+# measure SNR on water during data rejecting (shown to be more robust for SC)
+p.job["data_rejecting"]["POI_SNR_range_ppm"] = [4.5, 4.8]
+
 p.job["cropping"]["final_npts"] = 2048
-p.job["displaying"]["apodization_factor"] = 5.0
+p.job["displaying"]["allowed_apodization"] = 5.0
 
 # SNR like LCModel...
 p.job["analyzing_snr"]["half_factor"] = True
@@ -69,7 +81,12 @@ p.job["ref_data_analyzing_snr"]["half_factor"] = True
 
 p.save_template(template_name)
 
-# %% 20/06/2019 - 296_ym_p1_brainmoelle - Yasmin :)
+# create corresponding "*_concatenate" reconstruction template (for the first 2 crappy datasets)
+p.job_list.insert(4, p.job["concatenate"])
+p.settings["storage_file"] = "/home/tangir/crmbm/acq_db/%s.pkl" % (template_name + "_concatenate")
+p.save_template(template_name + "_concatenate")
+
+# %% 20/06/2019 - 296_ym_p1_brainmoelle - Yasmin :) x
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -93,24 +110,23 @@ p.dataset[2]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/296_ym_p1_brainmoel
 p.dataset[2]["dcm"]["files"] = ["/home/tangir/crmbm/acq/296_ym_p1_brainmoelle/296-ym-p1-brainmoelle/20190619/01_0008_steam-shortte-snr/original-primary_e09_0001.dcm",
                                 "/home/tangir/crmbm/acq/296_ym_p1_brainmoelle/296-ym-p1-brainmoelle/20190619/01_0006_steam-shortte-snr/original-primary_e09_0001.dcm"]
 
-
-p.settings["datasets_indexes"] = [0, 1]
 p.run()
-p.check_analyze_results()
+p.check_analyze_results(True)
 p.save_datasets()
 
 # %% 25/06/2019 - 296_ym_p1_brainmoelle - FID modulus tests
 get_ipython().magic("clear")
+plt.close("all")
 
 p = reco.pipeline(reco_template)
 
 p.dataset[0]["legend"] = "brain - sLASER no VAPOR + conventionnal process"
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/296_ym_p1_brainmoelle/meas_MID73_slaser_R_N=20+_1_longTE_SNR++++_FID33872.dat"]
 
-p.job_list.insert(11, p.job["water_removal"])
+p.job_list.insert(9, p.job["water_removal"])
 p.job_list.remove(p.job["data_rejecting"])
 p.settings["POI_range_ppm"] = [4.5, 5.2]
-p.run()
+# p.run()
 
 p = reco.pipeline(reco_template)
 
@@ -118,12 +134,12 @@ p.dataset[0]["legend"] = "brain - sLASER no VAPOR + FID process"
 p.dataset[0]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/296_ym_p1_brainmoelle/meas_MID73_slaser_R_N=20+_1_longTE_SNR++++_FID33872.dat"]
 
 p.job_list.insert(2, p.job["FID modulus"])
-p.job_list.insert(12, p.job["water_removal"])
+p.job_list.insert(10, p.job["water_removal"])
 p.job_list.remove(p.job["data_rejecting"])
 p.settings["POI_range_ppm"] = [4.5, 5.2]
-p.run()
+# p.run()
 
-# %% 27/08/2019 - 308-rs-p1-moelle - Ocha
+# %% 27/08/2019 - 308-rs-p1-moelle - Ocha x
 get_ipython().magic("clear")
 plt.close("all")
 
@@ -136,10 +152,10 @@ p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/308-rs-p1-moelle/2019082
                                 "/home/tangir/crmbm/acq/308-rs-p1-moelle/20190827/01_0025_slaser-r-n/original-primary_e09_0001.dcm"]
 
 p.run()
-p.check_analyze_results()
+p.check_analyze_results(True)
 p.save_datasets()
 
-# %% 23/01/2019 - 347-re-p1-moelle - Renaud
+# %% 23/01/2019 - 347-re-p1-moelle - Renaud x
 get_ipython().magic("clear")
 plt.close("all")
 
