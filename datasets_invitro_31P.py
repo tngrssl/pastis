@@ -573,3 +573,174 @@ p.job["displaying"]["range_ppm"] = [-25, 25]
 p.analyze_enable = False
 p.run()
 
+# %% 05/05/2021 - 31P phantom multicomp, exc pulse optim
+get_ipython().magic("clear")
+plt.close("all")
+
+p = reco.pipeline()
+p.settings["ppm0"] = 0.0
+p.settings["display_range_ppm"] = [-25, 25]
+
+p.dataset[0]["legend"] = "Pulse dur. 0.10ms"
+p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/31p-phantom/20210505/01_0012_fid"]
+p.dataset[1]["legend"] = "Pulse dur. 0.20ms"
+p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/31p-phantom/20210505/01_0013_fid"]
+p.dataset[2]["legend"] = "Pulse dur. 0.50ms"
+p.dataset[2]["dcm"]["files"] = ["/home/tangir/crmbm/acq/31p-phantom/20210505/01_0014_fid"]
+p.dataset[3]["legend"] = "Pulse dur. 1ms"
+p.dataset[3]["dcm"]["files"] = ["/home/tangir/crmbm/acq/31p-phantom/20210505/01_0015_fid"]
+p.dataset[4]["legend"] = "Pulse dur. 1ms - AHP"
+p.dataset[4]["dcm"]["files"] = ["/home/tangir/crmbm/acq/31p-phantom/20210505/01_0016_fid"]
+p.dataset[5]["legend"] = "Pulse dur. 2.5ms - AHP"
+p.dataset[5]["dcm"]["files"] = ["/home/tangir/crmbm/acq/31p-phantom/20210505/01_0017_fid"]
+p.dataset[6]["legend"] = "Pulse dur. 5ms - AHP"
+p.dataset[6]["dcm"]["files"] = ["/home/tangir/crmbm/acq/31p-phantom/20210505/01_0018_fid"]
+p.dataset[7]["legend"] = "Pulse dur. 7ms - BIR4 (checked voltage)"
+p.dataset[7]["dcm"]["files"] = ["/home/tangir/crmbm/acq/31p-phantom/20210505/01_0019_fid"]
+p.dataset[8]["legend"] = "Pulse dur. 9ms - AHP (checked voltage)"
+p.dataset[8]["dcm"]["files"] = ["/home/tangir/crmbm/acq/31p-phantom/20210505/01_0020_fid"]
+
+p.job_list = [  # p.job["time_shifting"],
+                # p.job["phasing"],
+                # p.job["scaling"],
+                # p.job["FID modulus"],
+                p.job["channel_combining"],
+                # p.job["concatenate"],
+                # p.job["zero_filling"],
+                # p.job["physio_analysis"],
+                # p.job["data_rejecting"],
+                # p.job["realigning"],
+                p.job["averaging"],
+                # p.job["noise_estimation"],
+                p.job["apodizing"],
+                #p.job["phasing_suspect"],
+                # p.job["cropping"],
+                # p.job["water_removal"],
+                p.job["calibrating"],
+                p.job["displaying"]
+                ]
+
+p.job["time_shifting"]["time_shift_us"] = -400
+p.job["phasing"]["POI_range_ppm"] = [-2, 2]
+p.job["phasing_suspect"]["range_ppm"] = [-5, 20]
+# p.job["phasing_suspect"]["suspect_method"] = reco.suspect_phasing_method.ACME
+p.job["apodizing"]["damping_hz"] = 20.0
+
+p.job["calibrating"]["POI_shift_range_ppm"] = [-1, +1]
+p.job["calibrating"]["POI_shift_true_ppm"] = 0
+
+p.job["displaying"]['magnitude_mode'] = True
+
+p.job["analyzing_snr"]["display"] = False
+p.job["analyzing_lw"]["display"] = False
+p.analyze_enable = False
+
+p.run()
+
+# %% 05/05/2021 - 31P phantom multicomp, NOE on/off
+get_ipython().magic("clear")
+plt.close("all")
+
+p = reco.pipeline()
+p.settings["ppm0"] = 0.0
+p.settings["display_range_ppm"] = [-25, 25]
+
+p.dataset[0]["legend"] = "NOE off"
+p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/31p-phantom/20210505/01_0021_fid"]
+p.dataset[1]["legend"] = "NOE on"
+p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/31p-phantom/20210505/01_0022_fid"]
+
+p.job_list = [  # p.job["time_shifting"],
+                # p.job["phasing"],
+                # p.job["scaling"],
+                # p.job["FID modulus"],
+                p.job["channel_combining"],
+                # p.job["concatenate"],
+                # p.job["zero_filling"],
+                # p.job["physio_analysis"],
+                # p.job["data_rejecting"],
+                # p.job["realigning"],
+                p.job["averaging"],
+                # p.job["noise_estimation"],
+                p.job["apodizing"],
+                #p.job["phasing_suspect"],
+                # p.job["cropping"],
+                # p.job["water_removal"],
+                p.job["calibrating"],
+                p.job["displaying"]
+                ]
+
+p.job["time_shifting"]["time_shift_us"] = -400
+p.job["phasing"]["POI_range_ppm"] = [-2, 2]
+p.job["phasing_suspect"]["range_ppm"] = [-5, 20]
+# p.job["phasing_suspect"]["suspect_method"] = reco.suspect_phasing_method.ACME
+p.job["apodizing"]["damping_hz"] = 20.0
+
+p.job["calibrating"]["POI_shift_range_ppm"] = [-1, +1]
+p.job["calibrating"]["POI_shift_true_ppm"] = 0
+
+p.job["displaying"]['magnitude_mode'] = True
+
+p.job["analyzing_snr"]["display"] = False
+p.job["analyzing_lw"]["display"] = False
+p.analyze_enable = False
+
+p.run()
+
+# %% 05/05/2021 - 31P phantom multicomp, TR optim
+get_ipython().magic("clear")
+plt.close("all")
+
+p = reco.pipeline()
+p.settings["ppm0"] = 0.0
+p.settings["display_range_ppm"] = [-25, 25]
+
+p.dataset[0]["legend"] = "TR=15s"
+p.dataset[0]["dcm"]["files"] = ["/home/tangir/crmbm/acq/31p-phantom/20210505/01_0029_fid"]
+p.dataset[1]["legend"] = "TR=10s"
+p.dataset[1]["dcm"]["files"] = ["/home/tangir/crmbm/acq/31p-phantom/20210505/01_0024_fid"]
+p.dataset[2]["legend"] = "TR=8s"
+p.dataset[2]["dcm"]["files"] = ["/home/tangir/crmbm/acq/31p-phantom/20210505/01_0025_fid"]
+p.dataset[3]["legend"] = "TR=6s"
+p.dataset[3]["dcm"]["files"] = ["/home/tangir/crmbm/acq/31p-phantom/20210505/01_0026_fid"]
+p.dataset[4]["legend"] = "TR=4s"
+p.dataset[4]["dcm"]["files"] = ["/home/tangir/crmbm/acq/31p-phantom/20210505/01_0027_fid"]
+p.dataset[5]["legend"] = "TR=2s"
+p.dataset[5]["dcm"]["files"] = ["/home/tangir/crmbm/acq/31p-phantom/20210505/01_0028_fid"]
+
+p.job_list = [  # p.job["time_shifting"],
+                # p.job["phasing"],
+                # p.job["scaling"],
+                # p.job["FID modulus"],
+                p.job["channel_combining"],
+                # p.job["concatenate"],
+                # p.job["zero_filling"],
+                # p.job["physio_analysis"],
+                # p.job["data_rejecting"],
+                # p.job["realigning"],
+                p.job["averaging"],
+                # p.job["noise_estimation"],
+                p.job["apodizing"],
+                #p.job["phasing_suspect"],
+                # p.job["cropping"],
+                # p.job["water_removal"],
+                p.job["calibrating"],
+                p.job["displaying"]
+                ]
+
+p.job["time_shifting"]["time_shift_us"] = -400
+p.job["phasing"]["POI_range_ppm"] = [-2, 2]
+p.job["phasing_suspect"]["range_ppm"] = [-5, 20]
+# p.job["phasing_suspect"]["suspect_method"] = reco.suspect_phasing_method.ACME
+p.job["apodizing"]["damping_hz"] = 20.0
+
+p.job["calibrating"]["POI_shift_range_ppm"] = [-1, +1]
+p.job["calibrating"]["POI_shift_true_ppm"] = 0
+
+p.job["displaying"]['magnitude_mode'] = True
+
+p.job["analyzing_snr"]["display"] = False
+p.job["analyzing_lw"]["display"] = False
+p.analyze_enable = False
+
+p.run()
