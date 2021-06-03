@@ -22,8 +22,8 @@ log.setLevel(log.INFO)
 # display stuff?
 display_stuff = False
 
-# stop pipeline if the reco went bad
-raise_error_on_bad_reco = True
+# raise error?
+raise_error = True
 
 # template to use here (see definitions below)
 reco_template = "brain"
@@ -47,6 +47,8 @@ p.settings["POI_LW_range_ppm"] = [4.5, 4.8]
 # 1Hz apodization during signal analysis (realignement, etc.)
 p.settings["allowed_apodization"] = 1.0
 p.settings["display"] = display_stuff
+# error when raw data reconstruction goes bad?
+p.settings["raise_error_on_badreco"] = raise_error
 
 p.job_list = [  # p.job["displaying_anatomy"],
                 p.job["phasing"],
