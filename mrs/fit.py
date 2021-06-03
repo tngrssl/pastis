@@ -992,14 +992,14 @@ class fit_pastis(fit_tool):
             fig.show()
             plt.pause(0.5)
 
-        # merge back with macromolecules
-        new_metabolites_list = list(set(np.sort(metabolites_kept_list + macromolecules_to_keep_list)))
-
         # display results
         log.info("Initial basis set (n=%d): %s" % (len(self.metabolites), " ".join([meta_names[im] for im in self.metabolites])))
         log.info("Metabolite tested (n=%d): %s" % (len(metabolites_to_test_list), " ".join([meta_names[im] for im in metabolites_to_test_list])))
         log.info("Metabolite included (n=%d): %s" % (len(metabolites_kept_list), " ".join([meta_names[im] for im in metabolites_kept_list])))
         log.info("Metabolite excluded (n=%d): %s" % (len(metabolites_excluded_list), " ".join([meta_names[im] for im in metabolites_excluded_list])))
+
+        # merge back with macromolecules
+        new_metabolites_list = list(np.sort(list(set(metabolites_kept_list + macromolecules_to_keep_list))))
         log.info("Final basis set (n=%d): %s" % (len(new_metabolites_list), " ".join([meta_names[im] for im in new_metabolites_list])))
 
         # and return
