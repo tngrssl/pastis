@@ -28,13 +28,13 @@ plt.rcParams['font.size'] = 9
 log.setLevel(log.INFO)
 
 # data to process is in here
-db_filepath = "/home/tangir/crmbm/acq_db/brain.pkl"
+db_filepath = "/home/tangir/crmbm/acq_db/sc.pkl"
 
 # apodize before fitting (WARNING WARNING experimental achtung)
 apodization_factor = 0.0
 
 # display real-time fit and other stuff?
-display_stuff = True
+display_stuff = False
 
 # fit ppm ranges
 fit_ppm_range_ws = [0.5, 4.3]
@@ -43,11 +43,15 @@ fit_ppm_range_nows = [4, 6]
 # %% select datasets via dataframe
 
 df = pd.read_pickle(db_filepath)
-#df = df.iloc[1]
+
+#df = df.dropna(subset=["reco_dataset_raw_data_name"])
+#df = df.loc[df["reco_dataset_raw_data_name"].str.contains("319")]
 
 # keep a dataframe type, even if one line
 if(type(df) is pd.core.series.Series):
     df = df.to_frame().T
+
+print(df)
 
 # %% prepare simulation machine
 
@@ -86,9 +90,9 @@ metabolites2fit = np.sort([
     xxx.m_Gln,
     xxx.m_Glu,
     xxx.m_Water,
-    xxx.m_Lip1,
-    xxx.m_Lip2,
-    xxx.m_Lip3])
+    xxx.m_LipA,
+    xxx.m_LipB,
+    xxx.m_LipC])
 
 # linklock: relations between fit parameters
 linklock = np.full([len(meta_bs), 4], 1)
@@ -106,7 +110,7 @@ linklock[xxx.m_NAA_CH2, xxx.p_cm] = 3000
 # leave water free
 linklock[xxx.m_Water, :] = [0, 0, 0, 0]
 # leave Lipids linewidth free
-linklock[[xxx.m_Lip1, xxx.m_Lip2, xxx.m_Lip3], :] = [0, 0, 0, 100]
+linklock[[xxx.m_LipA, xxx.m_LipB, xxx.m_LipC], :] = [0, 0, 0, 100]
 
 # store this strategy
 for this_sequence in sequence_list:
@@ -223,7 +227,7 @@ for this_index, this_row in df.iterrows():
     this_dcm_data = this_row["reco_dataset_dcm_data_obj"]
 
     # get the data
-    if(this_raw_data is None):
+    if(np.isnan(this_raw_data).any()):
         # no raw data? ok get the dicom
         this_data = this_dcm_data
     else:
@@ -253,6 +257,7 @@ for this_index, this_row in df.iterrows():
     this_fit_nows_df = this_fit_nows.to_dataframe('nows_')
 
     # %% use various fit strategies
+    fit_ws = fit_ws_list[0]
     for fit_ws in fit_ws_list:
 
         # --- fit water-suppressed data ---
@@ -270,7 +275,7 @@ for this_index, this_row in df.iterrows():
             this_fit_ws.run()
 
             # test metabolite basis set
-            new_metabolites_list, metabolites_excluded_list = this_fit_ws.get_fittable_metabolites(mode=fit.fit_adjust_metabolite_mode.AVERAGE)
+            new_metabolites_list, metabolites_excluded_list = this_fit_ws.get_fittable_metabolites(mode=fit.fit_adjust_metabolite_mode.OPTIMISTIC)
 
             if(len(metabolites_excluded_list) > 0):
                 this_fit_ws.metabolites = new_metabolites_list
