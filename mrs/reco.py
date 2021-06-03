@@ -3357,7 +3357,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         df["file_hash"] = self.data_file_hash
         df["is_rawdata"] = self.is_rawdata
         df = pd.concat([df, pd.DataFrame.from_dict([self.patient])], axis=1)
-        df = pd.concat([df, self.sequence.to_dataframe()], axis=1)
+        df = pd.concat([df, self.sequence.to_dataframe(True)], axis=1)
 
         if(include_obj):
             df["obj"] = [self]
@@ -3744,6 +3744,7 @@ class pipeline:
         self.analyze_display = True
 
         # --- template loading if needed ---
+        self.template_name = template_name
         if(template_name is not None):
             # overwrite everything above with the template
             self.load_template(template_name)
