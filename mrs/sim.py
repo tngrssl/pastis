@@ -1770,24 +1770,24 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
         # X selection done with asymmetric 90° pulse
         # we do not know much about this pulse. We can only say it is 3.4kHz large if the duration is 2ms
         log.debug("estimating CS displacement for (90x): this pulse is the weird asymmetric one, we have no idea what it is exactly!")
-        if(self.pulse_laser_exc_length == 2000.0):
+        if(self.pulse_exc_duration == 2000.0):
             log.debug("since its duration is 2ms here, we assume, according to Oz & Tkac, MRM 65:901-910 (2011), that its bandwidth is 3.4kHz.")
             bw_x_Hz = 3400.0
             grad_x_Hz_m = bw_x_Hz / (voxel_size_mm_list[0] * 0.001)
             d_x_mm = 1000.0 * df_abs_Hz / grad_x_Hz_m
             d_x_prct = d_x_mm / voxel_size_mm_list[0] * 100.0
         else:
-            log.debug("since its duration is not 2ms here, we do not know its bandwith. Therefore, no way to calculate the CS displacement for this axis, sorry ;)")
-            d_x_mm = None
+            log.warning("since its duration is not 2ms here, we do not know its bandwith. Therefore, no way to calculate the CS displacement for this axis, sorry ;)")
+            d_x_prct = None
 
         # Y selection done with 180°
-        bw_y_Hz = self.pulse_laser_rfc_r / (self.pulse_laser_rfc_length / 1000000.0)
+        bw_y_Hz = self.pulse_rfc_r / (self.pulse_rfc_duration / 1000000.0)
         grad_y_Hz_m = bw_y_Hz / (voxel_size_mm_list[1] * 0.001)
         d_y_mm = 1000.0 * df_abs_Hz / grad_y_Hz_m
         d_y_prct = d_y_mm / voxel_size_mm_list[1] * 100.0
 
         # Z selection done with 180°
-        bw_z_Hz = self.pulse_laser_rfc_r / (self.pulse_laser_rfc_length / 1000000.0)
+        bw_z_Hz = self.pulse_rfc_r / (self.pulse_rfc_duration / 1000000.0)
         grad_z_Hz_m = bw_z_Hz / (voxel_size_mm_list[2] * 0.001)
         d_z_mm = 1000.0 * df_abs_Hz / grad_z_Hz_m
         d_z_prct = d_z_mm / voxel_size_mm_list[2] * 100.0
