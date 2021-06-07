@@ -28,7 +28,7 @@ plt.rcParams['font.size'] = 9
 log.setLevel(log.INFO)
 
 # data to process is in here
-db_filepath = "/home/tangir/crmbm/acq_db/sc.pkl"
+db_filepath = "/home/tangir/crmbm/acq_db/brain.pkl"
 
 # apodize before fitting (WARNING WARNING experimental achtung)
 apodization_factor = 0.0
@@ -66,7 +66,7 @@ meta_bs_nows = sim.metabolite_basis_set(ppm_range=fit_ppm_range_nows)
 fit_ws_list = []
 
 # list of sequence to try
-# sequence_list = [None, sim.mrs_seq_press]
+#sequence_list = [None, sim.mrs_seq_press]
 sequence_list = [None]
 
 # --- easy strategy: singlets ---
@@ -115,7 +115,7 @@ linklock[[xxx.m_LipA, xxx.m_LipB, xxx.m_LipC], :] = [0, 0, 0, 100]
 # store this strategy
 for this_sequence in sequence_list:
     this_fit = fit.fit_pastis(meta_bs=meta_bs)
-    this_fit.name = "singlets" + "_" + str(this_sequence)
+    this_fit.name = "pastis" + "_" + str(this_sequence)
     this_fit.metabolites_area_integration = [xxx.m_NAA_CH3, xxx.m_Cr_CH3, xxx.m_Cho_CH3]
     this_fit.area_integration_peak_ranges = [0.1, 0.1, 0.1]
     this_fit.metabolites = metabolites2fit
@@ -237,17 +237,17 @@ for this_index, this_row in df.iterrows():
     if(display_stuff):
         this_data.display_spectrum_1d()
 
+    # measure linewidth of water to help initialize stuff
+    this_linewidth_estimated = this_data.correct_zerofill_nd().analyze_linewidth_1d([4.5, 4.8], display=display_stuff)
+
     # removing water and any artefact > 5ppm (corrupts fit quality criteria)
-    this_data = this_data.correct_water_removal_1d(16, [4.3, 6], display_stuff)
+    this_data = this_data.correct_water_removal_1d(16, [4.3, 6], display=display_stuff)
 
     # filtering
-    # this_data = this_data.correct_bandpass_filtering_1d([0, 6], np.ones, display_stuff)
+    # this_data = this_data.correct_bandpass_filtering_1d([0, 6], np.ones, display=display_stuff)
     # reapodize to remove filtering artefact (will not affect linewidth because already apodized)
     if(apodization_factor > 0):
-        this_data = this_data.correct_apodization_nd(apodization_factor, display_stuff)
-
-    # measure linewidth of NAA to help initialize stuff
-    this_linewidth_estimated = this_data.correct_zerofill_nd().analyze_linewidth_1d([1.8, 2.2], False, True)
+        this_data = this_data.correct_apodization_nd(apodization_factor, display=display_stuff)
 
     # %% fit non water-suppressed data
 
