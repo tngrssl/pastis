@@ -40,12 +40,19 @@ class fit_plot_type(Enum):
     TIME_DOMAIN = 7
 
 
-class fit_adjust_metabolite_mode(Enum):
+class fit_adjust_metabolites_mode(Enum):
     """The enum fit_adjust_metabolite_mode describes how the algorithm should look for fittable metabolites. See the method fit_pastis.adjust_metabolites() for more info."""
 
     OPTIMISTIC = 1
     AVERAGE = 2
     PESSIMISTIC = 3
+
+
+class fit_adjust_metabolites_when(Enum):
+    """The enum fit_adjust_metabolite_when describes when the algorithm should look for fittable metabolites."""
+
+    BEFORE_SECOND_FIT_ONLY = 1
+    BEFORE_EACH_FIT = 2
 
 
 class fit_tool():
@@ -267,9 +274,13 @@ class fit_lcmodel(fit_tool):
         df_data = self.data.to_dataframe(True, "data_")
         del df_attr["data"]
 
+        df_params_fit = self.params_fit.to_dataframe("params_fit_")
+        df_attr = df_attr.rename(columns = {'params_fit': 'params_fit_obj'})
+
         # append columns
         df = pd.concat([df_attr.reset_index(),
-                        df_data.reset_index()], axis=1)
+                        df_data.reset_index(),
+                        df_params_fit], axis=1)
 
         # add fit hash
         df["fit_hash"] = self.get_hash()
@@ -376,7 +387,11 @@ class fit_pastis(fit_tool):
         # record cost function
         self._cost_function = []
         # time
-        self._fit_time = None
+        self._fit_time = 0
+        # number of successive fits
+        self._fit_count = 0
+        # total time
+        self._fit_total_time = 0
         # FQN noise region
         self.fqn_noise_range = [-2, -1]
 
@@ -394,6 +409,14 @@ class fit_pastis(fit_tool):
         # --- display options ---
         # should we show the CRBs error bars during the fit?
         self.display_CRBs = True
+
+        # --- metabolite list adjustment options (experimental) ---
+        # SNR threshold to include or exclude a metabolite
+        self.metabolites_auto_adjust_threshold = 1
+        # see fit_adjust_metabolite_mode above
+        self.metabolites_auto_adjust_mode = None
+        # when to apply this tweak?
+        self.metabolites_auto_adjust_when = fit_adjust_metabolites_when.BEFORE_SECOND_FIT_ONLY
 
         # --- peak area integration options ---
         # ppm range to look for peak maximum
@@ -735,12 +758,33 @@ class fit_pastis(fit_tool):
         if(not self.sequence.ready):
             self.sequence.initialize(self.meta_bs)
 
+        # running metabolite list optimization now
+        if(self.metabolites_auto_adjust_mode is not None):
+            if(((self.metabolites_auto_adjust_when == fit_adjust_metabolites_when.BEFORE_SECOND_FIT_ONLY) and (self._fit_count == 1)) or
+               ((self.metabolites_auto_adjust_when == fit_adjust_metabolites_when.BEFORE_EACH_FIT))):
+
+                # test metabolite basis set
+                new_metabolites_list, metabolites_excluded_list = self.get_fittable_metabolites(self.metabolites_auto_adjust_threshold, self.metabolites_auto_adjust_mode)
+
+                if(len(metabolites_excluded_list) > 0):
+                    self.metabolites = new_metabolites_list
+                    # fix params according to new metabolite basis (hoping it does not break anything)
+                    # null excluded metabolites
+                    self.params_init[metabolites_excluded_list, xxx.p_cm] = 0.0
+                    # and lock them
+                    self.params_linklock[metabolites_excluded_list, :] = 1
+
         # reset linklock
         self._set_unique_linklock()
 
         # run
         pars_area, pars_area_pnorm = self._run_area_integration()
         params_fit, optim_result = self._run_linear_combination()
+
+        # number of successive fits
+        self._fit_count += 1
+        # total time
+        self._fit_total_time += self._fit_time
 
         # store
         log.info("saving fit results...")
@@ -769,7 +813,6 @@ class fit_pastis(fit_tool):
 
         # calling jacobian model
         j_full = self.sequence._jac(params)
-
 
         # linlock the jacobian vector
         # for each master parameter, sum the slave derivates
@@ -888,7 +931,7 @@ class fit_pastis(fit_tool):
 
         return(diff_cmplx_odd_even)
 
-    def get_fittable_metabolites(self, snr_threshold=1, mode=fit_adjust_metabolite_mode.AVERAGE):
+    def get_fittable_metabolites(self, snr_threshold=1, mode=fit_adjust_metabolites_mode.AVERAGE):
         """
         Adjust the list of metabolites to fit. This method is experimental. It runs an algorithm to try and test which metabolites are actually fittable. How? Based on their common concentration and simulated time-domain SNR. If the metabolite SNR is above the threshold (1, by default, meaning above noise level in short), the metabolite is kept in the fit list. The final metabolite basis set is printed on screen. This method should be run after the run() method in order to get some first fit results.
 
@@ -913,13 +956,13 @@ class fit_pastis(fit_tool):
         # correct for T1/T2 effects
         params_fit_ref = self.params_fit.correct_T2s(self.data.te).correct_T1s(self.data.tr)
         # go and get concentration for this metabolites according to literature
-        if(mode == fit_adjust_metabolite_mode.AVERAGE):
+        if(mode == fit_adjust_metabolites_mode.AVERAGE):
             cm_lit_ref = (self.meta_bs.get_literature_min() + self.meta_bs.get_literature_max()) / 2.0
             cm_lit_test = (self.meta_bs.get_literature_min() + self.meta_bs.get_literature_max()) / 2.0
-        elif(mode == fit_adjust_metabolite_mode.OPTIMISTIC):
+        elif(mode == fit_adjust_metabolites_mode.OPTIMISTIC):
             cm_lit_ref = self.meta_bs.get_literature_min()
             cm_lit_test = self.meta_bs.get_literature_max()
-        if(mode == fit_adjust_metabolite_mode.PESSIMISTIC):
+        if(mode == fit_adjust_metabolites_mode.PESSIMISTIC):
             cm_lit_ref = self.meta_bs.get_literature_max()
             cm_lit_test = self.meta_bs.get_literature_min()
 
@@ -1319,18 +1362,22 @@ class fit_pastis(fit_tool):
         df_params_min = self.params_min.to_dataframe("params_min_")
         df_params_max = self.params_max.to_dataframe("params_max_")
         df_params_init = self.params_init.to_dataframe("params_init_")
-        del df_attr["params_min"]
-        del df_attr["params_max"]
-        del df_attr["params_init"]
+
+        # keep objects
+        df_attr = df_attr.rename(columns = {'params_min': 'params_min_obj',
+                                            'params_max': 'params_max_obj',
+                                            'params_init': 'params_init_obj'})
 
         # if any results, do them too
         if((self.params_fit is not None) and (self.params_area is not None) and (self.params_area_pnorm is not None)):
             df_params_fit = self.params_fit.to_dataframe("params_fit_")
             df_params_area = self.params_area.to_dataframe("params_area_")
             df_params_area_pnorm = self.params_area_pnorm.to_dataframe("params_area_pnorm_")
-            del df_attr["params_fit"]
-            del df_attr["params_area"]
-            del df_attr["params_area_pnorm"]
+
+            # keep objects
+            df_attr = df_attr.rename(columns = {'params_fit': 'params_fit_obj',
+                                            'params_area': 'params_area_obj',
+                                            'params_area_pnorm_init': 'params_area_pnorm_obj'})
 
             # append columns
             df = pd.concat([df_attr.reset_index(),
