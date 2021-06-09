@@ -460,31 +460,35 @@ class params(np.ndarray):
             p3.linklock[:, xxx.p_dd] = 1
             p3.linklock[:, xxx.p_df] = 1
             p3.linklock[:, xxx.p_dp] = 1
-            # convert ot free params
+            # convert to free params
             p3_free = p3.toFreeParams()
             # here we should get a list of indexes
             # find where is mIndex and we did it
-            ind_free_pars_mIndex = np.where(p3_free == mIndex)[0][0]
-            # extract corr vector
-            free_param_corr_vec = free_param_corr_mat[:, ind_free_pars_mIndex]
-            # convert it to full params
-            p3 = self.copy()
-            # lock all other pars
-            p3.linklock[:, xxx.p_dd] = 1
-            p3.linklock[:, xxx.p_df] = 1
-            p3.linklock[:, xxx.p_dp] = 1
-            # replace cm by cor coeffs
-            p3 = p3.toFullParams(free_param_corr_vec)
-            # get full param corr vector
-            full_param_corr_vec = p3[:, xxx.p_cm]
-            # make it absolute
-            rc_num_den_abs = np.abs(full_param_corr_vec)
+            if(len(np.where(p3_free == mIndex)[0]) > 0):
+                ind_free_pars_mIndex = np.where(p3_free == mIndex)[0][0]
+                # extract corr vector
+                free_param_corr_vec = free_param_corr_mat[:, ind_free_pars_mIndex]
+                # convert it to full params
+                p3 = self.copy()
+                # lock all other pars
+                p3.linklock[:, xxx.p_dd] = 1
+                p3.linklock[:, xxx.p_df] = 1
+                p3.linklock[:, xxx.p_dp] = 1
+                # replace cm by cor coeffs
+                p3 = p3.toFullParams(free_param_corr_vec)
+                # get full param corr vector
+                full_param_corr_vec = p3[:, xxx.p_cm]
+                # make it absolute
+                rc_num_den_abs = np.abs(full_param_corr_vec)
 
-            # calculate the final relCRB
-            rel_CRBs_ratio = np.sqrt(relCRBs_num**2 + relCRBs_den**2 - 2 * rc_num_den_abs * relCRBs_num * relCRBs_den)
-            # back to absCRB
-            abs_CRBs_ratio = p2[:, xxx.p_cm] * rel_CRBs_ratio / 100.0
-            p2._errors[:, xxx.p_cm] = abs_CRBs_ratio
+                # calculate the final relCRB
+                rel_CRBs_ratio = np.sqrt(relCRBs_num**2 + relCRBs_den**2 - 2 * rc_num_den_abs * relCRBs_num * relCRBs_den)
+                # back to absCRB
+                abs_CRBs_ratio = p2[:, xxx.p_cm] * rel_CRBs_ratio / 100.0
+                p2._errors[:, xxx.p_cm] = abs_CRBs_ratio
+            else:
+                # if we fall here, it probably means that the fit that generated thsi param object was done without this metabolite. Therefore, no correlation coefficient available. So we switch to an approximate ratio error calculation: we take the error of the numerator only (which is actually what a lot of people do)...
+                log.warning("no correlation coefficient available for metabolite [%d]: cannot calculate the ratio error properly... Taking the numerator error instead. :(" % mIndex)
 
         return(p2)
 
