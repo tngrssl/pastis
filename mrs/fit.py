@@ -43,6 +43,7 @@ class fit_plot_type(Enum):
 class fit_adjust_metabolites_mode(Enum):
     """The enum fit_adjust_metabolite_mode describes how the algorithm should look for fittable metabolites. See the method fit_pastis.adjust_metabolites() for more info."""
 
+    NONE = 0
     OPTIMISTIC = 1
     AVERAGE = 2
     PESSIMISTIC = 3
@@ -51,6 +52,7 @@ class fit_adjust_metabolites_mode(Enum):
 class fit_adjust_metabolites_when(Enum):
     """The enum fit_adjust_metabolite_when describes when the algorithm should look for fittable metabolites."""
 
+    NEVER = 0
     BEFORE_SECOND_FIT_ONLY = 1
     BEFORE_EACH_FIT = 2
 
@@ -414,7 +416,7 @@ class fit_pastis(fit_tool):
         # SNR threshold to include or exclude a metabolite
         self.metabolites_auto_adjust_threshold = 1
         # see fit_adjust_metabolite_mode above
-        self.metabolites_auto_adjust_mode = None
+        self.metabolites_auto_adjust_mode = fit_adjust_metabolites_mode.NONE
         # when to apply this tweak?
         self.metabolites_auto_adjust_when = fit_adjust_metabolites_when.BEFORE_SECOND_FIT_ONLY
 
@@ -758,8 +760,10 @@ class fit_pastis(fit_tool):
         if(not self.sequence.ready):
             self.sequence.initialize(self.meta_bs)
 
-        # running metabolite list optimization now
-        if(self.metabolites_auto_adjust_mode is not None):
+        # running metabolite list optimization now if required and if we already have fit results
+        if((self.metabolites_auto_adjust_mode is not fit_adjust_metabolites_mode.NONE) and
+           (self.metabolites_auto_adjust_when is not fit_adjust_metabolites_when.NEVER) and
+           (self.params_fit is not None)):
             if(((self.metabolites_auto_adjust_when == fit_adjust_metabolites_when.BEFORE_SECOND_FIT_ONLY) and (self._fit_count == 1)) or
                ((self.metabolites_auto_adjust_when == fit_adjust_metabolites_when.BEFORE_EACH_FIT))):
 
