@@ -15,6 +15,8 @@ import mrs.log as log
 import numpy as np
 import pandas as pd
 import os
+import itertools
+from datetime import datetime
 
 import pdb
 
@@ -44,8 +46,12 @@ fit_ppm_range_nows = [4, 6]
 
 df = pd.read_pickle(db_filepath)
 
+#df = df.loc["e8481853cde6f05d66b1c43d8dd00e40"]
+
 #df = df.dropna(subset=["reco_dataset_raw_data_name"])
 #df = df.loc[df["reco_dataset_raw_data_name"].str.contains("319")]
+
+df = df.iloc[0]
 
 # keep a dataframe type, even if one line
 if(type(df) is pd.core.series.Series):
@@ -65,12 +71,15 @@ meta_bs_nows = sim.metabolite_basis_set(ppm_range=fit_ppm_range_nows)
 # list to save different strategies
 fit_ws_list = []
 
-# list of sequence to try
-#sequence_list = [None, sim.mrs_seq_press]
+# --- list of sequence to try ---
 sequence_list = [None]
+sequence_list.append(sim.mrs_seq_press)
 
-# --- easy strategy: singlets ---
-metabolites2fit = np.sort([
+# --- list of metabolite lists to try ---
+metabolites_list_list = []
+
+# --- all metabolites ---
+metabolites_list_list.append(np.sort([
     xxx.m_Ala,
     xxx.m_Asp,
     xxx.m_PCr,
@@ -92,34 +101,68 @@ metabolites2fit = np.sort([
     xxx.m_Water,
     xxx.m_LipA,
     xxx.m_LipB,
-    xxx.m_LipC])
+    xxx.m_LipC]))
 
-# linklock: relations between fit parameters
-linklock = np.full([len(meta_bs), 4], 1)
-# link singlets by linewidth and phase
-linklock[metabolites2fit, :] = [0, 300, 200, 100]
-linklock[xxx.m_Cr_CH3, :] = [0, -300, -200, -100]
-# link Cho, Cre, NAA CH3s to their recpective CH2s
-linklock[xxx.m_Cr_CH3, xxx.p_cm] = -1000
-linklock[xxx.m_Cr_CH2, xxx.p_cm] = 1000
-linklock[xxx.m_Cho_CH3, xxx.p_cm] = -2000
-linklock[xxx.m_Cho_CH2, xxx.p_cm] = 2000
-linklock[xxx.m_NAA_CH3, xxx.p_cm] = -3000
-linklock[xxx.m_NAA_CH2, xxx.p_cm] = 3000
+metabolites_list_list.append(np.sort([
+    xxx.m_Tau,
+    xxx.m_NAA_CH3,
+    xxx.m_Cr_CH3,
+    xxx.m_Cho_CH3,
+    xxx.m_mI,
+    xxx.m_Gln,
+    xxx.m_Glu,
+    xxx.m_Water,
+    xxx.m_LipA,
+    xxx.m_LipB,
+    xxx.m_LipC]))
 
-# leave water free
-linklock[xxx.m_Water, :] = [0, 0, 0, 0]
-# leave Lipids linewidth free
-linklock[[xxx.m_LipA, xxx.m_LipB, xxx.m_LipC], :] = [0, 0, 0, 100]
+# --- metabolite_auto_adjust ---
+metabolites_auto_adjust_mode_list = [fit.fit_adjust_metabolites_mode.NONE]
+metabolites_auto_adjust_mode_list.append(fit.fit_adjust_metabolites_mode.OPTIMISTIC)
+metabolites_auto_adjust_mode_list.append(fit.fit_adjust_metabolites_mode.AVERAGE)
+metabolites_auto_adjust_mode_list.append(fit.fit_adjust_metabolites_mode.PESSIMISTIC)
 
-# store this strategy
-for this_sequence in sequence_list:
+metabolites_auto_adjust_when_list = [fit.fit_adjust_metabolites_when.BEFORE_SECOND_FIT_ONLY]
+metabolites_auto_adjust_when_list.append(fit.fit_adjust_metabolites_when.BEFORE_EACH_FIT)
+
+param_big_list = itertools.product(metabolites_list_list,
+                                   sequence_list,
+                                   metabolites_auto_adjust_mode_list,
+                                   metabolites_auto_adjust_when_list)
+
+# create all fit strategies
+for (this_met_list, this_seq, this_met_adj_mode, this_met_adj_when) in param_big_list:
+
+    # linklock: relations between fit parameters
+    linklock = np.full([len(meta_bs), 4], 1)
+    # link singlets by linewidth and phase
+    linklock[this_met_list, :] = [0, 300, 200, 100]
+    linklock[xxx.m_Cr_CH3, :] = [0, -300, -200, -100]
+
+    # link Cho, Cre, NAA CH3s to their recpective CH2s if needed
+    if(xxx.m_Cr_CH2 in this_met_list):
+        linklock[xxx.m_Cr_CH3, xxx.p_cm] = -1000
+        linklock[xxx.m_Cr_CH2, xxx.p_cm] = 1000
+    if(xxx.m_Cho_CH2 in this_met_list):
+        linklock[xxx.m_Cho_CH3, xxx.p_cm] = -2000
+        linklock[xxx.m_Cho_CH2, xxx.p_cm] = 2000
+    if(xxx.m_NAA_CH2 in this_met_list):
+        linklock[xxx.m_NAA_CH3, xxx.p_cm] = -3000
+        linklock[xxx.m_NAA_CH2, xxx.p_cm] = 3000
+
+    # leave water free
+    linklock[xxx.m_Water, :] = [0, 0, 0, 0]
+    # leave Lipids linewidth free
+    linklock[[xxx.m_LipA, xxx.m_LipB, xxx.m_LipC], :] = [0, 0, 0, 100]
+
     this_fit = fit.fit_pastis(meta_bs=meta_bs)
-    this_fit.name = "pastis" + "_" + str(this_sequence)
     this_fit.metabolites_area_integration = [xxx.m_NAA_CH3, xxx.m_Cr_CH3, xxx.m_Cho_CH3]
     this_fit.area_integration_peak_ranges = [0.1, 0.1, 0.1]
-    this_fit.metabolites = metabolites2fit
-    this_fit.sequence = this_sequence
+    this_fit.metabolites = this_met_list
+    this_fit.sequence = this_seq
+    #
+    this_fit.metabolites_auto_adjust_mode = this_met_adj_mode
+    this_fit.metabolites_auto_adjust_when = this_met_adj_when
 
     # default fitting bounds from template
     this_fit.params_min = this_fit.params_min.set_default_min().add_macromolecules_min()
@@ -144,7 +187,7 @@ for this_sequence in sequence_list:
 
     # initial concentrations
     this_fit.params_init[:, xxx.p_cm] = 0.0
-    this_fit.params_init[metabolites2fit, xxx.p_cm] = 0.1
+    this_fit.params_init[this_met_list, xxx.p_cm] = 0.1
 
     # frequency shifts for metabolites and MMs
     this_fit.params_init[:, xxx.p_df] = 0.0
@@ -170,6 +213,9 @@ for this_sequence in sequence_list:
     this_fit.display_range_ppm = [0.5, 4.5]
     this_fit.display_frequency = 2
 
+    # name
+    this_fit.name = "pastis_" + str(len(this_met_list)) + "metabolites_" + str(this_seq) + "_" + str(this_met_adj_mode) + "_" + str(this_met_adj_when)
+
     # store
     fit_ws_list.append(this_fit)
 
@@ -188,7 +234,7 @@ water_concentration = 55000.0  # mmol/kg
 fit_nows = fit.fit_pastis(meta_bs=meta_bs_nows)
 
 fit_nows.name = "water fit"
-fit_nows.metabolites = metabolites2fit
+fit_nows.metabolites = metabolites_list_list[0]
 
 # peak area integration
 fit_nows.area_integration_peaks = [xxx.m_Water]
@@ -221,7 +267,7 @@ fit_nows.display_enable = display_stuff
 fit_results_list = []
 
 # browse though datasets
-for this_index, this_row in df.iterrows():
+for this_row_i, (this_index, this_row) in enumerate(df.iterrows()):
 
     this_raw_data = this_row["reco_dataset_raw_data_obj"]
     this_dcm_data = this_row["reco_dataset_dcm_data_obj"]
@@ -254,11 +300,11 @@ for this_index, this_row in df.iterrows():
     this_fit_nows = fit_nows.copy()
     this_fit_nows.data = this_data.data_ref.copy()
     this_fit_nows.run()
-    this_fit_nows_df = this_fit_nows.to_dataframe('nows_')
+    this_fit_nows_df = this_fit_nows.to_dataframe('fit_nows_')
 
     # %% use various fit strategies
-    fit_ws = fit_ws_list[0]
-    for fit_ws in fit_ws_list:
+    for fit_ws_i, fit_ws in enumerate(fit_ws_list):
+        fit_ws_i += 1
 
         # --- fit water-suppressed data ---
         this_fit_ws = fit_ws.copy()
@@ -273,17 +319,6 @@ for this_index, this_row in df.iterrows():
 
             # run the fit
             this_fit_ws.run()
-
-            # test metabolite basis set
-            new_metabolites_list, metabolites_excluded_list = this_fit_ws.get_fittable_metabolites(mode=fit.fit_adjust_metabolite_mode.OPTIMISTIC)
-
-            if(len(metabolites_excluded_list) > 0):
-                this_fit_ws.metabolites = new_metabolites_list
-                # fix params according to new metabolite basis (hoping it does not break anything)
-                # null excluded metabolites
-                this_fit_ws.params_init[metabolites_excluded_list, xxx.p_cm] = 0.0
-                # and lock them
-                this_fit_ws.params_linklock[metabolites_excluded_list, :] = 1
 
             # now, low constraints, dichotomic range shrinking
             n_iter = 3
@@ -326,10 +361,14 @@ for this_index, this_row in df.iterrows():
             this_fit_ws.run()
 
         # --- save the fit results ---
-        this_fit_ws_df = this_fit_ws.to_dataframe('ws_')
+        this_fit_ws_df = this_fit_ws.to_dataframe('fit_ws_')
         this_fit_df = pd.concat([this_fit_ws_df, this_fit_nows_df], axis=1)
-        this_fit_df = this_fit_df.set_index(["ws_fit_hash", "ws_data_file_hash"])
+        this_fit_df = this_fit_df.set_index(["fit_ws_fit_hash", "fit_ws_data_file_hash"])
         fit_results_list.append(this_fit_df)
+
+        # --- store progress ---
+        prct_done = (this_row_i * len(fit_ws_list) + fit_ws_i) / (len(df) * len(fit_ws_list)) * 100.0
+        os.system("echo " + str(datetime.now()) + " " + os.path.basename(__file__) + "/" + os.path.basename(db_filepath) + ": %.1f%% >> progress.txt" % prct_done)
 
 
 # append all the results and store
