@@ -1061,7 +1061,7 @@ class fit_pastis(fit_tool):
         h : string
             Hash code of this strategy. Usefull later when dealing with databases...
         """
-        bytes_to_hash = np.array(self.metabolites).tobytes() + self.params_linklock.tobytes() + str(self.sequence).encode()
+        bytes_to_hash = np.array(self.metabolites).tobytes() + np.array(self.metabolites_area_integration).tobytes() + self.params_linklock.tobytes() + str(self.sequence).encode() + str(self.optim_jacobian).encode() + np.array(self.optim_ppm_range).tobytes() + str(self.optim_xtol).encode() + str(self.optim_ftol).encode() + str(self.optim_gtol).encode() + self.optim_method.encode() + np.array(self.fqn_noise_range).tobytes() + str(self.metabolites_auto_adjust_threshold).encode() + str(self.metabolites_auto_adjust_mode).encode() + str(self.metabolites_auto_adjust_when).encode() + str(self.area_integration_peak_ranges).encode()
 
         h = hashlib.md5(bytes_to_hash)
 
@@ -1381,7 +1381,7 @@ class fit_pastis(fit_tool):
             # keep objects
             df_attr = df_attr.rename(columns = {'params_fit': 'params_fit_obj',
                                             'params_area': 'params_area_obj',
-                                            'params_area_pnorm_init': 'params_area_pnorm_obj'})
+                                            'params_area_pnorm': 'params_area_pnorm_obj'})
 
             # append columns
             df = pd.concat([df_attr.reset_index(),
