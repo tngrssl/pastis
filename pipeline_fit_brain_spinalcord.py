@@ -51,7 +51,7 @@ df = pd.read_pickle(db_filepath)
 #df = df.dropna(subset=["reco_dataset_raw_data_name"])
 #df = df.loc[df["reco_dataset_raw_data_name"].str.contains("319")]
 
-df = df.iloc[0]
+#df = df.iloc[0]
 
 # keep a dataframe type, even if one line
 if(type(df) is pd.core.series.Series):
@@ -106,6 +106,22 @@ metabolites_list_list.append(np.sort([
 metabolites_list_list.append(np.sort([
     xxx.m_Tau,
     xxx.m_NAA_CH3,
+    xxx.m_NAA_CH2,
+    xxx.m_Cr_CH3,
+    xxx.m_Cr_CH2,
+    xxx.m_Cho_CH3,
+    xxx.m_Cho_CH2,
+    xxx.m_mI,
+    xxx.m_Gln,
+    xxx.m_Glu,
+    xxx.m_Water,
+    xxx.m_LipA,
+    xxx.m_LipB,
+    xxx.m_LipC]))
+
+metabolites_list_list.append(np.sort([
+    xxx.m_Tau,
+    xxx.m_NAA_CH3,
     xxx.m_Cr_CH3,
     xxx.m_Cho_CH3,
     xxx.m_mI,
@@ -116,22 +132,19 @@ metabolites_list_list.append(np.sort([
     xxx.m_LipB,
     xxx.m_LipC]))
 
-# --- metabolite_auto_adjust ---
-metabolites_auto_adjust_mode_list = [fit.fit_adjust_metabolites_mode.NONE]
-metabolites_auto_adjust_mode_list.append(fit.fit_adjust_metabolites_mode.OPTIMISTIC)
-metabolites_auto_adjust_mode_list.append(fit.fit_adjust_metabolites_mode.AVERAGE)
-metabolites_auto_adjust_mode_list.append(fit.fit_adjust_metabolites_mode.PESSIMISTIC)
+metabolites_list_list.append(np.sort([
+    xxx.m_NAA_CH3,
+    xxx.m_Cr_CH3,
+    xxx.m_Cho_CH3,
+    xxx.m_Water,
+    xxx.m_LipA,
+    xxx.m_LipB,
+    xxx.m_LipC]))
 
-metabolites_auto_adjust_when_list = [fit.fit_adjust_metabolites_when.BEFORE_SECOND_FIT_ONLY]
-metabolites_auto_adjust_when_list.append(fit.fit_adjust_metabolites_when.BEFORE_EACH_FIT)
-
-param_big_list = itertools.product(metabolites_list_list,
-                                   sequence_list,
-                                   metabolites_auto_adjust_mode_list,
-                                   metabolites_auto_adjust_when_list)
+param_big_list = itertools.product(metabolites_list_list, sequence_list)
 
 # create all fit strategies
-for (this_met_list, this_seq, this_met_adj_mode, this_met_adj_when) in param_big_list:
+for (this_met_list, this_seq) in param_big_list:
 
     # linklock: relations between fit parameters
     linklock = np.full([len(meta_bs), 4], 1)
@@ -160,9 +173,6 @@ for (this_met_list, this_seq, this_met_adj_mode, this_met_adj_when) in param_big
     this_fit.area_integration_peak_ranges = [0.1, 0.1, 0.1]
     this_fit.metabolites = this_met_list
     this_fit.sequence = this_seq
-    #
-    this_fit.metabolites_auto_adjust_mode = this_met_adj_mode
-    this_fit.metabolites_auto_adjust_when = this_met_adj_when
 
     # default fitting bounds from template
     this_fit.params_min = this_fit.params_min.set_default_min().add_macromolecules_min()
@@ -214,7 +224,7 @@ for (this_met_list, this_seq, this_met_adj_mode, this_met_adj_when) in param_big
     this_fit.display_frequency = 2
 
     # name
-    this_fit.name = "pastis_" + str(len(this_met_list)) + "metabolites_" + str(this_seq) + "_" + str(this_met_adj_mode) + "_" + str(this_met_adj_when)
+    this_fit.name = "pastis_" + str(len(this_met_list)) + "metabolites_" + str(this_seq)
 
     # store
     fit_ws_list.append(this_fit)
@@ -354,7 +364,6 @@ for this_row_i, (this_index, this_row) in enumerate(df.iterrows()):
                     this_fit_ws.params_linklock[xxx.m_NAA_CH3, xxx.p_cm] = -3000
                     this_fit_ws.params_linklock[xxx.m_NAA_CH2, xxx.p_cm] = 3000
                 # run the fit
-                this_fit_ws.sequence = sim.mrs_seq_press
                 this_fit_ws.run()
         else:
             # if LCModel fit, just run it
