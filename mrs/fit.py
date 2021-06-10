@@ -738,7 +738,7 @@ class fit_pastis(fit_tool):
         # sequence
         if(self.sequence is None):
             self.sequence = self.data.sequence
-        else:
+        elif(type(self.sequence) is type):
             self.sequence = self.sequence(self.data.sequence.te,
                                           self.data.sequence.tr,
                                           self.data.sequence.na,
@@ -748,6 +748,9 @@ class fit_pastis(fit_tool):
                                           self.data.sequence.voxel_size,
                                           self.data.sequence.fs,
                                           self.data.sequence.f0)
+        else:
+            # means it is already an instance
+            pass
 
         # do we need to adapt our ppm range?
         if(self.optim_ppm_range != self.meta_bs.ppm_range):
