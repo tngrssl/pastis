@@ -12,10 +12,10 @@ PASTIS relies a lot on the suspect package.
 
 * Python 3.7
 * Python packages:
-    * pyGAMMA (https://scion.duhs.duke.edu/vespa/gamma/wiki/PyGamma)
-    * numpy suspect pandas pymapvbvd xlrd termcolor
+    * pygamma numpy suspect pandas pymapvbvd xlrd termcolor
 
 * GAMMA library installed on system (https://scion.duhs.duke.edu/vespa/gamma/)
+    * apt-get install gamma (Debian/Ubuntu)
 
 ## Features
 
