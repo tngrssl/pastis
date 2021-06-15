@@ -30,7 +30,7 @@ plt.rcParams['font.size'] = 9
 log.setLevel(log.INFO)
 
 # data to process is in here
-db_filepath = "/home/tangir/crmbm/acq_db/brain.pkl"
+db_filepath = "/home/tangir/crmbm/acq_db/sc_nodatarej_norea.pkl"
 
 # apodize before fitting (WARNING WARNING experimental achtung)
 apodization_factor = 0.0
@@ -39,14 +39,14 @@ apodization_factor = 0.0
 display_stuff = False
 
 # fit ppm ranges
-fit_ppm_range_ws = [0.5, 4.3]
+fit_ppm_range_ws = [0.5, 4.2]
 fit_ppm_range_nows = [4, 6]
 
 # %% select datasets via dataframe
 
 df = pd.read_pickle(db_filepath)
 
-#df = df.loc["e8481853cde6f05d66b1c43d8dd00e40"]
+#df = df.loc["2fff316122fc89a0b4d1f918f6cd62d8"]
 
 #df = df.dropna(subset=["reco_dataset_raw_data_name"])
 #df = df.loc[df["reco_dataset_raw_data_name"].str.contains("319")]
@@ -82,19 +82,18 @@ metabolites_list_list = []
 metabolites_list_list.append(np.sort([
     xxx.m_Ala,
     xxx.m_Asp,
-    xxx.m_PCr,
     xxx.m_GABA,
     xxx.m_Gsh,
     xxx.m_Lac,
+    xxx.m_NAA,
     xxx.m_NAAG,
     xxx.m_sI,
     xxx.m_Tau,
-    xxx.m_NAA_CH3,
-    xxx.m_NAA_CH2,
     xxx.m_Cr_CH3,
     xxx.m_Cr_CH2,
-    xxx.m_Cho_CH3,
-    xxx.m_Cho_CH2,
+    xxx.m_PCr,
+    xxx.m_GPC,
+    xxx.m_PC,
     xxx.m_mI,
     xxx.m_Gln,
     xxx.m_Glu,
@@ -105,12 +104,13 @@ metabolites_list_list.append(np.sort([
 
 metabolites_list_list.append(np.sort([
     xxx.m_Tau,
-    xxx.m_NAA_CH3,
-    xxx.m_NAA_CH2,
+    xxx.m_NAA,
+    xxx.m_NAAG,
     xxx.m_Cr_CH3,
     xxx.m_Cr_CH2,
-    xxx.m_Cho_CH3,
-    xxx.m_Cho_CH2,
+    xxx.m_PCr,
+    xxx.m_GPC,
+    xxx.m_PC,
     xxx.m_mI,
     xxx.m_Gln,
     xxx.m_Glu,
@@ -121,21 +121,13 @@ metabolites_list_list.append(np.sort([
 
 metabolites_list_list.append(np.sort([
     xxx.m_Tau,
-    xxx.m_NAA_CH3,
+    xxx.m_NAA,
+    xxx.m_NAAG,
     xxx.m_Cr_CH3,
-    xxx.m_Cho_CH3,
-    xxx.m_mI,
-    xxx.m_Gln,
-    xxx.m_Glu,
-    xxx.m_Water,
-    xxx.m_LipA,
-    xxx.m_LipB,
-    xxx.m_LipC]))
-
-metabolites_list_list.append(np.sort([
-    xxx.m_NAA_CH3,
-    xxx.m_Cr_CH3,
-    xxx.m_Cho_CH3,
+    xxx.m_Cr_CH2,
+    xxx.m_PCr,
+    xxx.m_GPC,
+    xxx.m_PC,
     xxx.m_Water,
     xxx.m_LipA,
     xxx.m_LipB,
@@ -151,17 +143,6 @@ for (this_met_list, this_seq) in param_big_list:
     # link singlets by linewidth and phase
     linklock[this_met_list, :] = [0, 300, 200, 100]
     linklock[xxx.m_Cr_CH3, :] = [0, -300, -200, -100]
-
-    # link Cho, Cre, NAA CH3s to their recpective CH2s if needed
-    if(xxx.m_Cr_CH2 in this_met_list):
-        linklock[xxx.m_Cr_CH3, xxx.p_cm] = -1000
-        linklock[xxx.m_Cr_CH2, xxx.p_cm] = 1000
-    if(xxx.m_Cho_CH2 in this_met_list):
-        linklock[xxx.m_Cho_CH3, xxx.p_cm] = -2000
-        linklock[xxx.m_Cho_CH2, xxx.p_cm] = 2000
-    if(xxx.m_NAA_CH2 in this_met_list):
-        linklock[xxx.m_NAA_CH3, xxx.p_cm] = -3000
-        linklock[xxx.m_NAA_CH2, xxx.p_cm] = 3000
 
     # leave water free
     linklock[xxx.m_Water, :] = [0, 0, 0, 0]
@@ -352,17 +333,6 @@ for this_row_i, (this_index, this_row) in enumerate(df.iterrows()):
                 this_fit_ws.params_max[this_fit_ws.metabolites, :] = this_fit_ws.params_fit[this_fit_ws.metabolites, :] + params_min_max_range / 2.0
                 this_fit_ws.params_init[this_fit_ws.metabolites, :] = this_fit_ws.params_fit[this_fit_ws.metabolites, :]
 
-                # unlink all parameters except Cr, Cho, NAA if there
-                this_fit_ws.params_linklock[this_fit_ws.metabolites, :] = 0
-                if(xxx.m_Cr_CH2 in this_fit_ws.metabolites):
-                    this_fit_ws.params_linklock[xxx.m_Cr_CH3, xxx.p_cm] = -1000
-                    this_fit_ws.params_linklock[xxx.m_Cr_CH2, xxx.p_cm] = 1000
-                if(xxx.m_Cho_CH2 in this_fit_ws.metabolites):
-                    this_fit_ws.params_linklock[xxx.m_Cho_CH3, xxx.p_cm] = -2000
-                    this_fit_ws.params_linklock[xxx.m_Cho_CH2, xxx.p_cm] = 2000
-                if(xxx.m_NAA_CH2 in this_fit_ws.metabolites):
-                    this_fit_ws.params_linklock[xxx.m_NAA_CH3, xxx.p_cm] = -3000
-                    this_fit_ws.params_linklock[xxx.m_NAA_CH2, xxx.p_cm] = 3000
                 # run the fit
                 this_fit_ws.run()
         else:
