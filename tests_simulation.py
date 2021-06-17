@@ -38,7 +38,7 @@ f0_list = [123.198361, 297.205620]  # MHz
 te_list = np.arange(1.0, 400.0, 50.0)  # ms
 
 # metabolite db
-meta_bs = sim.metabolite_basis_set(basis_set_name=basis_set_name, non_coupled_only=True, one_proton_mode=True)
+meta_bs = sim.metabolite_basis_set(basis_set_name=basis_set_name)
 
 df_list = []
 for this_seq in seq_list:
@@ -73,7 +73,7 @@ sim.GAMMA_LIB_LOADED = False
 te = 55.0
 basis_set_name = 'Muscle'
 basis_set_pkl_file = "20210331_muscle.pkl"
-meta_bs = sim.metabolite_basis_set(basis_set_name=basis_set_name, non_coupled_only=True, one_proton_mode=True)
+meta_bs = sim.metabolite_basis_set(basis_set_name=basis_set_name)
 
 seq = sim.mrs_seq_press(te)
 seq.db_file = basis_set_pkl_file
@@ -108,6 +108,26 @@ ax = fig.subplots()
 fig.canvas.set_window_title("sim_datasets")
 ax.set_title("pyGAMMA simulation of MR spectrum\nTemplate=" + meta_bs.basis_set_name + " | Sequence=" + seq.name + " | TE=" + str(seq.te) + "ms")
 fit.disp_fit(ax, ss_mod, p_human, seq, True, True)
+
+# %% testing simuation ppm range
+
+sim.GAMMA_LIB_LOADED = True
+
+te = 30.0
+
+meta_bs = sim.metabolite_basis_set()
+
+seq = sim.mrs_seq_press(te)
+seq.bandpass_filter_range_ppm =[-2, 5]
+seq.initialize(meta_bs)
+
+p_test = ( sim.params(meta_bs).set_default_min() + sim.params(meta_bs).set_default_max() )/ 2
+p_test[:, xxx.p_dd] = 10
+
+ss = seq.simulate_signal(p_test)
+p_test.print()
+
+ss.display_spectrum_1d(display_range=[-5, 15])
 
 # %% lipid spectrum: simple model with individual lipid components
 
