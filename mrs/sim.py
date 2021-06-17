@@ -828,6 +828,9 @@ class mrs_sequence:
         # NMR simulation option: when hard zero-duration RF pulse are employed, should we take into account the duration of the real pulses in the evolution times or not? Experimentally, looks like yes.
         self.allow_evolution_during_hard_pulses = True
 
+        # band-pass filter signals
+        self.bandpass_filter_range_ppm = None
+
         # in case GAMMA could not be loaded, we can load the sequence from a stored file
         self.db_file = None
 
@@ -935,7 +938,8 @@ class mrs_sequence:
             elif(iso[i_spin] == 31):
                 sys.isotope(i_spin, '31P')
             else:
-                log.error(str(iso[i_spin]) + ", that is weird nuclei!")
+                pass
+                #log.error(str(iso[i_spin]) + ", that is weird nuclei!")
 
             # set the ppm
             sys.PPM(i_spin, ppm[i_spin])
@@ -1017,6 +1021,11 @@ class mrs_sequence:
                 log.info("simulating MRS signal for metabolite [%s/%s]..." % (this_metagroup_key, this_meta_key))
                 # build up the metabolite group
                 s = s + self._run_sequence(this_meta_entry)
+                
+            # band pass filter?
+            if(self.bandpass_filter_range_ppm is not None):
+                s = s.correct_bandpass_filtering_1d(self.bandpass_filter_range_ppm, np.ones)
+                    
             # append this metabolite group to the metabase
             self._meta_signals.append(s)
 
@@ -1079,14 +1088,9 @@ class mrs_sequence:
         log.info("complicated stuff match: n=%d (%r)" % (len(df), self.allow_evolution_during_hard_pulses))
 
         # metabolites
-        df["sequence_metabolite_basisset_ppm_range_0"] = [r[0] for r in df["sequence_metabolite_basisset_ppm_range"]]
-        df["sequence_metabolite_basisset_ppm_range_1"] = [r[1] for r in df["sequence_metabolite_basisset_ppm_range"]]
+        df["sequence_metabolite_basisset_obj_eq"] = [pd.json_normalize(mb).equals(pd.json_normalize(dict(self.meta_bs))) for mb in df["sequence_metabolite_basisset_obj"]]
         df = df.loc[(df["sequence_metabolite_basisset_basis_set_name"] == self.meta_bs.basis_set_name) &
-                            (df["sequence_metabolite_basisset_ppm_range_0"] == self.meta_bs.ppm_range[0]) &
-                            (df["sequence_metabolite_basisset_ppm_range_1"] == self.meta_bs.ppm_range[1]) &
-                            (df["sequence_metabolite_basisset_non_coupled_only"] == self.meta_bs.non_coupled_only) &
-                            (df["sequence_metabolite_basisset_one_proton_mode"] == self.meta_bs.one_proton_mode) &
-                            (df["sequence_metabolite_basisset_obj"] == dict(self.meta_bs))]
+                            (df["sequence_metabolite_basisset_obj_eq"])]
         log.info("metabolites match: n=%d" % len(df))
 
         if(len(df) == 0):
@@ -1726,7 +1730,7 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
         # number of measurements in the previous range
         self.pulse_rfc_optim_power_voltage_n = 50
         # which metabolites should we test (separately)
-        self.pulse_rfc_optim_power_metabolites = [xxx.m_Water, xxx.m_Eth]
+        self.pulse_rfc_optim_power_metabolites = [xxx.m_Water]
         # margins/threshold parameters to estimate optimal RF power. By default:
         # [0] 10% last points (for higher power) used for plateau estimation
         # [1] 10% change allowed
@@ -2618,7 +2622,7 @@ class metabolite_basis_set(dict):
             log.error_new_attribute(key)
         object.__setattr__(self, key, value)
 
-    def __init__(self, basis_set_name=default_paths.DEFAULT_META_BASIS_SET_NAME, database_xls_file=default_paths.DEFAULT_META_DB_FILE, ppm_range=[0, 6], non_coupled_only=False, one_proton_mode=False):
+    def __init__(self, basis_set_name=default_paths.DEFAULT_META_BASIS_SET_NAME, database_xls_file=default_paths.DEFAULT_META_DB_FILE):
         """
         Construct a metabolite_basis_set object.
 
@@ -2628,37 +2632,16 @@ class metabolite_basis_set(dict):
             Metabolite basis set name corresponding the a "Template_BASISSETNAME" tab in the xls file
         database_xls_file : string
             Excel file containing metabolite chemical shifts, J-coupling, etc.
-        ppm_range : list
-            Will keep chemical shifts in this range
-        non_coupled_only : boolean
-            Keep only non-coupled resonances (J=0Hz)
-        one_proton_mode : boolean
-            Consider only 1 proton per resonance
         """
         super(metabolite_basis_set, self).__init__()
         # xls file that contains metabolites properties (you should not change that)
         # xls file that contains your metabolite basis set
         self.basis_set_name = basis_set_name
         self._xls_file = default_paths.DEFAULT_META_DB_FILE
-        # include peaks only in this range of chemical shifts
-        self.ppm_range = ppm_range
-        # include only non-coupled peaks
-        self.non_coupled_only = non_coupled_only
-        # set all metabolites to have only one peak (first chemical shift) and one proton
-        # one proton only for each metabolite
-        self.one_proton_mode = one_proton_mode
 
         log.info("initializing metabolite database...")
         self._read_xls_file()
         self._write_header_file()
-
-        # single proton AMARES style?
-        if(self.one_proton_mode):
-            for m in list(self.keys()):
-                for sm in list(self[m]["metabolites"].keys()):
-                    self[m]["metabolites"][sm]["ppm"] = np.array([self[m]["metabolites"][sm]["ppm"][0]])
-                    self[m]["metabolites"][sm]["iso"] = np.array([self[m]["metabolites"][sm]["iso"][0]])
-                    self[m]["metabolites"][sm]["J"] = np.array([[self[m]["metabolites"][sm]["J"][0][0]]])
 
         # freeze
         self.__isfrozen = True
@@ -2762,9 +2745,6 @@ class metabolite_basis_set(dict):
                     this_meta_mask = ~np.isnan(this_ppm_list)
                     this_ppm_list = this_ppm_list[this_meta_mask]
 
-                    # ppm filtering: hope that works
-                    this_ppm_list[(this_ppm_list < self.ppm_range[0]) | (this_ppm_list > self.ppm_range[1])] = 100.0
-
                     # iso
                     this_meta_iso_line = np.array(sheet_iso.row_values(this_meta_ind))
                     this_meta_iso_line[this_meta_iso_line == ''] = np.nan
@@ -2787,17 +2767,11 @@ class metabolite_basis_set(dict):
                         # if no sheet, put all J-couplings to zeroes
                         this_j_list = np.zeros([len(this_ppm_list), len(this_ppm_list)])
 
-                    # filter coupled and non-coupled peaks
-                    if(self.non_coupled_only):
-                        # sum up one axis
-                        this_j_list_summed = np.sum(np.abs(this_j_list), axis=0)
-                        this_j_list_summed_mask = (this_j_list_summed != 0.0)
-                        this_ppm_list[this_j_list_summed_mask] = 100.0
-
                     # append metabolite entry for this metabolite group
                     this_metagroup_entry["metabolites"][this_meta_name] = {"ppm": this_ppm_list, "iso": this_iso_list, "J": this_j_list}
+
             if(len(this_metagroup_entry["metabolites"]) == 0):
-                log.error("Metabolite %s is empty! Check your metabolite basis set in the XLS file!" % this_metagroup_name)
+                log.error("metabolite %s is empty! Check your metabolite basis set in the XLS file!" % this_metagroup_name)
 
             # add extra infos to metabolite group
             # is it a MM?

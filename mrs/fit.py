@@ -374,8 +374,8 @@ class fit_pastis(fit_tool):
         # --- optimization options ---
         # should we use jacobin information during the fit or not?
         self.optim_jacobian = True
-        # ppm range (By default, use metabolite_basis_set ppm range)
-        self.optim_ppm_range = self.meta_bs.ppm_range
+        # ppm range
+        self.optim_ppm_range = None
         # stop fit if parameter changes go below this tolerance
         self.optim_xtol = 1e-9
         # stop fit if (error?) function changes go below this tolerance
@@ -411,14 +411,6 @@ class fit_pastis(fit_tool):
         # --- display options ---
         # should we show the CRBs error bars during the fit?
         self.display_CRBs = True
-
-        # --- metabolite list adjustment options (experimental) ---
-        # SNR threshold to include or exclude a metabolite
-        self.metabolites_auto_adjust_threshold = 1
-        # see fit_adjust_metabolite_mode above
-        self.metabolites_auto_adjust_mode = fit_adjust_metabolites_mode.NONE
-        # when to apply this tweak?
-        self.metabolites_auto_adjust_when = fit_adjust_metabolites_when.BEFORE_SECOND_FIT_ONLY
 
         # --- peak area integration options ---
         # ppm range to look for peak maximum
@@ -753,33 +745,15 @@ class fit_pastis(fit_tool):
             pass
 
         # do we need to adapt our ppm range?
-        if(self.optim_ppm_range != self.meta_bs.ppm_range):
-            # we need to reinitialize the metabolite basis set
-            self.meta_bs.ppm_range = self.optim_ppm_range
+        if(self.optim_ppm_range != self.sequence.bandpass_filter_range_ppm):
+            # we need to reinitialize the sequence
+            self.sequence.bandpass_filter_range_ppm = self.optim_ppm_range
             # force reinit of sequence
             self.sequence._ready = False
 
-        # initialize sequence if needed
-        if(not self.sequence.ready):
+        # initialize sequence if needed with correct ppm range
+        if((not self.sequence.ready) or () ):
             self.sequence.initialize(self.meta_bs)
-
-        # running metabolite list optimization now if required and if we already have fit results
-        if((self.metabolites_auto_adjust_mode is not fit_adjust_metabolites_mode.NONE) and
-           (self.metabolites_auto_adjust_when is not fit_adjust_metabolites_when.NEVER) and
-           (self.params_fit is not None)):
-            if(((self.metabolites_auto_adjust_when == fit_adjust_metabolites_when.BEFORE_SECOND_FIT_ONLY) and (self._fit_count == 1)) or
-               ((self.metabolites_auto_adjust_when == fit_adjust_metabolites_when.BEFORE_EACH_FIT))):
-
-                # test metabolite basis set
-                new_metabolites_list, metabolites_excluded_list = self.get_fittable_metabolites(self.metabolites_auto_adjust_threshold, self.metabolites_auto_adjust_mode)
-
-                if(len(metabolites_excluded_list) > 0):
-                    self.metabolites = new_metabolites_list
-                    # fix params according to new metabolite basis (hoping it does not break anything)
-                    # null excluded metabolites
-                    self.params_init[metabolites_excluded_list, xxx.p_cm] = 0.0
-                    # and lock them
-                    self.params_linklock[metabolites_excluded_list, :] = 1
 
         # reset linklock
         self._set_unique_linklock()
@@ -1064,7 +1038,7 @@ class fit_pastis(fit_tool):
         h : string
             Hash code of this strategy. Usefull later when dealing with databases...
         """
-        bytes_to_hash = np.array(self.metabolites).tobytes() + np.array(self.metabolites_area_integration).tobytes() + self.params_linklock.tobytes() + str(self.sequence).encode() + str(self.optim_jacobian).encode() + np.array(self.optim_ppm_range).tobytes() + str(self.optim_xtol).encode() + str(self.optim_ftol).encode() + str(self.optim_gtol).encode() + self.optim_method.encode() + np.array(self.fqn_noise_range).tobytes() + str(self.metabolites_auto_adjust_threshold).encode() + str(self.metabolites_auto_adjust_mode).encode() + str(self.metabolites_auto_adjust_when).encode() + str(self.area_integration_peak_ranges).encode()
+        bytes_to_hash = np.array(self.metabolites).tobytes() + np.array(self.metabolites_area_integration).tobytes() + self.params_linklock.tobytes() + str(self.sequence).encode() + str(self.optim_jacobian).encode() + np.array(self.optim_ppm_range).tobytes() + str(self.optim_xtol).encode() + str(self.optim_ftol).encode() + str(self.optim_gtol).encode() + self.optim_method.encode() + np.array(self.fqn_noise_range).tobytes() + str(self.area_integration_peak_ranges).encode()
 
         h = hashlib.md5(bytes_to_hash)
 

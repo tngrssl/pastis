@@ -32,26 +32,27 @@ log.setLevel(log.INFO)
 # data to process is in here
 db_filepath = "/home/tangir/crmbm/acq_db/sc_nodatarej_norea.pkl"
 
-# apodize before fitting (WARNING WARNING experimental achtung)
-apodization_factor = 0.0
-
 # display real-time fit and other stuff?
 display_stuff = False
+display_range_ppm_ws = [0, 6]
+display_range_ppm_nows = [4, 6]
 
-# fit ppm ranges
-fit_ppm_range_ws = [0.5, 4.2]
+# remove residual water with HLSVD?
+remove_residual_water = True
+
+# remove lipids with HLSVD?
+remove_lipids = True
+
+# fit ppm ranges (experimental)
+fit_ppm_range_ws = [-2, 5]
 fit_ppm_range_nows = [4, 6]
 
 # %% select datasets via dataframe
 
 df = pd.read_pickle(db_filepath)
 
-#df = df.loc["2fff316122fc89a0b4d1f918f6cd62d8"]
-
-#df = df.dropna(subset=["reco_dataset_raw_data_name"])
-#df = df.loc[df["reco_dataset_raw_data_name"].str.contains("319")]
-
-#df = df.iloc[0]
+#df = df.loc["b057a3e07319341e032e3c6c36ec4d83"]
+#df = df.iloc[13]
 
 # keep a dataframe type, even if one line
 if(type(df) is pd.core.series.Series):
@@ -62,9 +63,9 @@ print(df)
 # %% prepare simulation machine
 
 # metabolite db for metabolites
-meta_bs = sim.metabolite_basis_set(ppm_range=fit_ppm_range_ws)
+meta_bs = sim.metabolite_basis_set()
 # for water
-meta_bs_nows = sim.metabolite_basis_set(ppm_range=fit_ppm_range_nows)
+meta_bs_nows = sim.metabolite_basis_set()
 
 # %% data fit strategies
 
@@ -164,7 +165,7 @@ for (this_met_list, this_seq) in param_big_list:
 
     # ranges for concentration
     this_fit.params_min[:, xxx.p_cm] = 0.0
-    this_fit.params_max[:, xxx.p_cm] = 300.0
+    this_fit.params_max[:, xxx.p_cm] = 200.0
     this_fit.params_max[xxx.m_All_MMs, xxx.p_cm] = 1000.0
     this_fit.params_max[xxx.m_Water, xxx.p_cm] = 100000.0
 
@@ -172,7 +173,7 @@ for (this_met_list, this_seq) in param_big_list:
     this_fit.params_min[:, xxx.p_dd] = 5
 
     # let the MMs go above
-    this_fit.params_max[xxx.m_All_MMs, xxx.p_dd] = 200
+    this_fit.params_max[xxx.m_All_MMs, xxx.p_dd] = 300
     # start with very narrow peaks / long-T2 FID
     this_fit.params_init[:, xxx.p_dd] = this_fit.params_min[:, xxx.p_dd] * 1.1
 
@@ -201,7 +202,7 @@ for (this_met_list, this_seq) in param_big_list:
 
     # display parameters
     this_fit.display_enable = display_stuff
-    this_fit.display_range_ppm = [0.5, 4.5]
+    this_fit.display_range_ppm = display_range_ppm_ws
     this_fit.display_frequency = 2
 
     # name
@@ -222,7 +223,7 @@ water_concentration = 55000.0  # mmol/kg
 
 # %% water data fit strategy
 
-fit_nows = fit.fit_pastis(meta_bs=meta_bs_nows)
+fit_nows = fit.fit_pastis()
 
 fit_nows.name = "water fit"
 fit_nows.metabolites = metabolites_list_list[0]
@@ -234,6 +235,7 @@ fit_nows.area_integration_peak_ranges = [0.5]
 # min/max fitting bounds
 fit_nows.params_min = fit_nows.params_min.set_default_water_min()
 fit_nows.params_max = fit_nows.params_max.set_default_water_max()
+fit_nows.params_max[xxx.m_Water, xxx.p_cm] = 1e6
 # water linewidth
 fit_nows.params_min[xxx.m_Water, xxx.p_dd] = 10.0
 fit_nows.params_max[xxx.m_Water, xxx.p_dd] = 500.0
@@ -248,8 +250,10 @@ fit_nows.params_init[xxx.m_Water, xxx.p_dd] = 100.0
 fit_nows.params_init[xxx.m_Water, xxx.p_df] = 0.0
 fit_nows.params_init[xxx.m_Water, xxx.p_dp] = 0.0
 
+fit_nows.optim_ppm_range = fit_ppm_range_nows
+
 # display
-fit_nows.display_range_ppm = [3, 7]
+fit_nows.display_range_ppm = display_range_ppm_nows
 fit_nows.display_enable = display_stuff
 
 # %% prepare data to fit
@@ -275,16 +279,15 @@ for this_row_i, (this_index, this_row) in enumerate(df.iterrows()):
         this_data.display_spectrum_1d()
 
     # measure linewidth of water to help initialize stuff
-    this_linewidth_estimated = this_data.correct_zerofill_nd().analyze_linewidth_1d([4.5, 4.8], display=display_stuff)
+    #this_linewidth_estimated = this_data.correct_zerofill_nd().analyze_linewidth_1d([4.5, 4.8], display=display_stuff)
 
     # removing water and any artefact > 5ppm (corrupts fit quality criteria)
-    this_data = this_data.correct_water_removal_1d(16, [4.3, 6], display=display_stuff)
+    if(remove_residual_water):
+        this_data = this_data.correct_water_removal_1d(100, [4.3, 6], display=display_stuff)
 
-    # filtering
-    # this_data = this_data.correct_bandpass_filtering_1d([0, 6], np.ones, display=display_stuff)
-    # reapodize to remove filtering artefact (will not affect linewidth because already apodized)
-    if(apodization_factor > 0):
-        this_data = this_data.correct_apodization_nd(apodization_factor, display=display_stuff)
+    # removing lipids
+    if(remove_lipids):
+        this_data = this_data.correct_water_removal_1d(100, [0, 1.6], display=display_stuff)
 
     # %% fit non water-suppressed data
 
@@ -293,9 +296,10 @@ for this_row_i, (this_index, this_row) in enumerate(df.iterrows()):
     this_fit_nows.run()
     this_fit_nows_df = this_fit_nows.to_dataframe('fit_nows_')
 
+    this_linewidth_estimated = this_fit_nows.params_fit[xxx.m_Water, xxx.p_dd] 
+
     # %% use various fit strategies
     for fit_ws_i, fit_ws in enumerate(fit_ws_list):
-        fit_ws_i += 1
 
         # --- fit water-suppressed data ---
         this_fit_ws = fit_ws.copy()
@@ -305,7 +309,7 @@ for this_row_i, (this_index, this_row) in enumerate(df.iterrows()):
             # linewidth bounds for metabolites
             # use water linewidth for max
             this_fit_ws.params_min[xxx.m_All_MBs, xxx.p_dd] = this_linewidth_estimated * 0.5
-            this_fit_ws.params_max[xxx.m_All_MBs, xxx.p_dd] = this_linewidth_estimated * 1.5
+            this_fit_ws.params_max[xxx.m_All_MBs, xxx.p_dd] = this_linewidth_estimated * 2
             this_fit_ws.params_init[xxx.m_All_MBs, xxx.p_dd] = this_linewidth_estimated * 0.6
 
             # run the fit
