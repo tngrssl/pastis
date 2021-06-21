@@ -30,7 +30,7 @@ plt.rcParams['font.size'] = 9
 log.setLevel(log.INFO)
 
 # data to process is in here
-db_filepath = "/home/tangir/crmbm/acq_db/sc_nodatarej_norea.pkl"
+db_filepath = "/home/tangir/crmbm/acq_db/brain.pkl"
 
 # display real-time fit and other stuff?
 display_stuff = False
@@ -41,7 +41,7 @@ display_range_ppm_nows = [4, 6]
 remove_residual_water = True
 
 # remove lipids with HLSVD?
-remove_lipids = True
+remove_lipids = False
 
 # fit ppm ranges (experimental)
 fit_ppm_range_ws = [-2, 5]
@@ -51,7 +51,7 @@ fit_ppm_range_nows = [4, 6]
 
 df = pd.read_pickle(db_filepath)
 
-#df = df.loc["b057a3e07319341e032e3c6c36ec4d83"]
+#df = df.loc["1baf6b702f39fefb5ad9e44179057ef7"]
 #df = df.iloc[13]
 
 # keep a dataframe type, even if one line
@@ -121,7 +121,7 @@ metabolites_list_list.append(np.sort([
     xxx.m_LipC]))
 
 metabolites_list_list.append(np.sort([
-    xxx.m_Tau,
+    xxx.m_mI,
     xxx.m_NAA,
     xxx.m_NAAG,
     xxx.m_Cr_CH3,
