@@ -30,7 +30,7 @@ plt.rcParams['font.size'] = 9
 log.setLevel(log.INFO)
 
 # data to process is in here
-db_filepath = "/home/tangir/crmbm/acq_db/brain.pkl"
+db_filepath = "/home/tangir/crmbm/acq_db/sc_nodatarej_norea.pkl"
 
 # display real-time fit and other stuff?
 display_stuff = False
@@ -41,18 +41,21 @@ display_range_ppm_nows = [4, 6]
 remove_residual_water = True
 
 # remove lipids with HLSVD?
-remove_lipids = False
+remove_lipids = True
 
 # fit ppm ranges (experimental)
-fit_ppm_range_ws = [-2, 5]
-fit_ppm_range_nows = [4, 6]
+fit_ppm_range_ws = [0, 4.2]
+fit_ppm_range_nows = None
 
 # %% select datasets via dataframe
 
 df = pd.read_pickle(db_filepath)
 
-#df = df.loc["1baf6b702f39fefb5ad9e44179057ef7"]
-#df = df.iloc[13]
+#df = df.loc["b057a3e07319341e032e3c6c36ec4d83"]
+#df = df.iloc[3]
+
+#df = df.loc[df["reco_dataset_raw_data_name"].str.contains("338").fillna(False)]
+#df = df.iloc[1]
 
 # keep a dataframe type, even if one line
 if(type(df) is pd.core.series.Series):
@@ -81,30 +84,28 @@ metabolites_list_list = []
 
 # --- all metabolites ---
 metabolites_list_list.append(np.sort([
-    xxx.m_Ala,
-    xxx.m_Asp,
-    xxx.m_GABA,
+    xxx.m_LipA,
+    xxx.m_LipB,
+    xxx.m_LipC,
+    xxx.m_NAA,
+    xxx.m_NAAG,
+    xxx.m_Cr_CH3,
+    xxx.m_Cr_CH2,
+    xxx.m_PCr,
+    xxx.m_GPC,
+    xxx.m_PC,
+    xxx.m_mI,
+    xxx.m_Glu,
+    xxx.m_Gln,
     xxx.m_Gsh,
-    xxx.m_Lac,
-    xxx.m_NAA,
-    xxx.m_NAAG,
-    xxx.m_sI,
     xxx.m_Tau,
-    xxx.m_Cr_CH3,
-    xxx.m_Cr_CH2,
-    xxx.m_PCr,
-    xxx.m_GPC,
-    xxx.m_PC,
-    xxx.m_mI,
-    xxx.m_Gln,
-    xxx.m_Glu,
-    xxx.m_Water,
-    xxx.m_LipA,
-    xxx.m_LipB,
-    xxx.m_LipC]))
+    xxx.m_Asp,
+    xxx.m_GABA]))
 
 metabolites_list_list.append(np.sort([
-    xxx.m_Tau,
+    xxx.m_LipA,
+    xxx.m_LipB,
+    xxx.m_LipC,
     xxx.m_NAA,
     xxx.m_NAAG,
     xxx.m_Cr_CH3,
@@ -113,15 +114,15 @@ metabolites_list_list.append(np.sort([
     xxx.m_GPC,
     xxx.m_PC,
     xxx.m_mI,
-    xxx.m_Gln,
     xxx.m_Glu,
-    xxx.m_Water,
-    xxx.m_LipA,
-    xxx.m_LipB,
-    xxx.m_LipC]))
+    xxx.m_Gln,
+    xxx.m_Gsh,
+    xxx.m_Asp]))
 
 metabolites_list_list.append(np.sort([
-    xxx.m_mI,
+    xxx.m_LipA,
+    xxx.m_LipB,
+    xxx.m_LipC,
     xxx.m_NAA,
     xxx.m_NAAG,
     xxx.m_Cr_CH3,
@@ -129,10 +130,7 @@ metabolites_list_list.append(np.sort([
     xxx.m_PCr,
     xxx.m_GPC,
     xxx.m_PC,
-    xxx.m_Water,
-    xxx.m_LipA,
-    xxx.m_LipB,
-    xxx.m_LipC]))
+    xxx.m_mI]))
 
 param_big_list = itertools.product(metabolites_list_list, sequence_list)
 
@@ -146,9 +144,9 @@ for (this_met_list, this_seq) in param_big_list:
     linklock[xxx.m_Cr_CH3, :] = [0, -300, -200, -100]
 
     # leave water free
-    linklock[xxx.m_Water, :] = [0, 0, 0, 0]
-    # leave Lipids linewidth free
-    linklock[[xxx.m_LipA, xxx.m_LipB, xxx.m_LipC], :] = [0, 0, 0, 100]
+    #linklock[xxx.m_Water, :] = [0, 0, 0, 0]
+    # leave MMs linewidth free
+    linklock[xxx.m_All_MMs, :] = [0, 0, 0, 100]
 
     this_fit = fit.fit_pastis(meta_bs=meta_bs)
     this_fit.metabolites_area_integration = [xxx.m_NAA_CH3, xxx.m_Cr_CH3, xxx.m_Cho_CH3]
@@ -167,12 +165,13 @@ for (this_met_list, this_seq) in param_big_list:
     this_fit.params_min[:, xxx.p_cm] = 0.0
     this_fit.params_max[:, xxx.p_cm] = 200.0
     this_fit.params_max[xxx.m_All_MMs, xxx.p_cm] = 1000.0
-    this_fit.params_max[xxx.m_Water, xxx.p_cm] = 100000.0
+    #this_fit.params_max[xxx.m_Water, xxx.p_cm] = 100000.0
 
     # linewidth bounds for metabolites
     this_fit.params_min[:, xxx.p_dd] = 5
 
     # let the MMs go above
+    this_fit.params_min[xxx.m_All_MMs, xxx.p_dd] = 150
     this_fit.params_max[xxx.m_All_MMs, xxx.p_dd] = 300
     # start with very narrow peaks / long-T2 FID
     this_fit.params_init[:, xxx.p_dd] = this_fit.params_min[:, xxx.p_dd] * 1.1
@@ -238,7 +237,7 @@ fit_nows.params_max = fit_nows.params_max.set_default_water_max()
 fit_nows.params_max[xxx.m_Water, xxx.p_cm] = 1e6
 # water linewidth
 fit_nows.params_min[xxx.m_Water, xxx.p_dd] = 10.0
-fit_nows.params_max[xxx.m_Water, xxx.p_dd] = 500.0
+fit_nows.params_max[xxx.m_Water, xxx.p_dd] = 100.0
 # water frequency shift
 fit_nows.params_min[xxx.m_Water, xxx.p_df] = -50.0
 fit_nows.params_max[xxx.m_Water, xxx.p_df] = +50.0
@@ -246,7 +245,7 @@ fit_nows.params_max[xxx.m_Water, xxx.p_df] = +50.0
 # initial fit values
 fit_nows.params_init = fit_nows.params_min.copy()
 fit_nows.params_init[xxx.m_Water, xxx.p_cm] = 1.0
-fit_nows.params_init[xxx.m_Water, xxx.p_dd] = 100.0
+fit_nows.params_init[xxx.m_Water, xxx.p_dd] = 11.0
 fit_nows.params_init[xxx.m_Water, xxx.p_df] = 0.0
 fit_nows.params_init[xxx.m_Water, xxx.p_dp] = 0.0
 
@@ -277,26 +276,29 @@ for this_row_i, (this_index, this_row) in enumerate(df.iterrows()):
     # display the data
     if(display_stuff):
         this_data.display_spectrum_1d()
-
-    # measure linewidth of water to help initialize stuff
-    #this_linewidth_estimated = this_data.correct_zerofill_nd().analyze_linewidth_1d([4.5, 4.8], display=display_stuff)
+        
+    # %% pre-processing
 
     # removing water and any artefact > 5ppm (corrupts fit quality criteria)
     if(remove_residual_water):
-        this_data = this_data.correct_water_removal_1d(100, [4.3, 6], display=display_stuff)
+        this_data = this_data.correct_peak_removal_1d(100, [4.3, 6], display=display_stuff)
 
     # removing lipids
     if(remove_lipids):
-        this_data = this_data.correct_water_removal_1d(100, [0, 1.6], display=display_stuff)
+        this_data = this_data.correct_peak_removal_1d(100, [0, 1.7], display=display_stuff)
+        
+    # recalibrating water spectrum
+    this_data_ref = this_data.data_ref.copy()
+    this_data_ref = this_data_ref.correct_freqshift_1d()
 
     # %% fit non water-suppressed data
 
     this_fit_nows = fit_nows.copy()
-    this_fit_nows.data = this_data.data_ref.copy()
+    this_fit_nows.data = this_data_ref
     this_fit_nows.run()
     this_fit_nows_df = this_fit_nows.to_dataframe('fit_nows_')
 
-    this_linewidth_estimated = this_fit_nows.params_fit[xxx.m_Water, xxx.p_dd] 
+    this_linewidth_estimated = this_fit_nows.params_fit[xxx.m_Water, xxx.p_dd]
 
     # %% use various fit strategies
     for fit_ws_i, fit_ws in enumerate(fit_ws_list):
@@ -332,7 +334,7 @@ for this_row_i, (this_index, this_row) in enumerate(df.iterrows()):
                 # set the min limits below last fit results
                 this_fit_ws.params_min[this_fit_ws.metabolites, :] = this_fit_ws.params_fit[this_fit_ws.metabolites, :] - params_min_max_range / 2.0
                 # with an exception for the concentration
-                this_fit_ws.params_min[this_fit_ws.metabolites, xxx.p_cm] = 0.0
+                this_fit_ws.params_min[:, xxx.p_cm] = 0.0
                 # set the max and init params
                 this_fit_ws.params_max[this_fit_ws.metabolites, :] = this_fit_ws.params_fit[this_fit_ws.metabolites, :] + params_min_max_range / 2.0
                 this_fit_ws.params_init[this_fit_ws.metabolites, :] = this_fit_ws.params_fit[this_fit_ws.metabolites, :]

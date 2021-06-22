@@ -2839,9 +2839,9 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         return(s_crop)
 
-    def correct_water_removal_1d(self, hsvd_nComponents=5, hsvd_range=[4.6, 4.8], display=False, display_range=[1, 6]):
+    def correct_peak_removal_1d(self, hsvd_nComponents=5, hsvd_range=[4.6, 4.8], display=False, display_range=[1, 6]):
         """
-        Remove any water residual peak(s) within a ppm range using HSVD.
+        Remove any peak(s) within a ppm range using HSVD. Usually used to remove residual water peak.
 
         * Works only with a 1D [timepoints] signal.
         * Returns a 1D [timepoints] signal.
@@ -2849,9 +2849,9 @@ class MRSData2(suspect.mrsobjects.MRSData):
         Parameters
         ----------
         hsvd_nComponents : int
-            Number of components for HSVD water residue removal
+            Number of components for HSVD
         hsvd_range : list [2]
-            Range in ppm of HSVD components to keep for the water peak removal
+            Range in ppm of HSVD components
         display : boolean
             Display correction process (True) or not (False)
         display_range : list [2]
@@ -2859,10 +2859,10 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         Returns
         -------
-        s_water_removed : MRSData2 numpy array [timepoints]
+        s_peak_removed : MRSData2 numpy array [timepoints]
             Resulting water HSVD suppressed data stored in a MRSData2 object
         """
-        log.debug("removing water peak for [%s]..." % self.display_label)
+        log.debug("removing peak for [%s]..." % self.display_label)
         # dimensions check
         if(self.ndim != 1):
             log.error("this method only works for 1D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
@@ -2870,7 +2870,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         # init
         s = self.copy()
         ppm = s.frequency_axis_ppm()
-        pbar = log.progressbar("removing residual water peak with HSVD", 5)
+        pbar = log.progressbar("removing peak(s) with HSVD", 5)
 
         # estimate HSVD components
         components = suspect.processing.water_suppression.hsvd(s, hsvd_nComponents)
@@ -2889,7 +2889,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         pbar.update(4)
 
         # and substract it from the fid
-        s_water_removed = s - hsvd_fid
+        s_peak_removed = s - hsvd_fid
         pbar.update(5)
 
         # display this over the data
@@ -2897,12 +2897,12 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig = plt.figure(230)
             fig.clf()
             axs = fig.subplots(2, 1, sharex='all', sharey='all')
-            fig.canvas.set_window_title("correct_water_removal_1d (mrs.reco.MRSData2)")
-            fig.suptitle("removing water peak for [%s]" % self.display_label)
+            fig.canvas.set_window_title("correct_peak_removal_1d (mrs.reco.MRSData2)")
+            fig.suptitle("removing peak for [%s]" % self.display_label)
 
             # original spectrum
             axs[0].plot(ppm, s.spectrum().real, 'k-', linewidth=1, label='original data (real part)')
-            axs[0].plot(ppm, hsvd_fid.spectrum().real, 'r-', linewidth=1, label='estimated HSVD water peak')
+            axs[0].plot(ppm, hsvd_fid.spectrum().real, 'r-', linewidth=1, label='estimated HSVD peak')
             axs[0].set_xlim(display_range[1], display_range[0])
             axs[0].set_xlabel('chemical shift (ppm)')
             axs[0].set_ylabel('original spectrum')
@@ -2910,10 +2910,10 @@ class MRSData2(suspect.mrsobjects.MRSData):
             axs[0].legend()
 
             # water removed spectrum
-            axs[1].plot(ppm, s_water_removed.spectrum().real, 'b-', linewidth=1)
+            axs[1].plot(ppm, s_peak_removed.spectrum().real, 'b-', linewidth=1)
             axs[1].set_xlim(display_range[1], display_range[0])
             axs[1].set_xlabel('chemical shift (ppm)')
-            axs[1].set_ylabel('water removed spectrum')
+            axs[1].set_ylabel('peak removed spectrum')
             axs[1].grid('on')
             axs[1].legend()
 
@@ -2923,9 +2923,9 @@ class MRSData2(suspect.mrsobjects.MRSData):
         pbar.finish("done")
 
         # convert back to MRSData2
-        s_water_removed = self.inherit(s_water_removed)
+        s_peak_removed = self.inherit(s_peak_removed)
 
-        return(s_water_removed)
+        return(s_peak_removed)
 
     def correct_freqshift_1d(self, peak_range=[4.5, 5], peak_real_ppm=4.7, allowed_apodization=1.0, display=False, display_range=[1, 6]):
         """
@@ -3634,7 +3634,7 @@ class pipeline:
                                 }
 
         # --- job: water post-acquisition removal ---
-        self.job["water_removal"] = {"job_func": MRSData2.correct_water_removal_1d, "job_name": "removing water peak",
+        self.job["water_removal"] = {"job_func": MRSData2.correct_peak_removal_1d, "job_name": "removing water peak",
                                      # number of components when running HSVD
                                      "hsvd_components": 5,
                                      # ppm range where all components will be remove
