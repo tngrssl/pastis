@@ -1016,18 +1016,32 @@ class mrs_sequence:
 
         # browse though the database and display everything
         for this_metagroup_key, this_metagroup_entry in self._meta_bs.items():
-            s = s_full_meta.copy()
+            s_grp = s_full_meta.copy()
             for this_meta_key, this_meta_entry in self._meta_bs[this_metagroup_key]["metabolites"].items():
                 log.info("simulating MRS signal for metabolite [%s/%s]..." % (this_metagroup_key, this_meta_key))
-                # build up the metabolite group
-                s = s + self._run_sequence(this_meta_entry)
+                s = self._run_sequence(this_meta_entry)
                 
-            # band pass filter?
-            if(self.bandpass_filter_range_ppm is not None):
-                s = s.correct_bandpass_filtering_1d(self.bandpass_filter_range_ppm, np.ones)
-                    
+                # band pass filter?
+                if(self.bandpass_filter_range_ppm is not None):
+                    #s = s.correct_bandpass_filtering_1d(self.bandpass_filter_range_ppm, np.ones)
+                    # first any peaks outside of range?
+                    if( (np.any(this_meta_entry["ppm"] > max(self.bandpass_filter_range_ppm))) or (np.any(this_meta_entry["ppm"] < min(self.bandpass_filter_range_ppm))) ):
+                        # yes, so count them on the right side
+                        n_peaks2remove = np.sum(this_meta_entry["ppm"] < min(self.bandpass_filter_range_ppm))
+                        # and remove them
+                        if(n_peaks2remove > 0):
+                            s = s.correct_peak_removal_1d(n_peaks2remove * 10, [min(this_meta_entry["ppm"]) - 1, min(self.bandpass_filter_range_ppm)], False)
+                        # now, count them on the left side
+                        n_peaks2remove = np.sum(this_meta_entry["ppm"] > max(self.bandpass_filter_range_ppm))
+                        # and remove them
+                        if(n_peaks2remove > 0):
+                            s = s.correct_peak_removal_1d(n_peaks2remove * 10, [max(self.bandpass_filter_range_ppm), max(this_meta_entry["ppm"] + 1)], False)
+                        
+                # build up the metabolite group
+                s_grp = s_grp + s
+                
             # append this metabolite group to the metabase
-            self._meta_signals.append(s)
+            self._meta_signals.append(s_grp)
 
     def _load_from_file(self, te_tol=5.0, f0_tol=5.0):
         """
