@@ -30,7 +30,7 @@ plt.rcParams['font.size'] = 9
 log.setLevel(log.INFO)
 
 # data to process is in here
-db_filepath = "/home/tangir/crmbm/acq_db/sc_nodatarej_norea.pkl"
+db_filepath = "/home/tangir/crmbm/acq_db/sc.pkl"
 
 # display real-time fit and other stuff?
 display_stuff = False
@@ -54,7 +54,7 @@ df = pd.read_pickle(db_filepath)
 #df = df.loc["b057a3e07319341e032e3c6c36ec4d83"]
 #df = df.iloc[3]
 
-#df = df.loc[df["reco_dataset_raw_data_name"].str.contains("338").fillna(False)]
+#df = df.loc[df["reco_dataset_raw_data_name"].str.contains("308").fillna(False)]
 #df = df.iloc[1]
 
 # keep a dataframe type, even if one line
@@ -338,6 +338,12 @@ for this_row_i, (this_index, this_row) in enumerate(df.iterrows()):
                 # set the max and init params
                 this_fit_ws.params_max[this_fit_ws.metabolites, :] = this_fit_ws.params_fit[this_fit_ws.metabolites, :] + params_min_max_range / 2.0
                 this_fit_ws.params_init[this_fit_ws.metabolites, :] = this_fit_ws.params_fit[this_fit_ws.metabolites, :]
+
+                #if(i > 0):
+                    # release dd and df
+                #    this_fit_ws.params_linklock[this_fit_ws.metabolites, xxx.p_dd] = 0
+                #    this_fit_ws.params_linklock[this_fit_ws.metabolites, xxx.p_df] = 0
+                #    this_fit_ws._set_unique_linklock()
 
                 # run the fit
                 this_fit_ws.run()
