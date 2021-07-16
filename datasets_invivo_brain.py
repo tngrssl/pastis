@@ -20,7 +20,7 @@ plt.rcParams['font.size'] = 9
 log.setLevel(log.INFO)
 
 # display stuff?
-display_stuff = False
+display_stuff = True
 
 # raise error?
 raise_error = True
@@ -112,6 +112,7 @@ p.dataset[2]["raw"]["files"] = ["/home/tangir/crmbm/acq_twix/296_ym_p1_brainmoel
 p.dataset[2]["dcm"]["files"] = ["/home/tangir/crmbm/acq/296_ym_p1_brainmoelle/296-ym-p1-brainmoelle/20190619/01_0008_steam-shortte-snr/original-primary_e09_0001.dcm",
                                 "/home/tangir/crmbm/acq/296_ym_p1_brainmoelle/296-ym-p1-brainmoelle/20190619/01_0006_steam-shortte-snr/original-primary_e09_0001.dcm"]
 
+p.settings["datasets_indexes"] = [0, 1]
 p.run()
 p.check_analyze_results(True)
 p.save_datasets()
