@@ -62,6 +62,8 @@ def get_data_file_reader(data_fullfilepath):
             return(SIEMENS_DICOM_reader_syngo_MR_B17(data_fullfilepath))
         if(dcm_header.SoftwareVersions == "syngo MR E12"):
             return(SIEMENS_DICOM_reader_syngo_MR_E12(data_fullfilepath))
+        if(dcm_header.SoftwareVersions == "syngo MR E11"):
+            return(SIEMENS_DICOM_reader_syngo_MR_E11(data_fullfilepath))
         elif(dcm_header.SoftwareVersions == "syngo MR XA20"):
             return(SIEMENS_DICOM_reader_syngo_XA20(data_fullfilepath))
         else:
@@ -327,7 +329,7 @@ class SIEMENS_TWIX_reader_syngo_MR_B17(data_file_reader):
         Returns
         -------
         patient_birthday_datetime : datetime
-            Patient birthday
+            Patient birthday (or None if no date found)
         """
         # find patient birthday dirty way
         a = self.file_content_str.find("PatientBirthDay")
@@ -335,8 +337,10 @@ class SIEMENS_TWIX_reader_syngo_MR_B17(data_file_reader):
         a = self.file_content_str.find("\"", a)
         birthday_str = self.file_content_str[(a + 1):(a + 9)]
         birthday_str = birthday_str.strip()
-        if(birthday_str):
+        if(birthday_str.isnumeric()):
             patient_birthday_datetime = datetime.strptime(birthday_str, '%Y%m%d')
+        else:
+            patient_birthday_datetime = None
         return(patient_birthday_datetime)
 
     def get_patient_sex(self):
@@ -1310,6 +1314,10 @@ class SIEMENS_DICOM_reader_syngo_MR_B17(data_file_reader):
         acq_time = float((AcquisitionTime_datetime - SeriesInstanceUID_datetime).seconds)
 
         return(acq_time)
+
+
+class SIEMENS_DICOM_reader_syngo_MR_E11(SIEMENS_DICOM_reader_syngo_MR_B17):
+    """A class used to scrap parameters out of SIEMENS MR Syngo VE11 DICOM files, sometimes in a very dirty way."""
 
 
 class SIEMENS_DICOM_reader_syngo_MR_E12(SIEMENS_DICOM_reader_syngo_MR_B17):
