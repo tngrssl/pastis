@@ -1139,8 +1139,6 @@ class fit_pastis(fit_tool):
 
         # our model is in TIME DOMAIN
         # but FQN only makes sense in FREQUENCY DOMAIN
-        # because the time domain data here is very probalby apodized
-        # the pure noise variance is therefore impossible to estimate
         # that's fine with me, let's do it FREQUENCY DOMAIN
 
         # estimate noise variance in user specified spectral region
@@ -1148,10 +1146,18 @@ class fit_pastis(fit_tool):
         sf = np.squeeze(self.data.spectrum())
         sf_analyze = np.real(sf)
         ippm_noise_range = (self.fqn_noise_range[0] < ppm) & (ppm < self.fqn_noise_range[1])
-        data_noise_var = np.std(sf_analyze[ippm_noise_range])
-
-        # variance of fit residual
-        residue_var = np.std(np.real(diff.spectrum()))
+        data_noise_var = np.var(sf_analyze[ippm_noise_range])
+        
+        # estimate variance of fit residual in user specified spectral region
+        ppm = diff.frequency_axis_ppm()
+        sf = np.squeeze(diff.spectrum())
+        sf_analyze = np.real(sf)
+        # TODO: decide if the FQN should be calculated in a spectral region or not
+        if(self.optim_ppm_range is None):
+            residue_var = np.var(sf_analyze)
+        else:
+            ippm_noise_range = (self.optim_ppm_range[0] < ppm) & (ppm < self.optim_ppm_range[1])
+            residue_var = np.var(sf_analyze[ippm_noise_range])
 
         fqn = residue_var / data_noise_var
         return(fqn)
