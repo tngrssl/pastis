@@ -3816,7 +3816,7 @@ class pipeline:
         Parameters
         ----------
         data : MRSData2 object [whatever,...,timepoints]
-            One of the processing function of the MRSData2 class
+            Dataset
         current_job : MRSData2 method function
             The job that was just applied to data before calling this function
         already_done_jobs : list (stack)
@@ -3871,6 +3871,34 @@ class pipeline:
 
         return(data_snr, data_lw, ref_data_snr, ref_data_lw)
 
+    def _detect_data_ref(self, s, s_ref):
+        """
+        Detect highest SNR between these two datasets and return them in the right order.
+        
+        Parameters
+        ----------
+        s : MRSData2 object
+            Data supposed to be WS
+        s_ref : MRSData2 object
+            Data supposed to be noWS and used as a reference signal for phasing, etc.
+            
+        Returns
+        -------
+        s2 : MRSData2 object
+            Data supposed to be WS
+        s_ref2 : MRSData2 object
+            Data supposed to be noWS and used as a reference signal for phasing, etc.
+        """
+        # compare FID max in magnitude (dirty but robust)
+        s_ref_tmp = np.mean(np.abs(s_ref), axis=(0, 1))
+        s_tmp = np.mean(np.abs(s), axis=(0, 1))
+        
+        if(np.max(s_tmp) > np.max(s_ref_tmp)):
+            # need to swap
+            return(s_ref, s)
+        else:
+            return(s, s_ref)
+    
     def get_te_list(self):
         """
         Return the TEs for all the data signals in this pipeline.
@@ -4013,10 +4041,22 @@ class pipeline:
                     # no? so pass
                     continue
 
-                this_data_ref_filename = d[dtype]["files"][1]
+                # reading WS data
                 log.info("reading data [" + this_legend + "]")
                 s = MRSData2(this_data_filename, this_physio_filename, this_imaging_filename)
-                log.debug("got a " + str(s.shape) + " vector")
+                
+                # reading noWS data
+                this_data_ref_filename = d[dtype]["files"][1]
+                if(this_data_ref_filename is not None):
+                    log.info_line_break()
+                    log.info("reading data [" + this_legend + "]")
+                    s_ref = MRSData2(this_data_ref_filename, None)
+                    # find ref data (highest snr)
+                    s, s_ref = self._detect_data_ref(s, s_ref)
+                else:
+                    s_ref = None
+                
+                log.info("data : got a " + str(s.shape) + " vector")
                 # set ppm reference
                 s.ppm0 = self.settings["ppm0"]
                 # set legend & offset
@@ -4031,27 +4071,25 @@ class pipeline:
                 self.dataset[i][dtype]["data"] = s
                 self.dataset[i]["legend"] = this_new_legend
 
-                if(this_data_ref_filename is not None):
+                if(s_ref is not None):
                     log.info_line_break()
-                    log.info("reading ref. data [" + this_legend + "]")
-                    s = MRSData2(this_data_ref_filename, None)
-                    log.info("got a " + str(s.shape) + " vector")
+                    log.info("ref. data: got a " + str(s_ref.shape) + " vector")
                     # if several averages, mean now (that could be a problem!?)
-                    s = s.mean(axis=0)
+                    s_ref = s_ref.mean(axis=0)
                     # add 1 dimension
-                    s = s.reshape((1,) + s.shape)
-                    log.debug("reshaped to a " + str(s.shape) + " vector")
+                    s_ref = s_ref.reshape((1,) + s_ref.shape)
+                    log.debug("reshaped to a " + str(s_ref.shape) + " vector")
                     # set ppm reference
-                    s.ppm0 = self.settings["ppm0"]
+                    s_ref.ppm0 = self.settings["ppm0"]
                     # set legend & offset
                     this_new_legend = ("#%d " % i) + this_legend
-                    if(s.is_rawdata):
-                        s.set_display_label(this_new_legend + " [REF] [RAW]")
+                    if(s_ref.is_rawdata):
+                        s_ref.set_display_label(this_new_legend + " [REF] [RAW]")
                     else:
-                        s.set_display_label(this_new_legend + " [REF] [DCM]")
-                    s.set_display_offset(self.settings["display_offset"])
+                        s_ref.set_display_label(this_new_legend + " [REF] [DCM]")
+                    s_ref.set_display_offset(self.settings["display_offset"])
                     # store
-                    self.dataset[i][dtype]["data"].data_ref = s
+                    self.dataset[i][dtype]["data"].data_ref = s_ref
 
                 log.info_line________________________()
 
