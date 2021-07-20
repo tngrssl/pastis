@@ -30,7 +30,7 @@ plt.rcParams['font.size'] = 9
 log.setLevel(log.INFO)
 
 # data to process is in here
-db_filepath = "/home/tangir/crmbm/acq_db/sc.pkl"
+db_filepath = "/home/tangir/crmbm/acq_db/sc_nodatarej_norea.pkl"
 
 # display real-time fit and other stuff?
 display_stuff = False
@@ -38,11 +38,10 @@ display_range_ppm_ws = [0, 6]
 display_range_ppm_nows = [4, 6]
 
 # remove residual water with HLSVD?
-remove_residual_water = True
-
+remove_residual_water_range_ppm = [4.3, 6]
 # remove lipids with HLSVD?
-remove_lipids = True
-
+remove_lipids_range_ppm = [0, 1.8]
+                                                      
 # fit ppm ranges (experimental)
 fit_ppm_range_ws = [0, 4.2]
 fit_ppm_range_nows = None
@@ -54,8 +53,8 @@ df = pd.read_pickle(db_filepath)
 #df = df.loc["b057a3e07319341e032e3c6c36ec4d83"]
 #df = df.iloc[3]
 
-#df = df.loc[df["reco_dataset_raw_data_name"].str.contains("308").fillna(False)]
-#df = df.iloc[1]
+#df = df.loc[df["reco_dataset_raw_data_name"].str.contains("314").fillna(False)]
+#df = df.iloc[2]
 
 # keep a dataframe type, even if one line
 if(type(df) is pd.core.series.Series):
@@ -77,7 +76,7 @@ fit_ws_list = []
 
 # --- list of sequence to try ---
 sequence_list = [None]
-sequence_list.append(sim.mrs_seq_press)
+#sequence_list.append(sim.mrs_seq_press)
 
 # --- list of metabolite lists to try ---
 metabolites_list_list = []
@@ -98,10 +97,9 @@ metabolites_list_list.append(np.sort([
     xxx.m_Glu,
     xxx.m_Gln,
     xxx.m_Gsh,
-    xxx.m_Tau,
-    xxx.m_Asp,
-    xxx.m_GABA]))
+    xxx.m_Asp]))
 
+"""
 metabolites_list_list.append(np.sort([
     xxx.m_LipA,
     xxx.m_LipB,
@@ -131,18 +129,53 @@ metabolites_list_list.append(np.sort([
     xxx.m_GPC,
     xxx.m_PC,
     xxx.m_mI]))
+"""
 
-param_big_list = itertools.product(metabolites_list_list, sequence_list)
+constraint_shrink_list = [1] #[0.5, 1]
+constraint_type_list = ["4groups"] #["lastallfree", "allfree", "2groups", "4groups", "alllinked"]
+
+param_big_list = itertools.product(metabolites_list_list, sequence_list, constraint_shrink_list, constraint_type_list)
 
 # create all fit strategies
-for (this_met_list, this_seq) in param_big_list:
+for (this_met_list, this_seq, this_constraint_shrink, this_constraint_type) in param_big_list:
 
     # linklock: relations between fit parameters
     linklock = np.full([len(meta_bs), 4], 1)
     # link singlets by linewidth and phase
     linklock[this_met_list, :] = [0, 300, 200, 100]
-    linklock[xxx.m_Cr_CH3, :] = [0, -300, -200, -100]
-
+    linklock[xxx.m_Asp, :] = [0, -300, -200, -100]
+    
+    if(this_constraint_type == "allfree"):
+        linklock[this_met_list, xxx.p_dd] = 0        
+        
+    elif(this_constraint_type == "2groups"):
+        linklock[xxx.m_NAA, :] = [0, 400, 200, 100]
+        linklock[xxx.m_NAAG, :] = [0, 400, 200, 100]
+        linklock[xxx.m_PC, :] = [0, 400, 200, 100]
+        linklock[xxx.m_GPC, :] = [0, 400, 200, 100]
+        
+        linklock[xxx.m_Cr_CH3, :] = [0, -400, 200, 100]
+        #linklock[xxx.m_Cr_CH2, :] = [0, 0, 200, 100]
+        
+    elif(this_constraint_type == "4groups"):
+        linklock[xxx.m_NAA, :] = [0, -400, 200, 100]
+        linklock[xxx.m_NAAG, :] = [0, 400, 200, 100]
+        
+        linklock[xxx.m_PC, :] = [0, -500, 200, 100]
+        linklock[xxx.m_GPC, :] = [0, 500, 200, 100]
+        
+        linklock[xxx.m_Cr_CH3, :] = [0, 0, 200, 100]
+        #linklock[xxx.m_Cr_CH2, :] = [0, 0, 200, 100]
+        
+    elif(this_constraint_type == "alllinked"):
+        pass
+        
+    elif(this_constraint_type == "lastallfree"):
+        pass
+    
+    else:
+        log.error("weird constraint type!")
+    
     # leave water free
     #linklock[xxx.m_Water, :] = [0, 0, 0, 0]
     # leave MMs linewidth free
@@ -198,6 +231,7 @@ for (this_met_list, this_seq) in param_big_list:
     this_fit.optim_ftol = 1e-6
     this_fit.optim_gtol = 1e-6
     this_fit.optim_ppm_range = fit_ppm_range_ws
+    this_fit.fqn_noise_range = [-2, 0]
 
     # display parameters
     this_fit.display_enable = display_stuff
@@ -205,7 +239,13 @@ for (this_met_list, this_seq) in param_big_list:
     this_fit.display_frequency = 2
 
     # name
-    this_fit.name = "pastis_" + str(len(this_met_list)) + "metabolites_" + str(this_seq)
+    this_fit.name = "pastis_" + str(len(this_met_list)) + "metabolites_" + str(this_seq) + "_" + str(this_constraint_shrink)
+
+    # extra parameters (experimental)
+    this_fit.__isfrozen = False
+    this_fit.constraint_shrink = this_constraint_shrink
+    this_fit.constraint_type = this_constraint_type
+    this_fit.__isfrozen = True
 
     # store
     fit_ws_list.append(this_fit)
@@ -216,9 +256,6 @@ this_fit.name = "lcmodel"
 this_fit.display_enable = display_stuff
 # store
 fit_ws_list.append(this_fit)
-
-# water concentration assumption
-water_concentration = 55000.0  # mmol/kg
 
 # %% water data fit strategy
 
@@ -280,12 +317,12 @@ for this_row_i, (this_index, this_row) in enumerate(df.iterrows()):
     # %% pre-processing
 
     # removing water and any artefact > 5ppm (corrupts fit quality criteria)
-    if(remove_residual_water):
-        this_data = this_data.correct_peak_removal_1d(100, [4.3, 6], display=display_stuff)
+    if(remove_residual_water_range_ppm is not None):
+        this_data = this_data.correct_peak_removal_1d(50, remove_residual_water_range_ppm, display=display_stuff)
 
     # removing lipids
-    if(remove_lipids):
-        this_data = this_data.correct_peak_removal_1d(100, [0, 1.7], display=display_stuff)
+    if(remove_lipids_range_ppm is not None):
+        this_data = this_data.correct_peak_removal_1d(50, remove_lipids_range_ppm, display=display_stuff)
         
     # recalibrating water spectrum
     this_data_ref = this_data.data_ref.copy()
@@ -308,42 +345,52 @@ for this_row_i, (this_index, this_row) in enumerate(df.iterrows()):
         this_fit_ws.data = this_data.copy()
 
         if(type(this_fit_ws) is fit.fit_pastis):
-            # linewidth bounds for metabolites
-            # use water linewidth for max
-            this_fit_ws.params_min[xxx.m_All_MBs, xxx.p_dd] = this_linewidth_estimated * 0.5
-            this_fit_ws.params_max[xxx.m_All_MBs, xxx.p_dd] = this_linewidth_estimated * 2
+            
+            # get extra parameters
+            this_constraint_shrink = this_fit_ws.constraint_shrink
+    
+            # prepare initial LW ranges according to water FWHM
+            this_fit_ws.params_min[xxx.m_All_MBs, xxx.p_dd] = this_linewidth_estimated * 0.3
+            this_fit_ws.params_max[xxx.m_All_MBs, xxx.p_dd] = this_linewidth_estimated * 1.7
             this_fit_ws.params_init[xxx.m_All_MBs, xxx.p_dd] = this_linewidth_estimated * 0.6
 
             # run the fit
             this_fit_ws.run()
 
-            # now, low constraints, dichotomic range shrinking
-            n_iter = 3
-            params_range_shrink_coeff = 0.5
-
-            # reset dampings min limits
-            #this_fit_ws.params_min[this_fit_ws.metabolites, xxx.p_dd] = this_fit_ws.params_fit[this_fit_ws.metabolites, xxx.p_dd] - (this_fit_ws.params_max[this_fit_ws.metabolites, xxx.p_dd] - this_fit_ws.params_fit[this_fit_ws.metabolites, xxx.p_dd])
-
+            # number of fit runs
+            n_iter = 2
+            
             for i in range(n_iter):
 
-                # check previous paramter ranges
-                params_min_max_range = this_fit_ws.params_max[this_fit_ws.metabolites, :] - this_fit_ws.params_min[this_fit_ws.metabolites, :]
+                # check previous parameter ranges
+                params_min_max_range = this_fit_ws.params_max - this_fit_ws.params_min
                 # reduce these ranges
-                params_min_max_range[:] = params_min_max_range[:] * params_range_shrink_coeff
-
-                # set the min limits below last fit results
-                this_fit_ws.params_min[this_fit_ws.metabolites, :] = this_fit_ws.params_fit[this_fit_ws.metabolites, :] - params_min_max_range / 2.0
+                params_min_max_range[:] = params_min_max_range[:] * this_constraint_shrink
+                
+                # set the min
+                this_fit_ws.params_min[this_fit_ws.metabolites, :] = this_fit_ws.params_fit[this_fit_ws.metabolites, :] - params_min_max_range[this_fit_ws.metabolites, :] / 2.0
+                # set the max
+                this_fit_ws.params_max[this_fit_ws.metabolites, :] = this_fit_ws.params_fit[this_fit_ws.metabolites, :] + params_min_max_range[this_fit_ws.metabolites, :] / 2.0
+                
                 # with an exception for the concentration
                 this_fit_ws.params_min[:, xxx.p_cm] = 0.0
-                # set the max and init params
-                this_fit_ws.params_max[this_fit_ws.metabolites, :] = this_fit_ws.params_fit[this_fit_ws.metabolites, :] + params_min_max_range / 2.0
+                this_fit_ws.params_max[this_fit_ws.metabolites, xxx.p_cm] = this_fit_ws.params_fit[this_fit_ws.metabolites, xxx.p_cm] + params_min_max_range[this_fit_ws.metabolites, xxx.p_cm] / 2.0
+                
+                # force minimal dd
+                #this_fit_ws.params_min[xxx.m_All_MBs, xxx.p_dd] = this_linewidth_estimated * 0.3
+                
+                # release df
+                this_fit_ws.params_linklock[this_fit_ws.metabolites, xxx.p_df] = 0
+                
+                if((i == (n_iter - 1)) and (this_fit_ws.constraint_type == "lastallfree")):
+                   # release all dd for this last fit
+                   this_fit_ws.params_linklock[this_fit_ws.metabolites, xxx.p_dd] = 0
+                
                 this_fit_ws.params_init[this_fit_ws.metabolites, :] = this_fit_ws.params_fit[this_fit_ws.metabolites, :]
-
-                #if(i > 0):
-                    # release dd and df
-                #    this_fit_ws.params_linklock[this_fit_ws.metabolites, xxx.p_dd] = 0
-                #    this_fit_ws.params_linklock[this_fit_ws.metabolites, xxx.p_df] = 0
-                #    this_fit_ws._set_unique_linklock()
+                ind_init_below_min = (this_fit_ws.params_init <= this_fit_ws.params_min)
+                this_fit_ws.params_init[ind_init_below_min] = this_fit_ws.params_min[ind_init_below_min] + params_min_max_range[ind_init_below_min] * 0.01
+                ind_init_above_max = (this_fit_ws.params_init >=  this_fit_ws.params_max)
+                this_fit_ws.params_init[ind_init_above_max] = this_fit_ws.params_max[ind_init_above_max] - params_min_max_range[ind_init_above_max] * 0.01
 
                 # run the fit
                 this_fit_ws.run()
