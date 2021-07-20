@@ -184,7 +184,9 @@ class fit_lcmodel(fit_tool):
         # create a parameters dictionary to set the basis set to use
         params = {
             "FILBAS": self.lcmodel_filbas,
-            "LCSV": self.lcmodel_lcsv
+            "LCSV": self.lcmodel_lcsv,
+            "DGPPMN": -5, 
+            "DGPPMX": 5
         }
         # call suspect to prepare LCModel files
         suspect.io.lcmodel.write_all_files(self.lcmodel_rawfile_fullpath, self.data, self.data.data_ref, params=params)
