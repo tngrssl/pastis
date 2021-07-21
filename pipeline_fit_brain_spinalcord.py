@@ -30,7 +30,8 @@ plt.rcParams['font.size'] = 9
 log.setLevel(log.INFO)
 
 # data to process is in here
-db_filepath = "/home/tangir/crmbm/acq_db/sc_nodatarej_norea.pkl"
+db_filepath = "/home/tangir/crmbm/acq_db/brain.pkl"
+fit_suffix_pkl = "_fit"
 
 # display real-time fit and other stuff?
 display_stuff = False
@@ -76,12 +77,11 @@ fit_ws_list = []
 
 # --- list of sequence to try ---
 sequence_list = [None]
-#sequence_list.append(sim.mrs_seq_press)
+sequence_list.append(sim.mrs_seq_press)
 
 # --- list of metabolite lists to try ---
 metabolites_list_list = []
 
-# --- all metabolites ---
 metabolites_list_list.append(np.sort([
     xxx.m_LipA,
     xxx.m_LipB,
@@ -97,9 +97,12 @@ metabolites_list_list.append(np.sort([
     xxx.m_Glu,
     xxx.m_Gln,
     xxx.m_Gsh,
-    xxx.m_Asp]))
+    xxx.m_Asp,
+    xxx.m_Tau,
+    xxx.m_GABA,
+    xxx.m_Glc]))
 
-"""
+# --- without Glc, GABA, Asp ---
 metabolites_list_list.append(np.sort([
     xxx.m_LipA,
     xxx.m_LipB,
@@ -115,8 +118,9 @@ metabolites_list_list.append(np.sort([
     xxx.m_Glu,
     xxx.m_Gln,
     xxx.m_Gsh,
-    xxx.m_Asp]))
+    xxx.m_Tau]))
 
+# --- without Tau ---
 metabolites_list_list.append(np.sort([
     xxx.m_LipA,
     xxx.m_LipB,
@@ -128,11 +132,13 @@ metabolites_list_list.append(np.sort([
     xxx.m_PCr,
     xxx.m_GPC,
     xxx.m_PC,
-    xxx.m_mI]))
-"""
+    xxx.m_mI,
+    xxx.m_Glu,
+    xxx.m_Gln,
+    xxx.m_Gsh]))
 
-constraint_shrink_list = [1] #[0.5, 1]
-constraint_type_list = ["4groups"] #["lastallfree", "allfree", "2groups", "4groups", "alllinked"]
+constraint_shrink_list = [0.5, 1]
+constraint_type_list = ["lastallfree", "allfree", "2groups", "4groups", "alllinked"]
 
 param_big_list = itertools.product(metabolites_list_list, sequence_list, constraint_shrink_list, constraint_type_list)
 
@@ -143,7 +149,7 @@ for (this_met_list, this_seq, this_constraint_shrink, this_constraint_type) in p
     linklock = np.full([len(meta_bs), 4], 1)
     # link singlets by linewidth and phase
     linklock[this_met_list, :] = [0, 300, 200, 100]
-    linklock[xxx.m_Asp, :] = [0, -300, -200, -100]
+    linklock[xxx.m_mI, :] = [0, -300, -200, -100]
     
     if(this_constraint_type == "allfree"):
         linklock[this_met_list, xxx.p_dd] = 0        
@@ -297,6 +303,9 @@ fit_nows.display_enable = display_stuff
 # list to save fit results
 fit_results_list = []
 
+# for ETA estimation
+start_time = datetime.today()
+
 # browse though datasets
 for this_row_i, (this_index, this_row) in enumerate(df.iterrows()):
 
@@ -363,18 +372,18 @@ for this_row_i, (this_index, this_row) in enumerate(df.iterrows()):
             for i in range(n_iter):
 
                 # check previous parameter ranges
-                params_min_max_range = this_fit_ws.params_max - this_fit_ws.params_min
+                params_min_max_range = this_fit_ws.params_max[this_fit_ws.metabolites, :] - this_fit_ws.params_min[this_fit_ws.metabolites, :]
                 # reduce these ranges
                 params_min_max_range[:] = params_min_max_range[:] * this_constraint_shrink
                 
                 # set the min
-                this_fit_ws.params_min[this_fit_ws.metabolites, :] = this_fit_ws.params_fit[this_fit_ws.metabolites, :] - params_min_max_range[this_fit_ws.metabolites, :] / 2.0
+                this_fit_ws.params_min[this_fit_ws.metabolites, :] = this_fit_ws.params_fit[this_fit_ws.metabolites, :] - params_min_max_range / 2.0
                 # set the max
-                this_fit_ws.params_max[this_fit_ws.metabolites, :] = this_fit_ws.params_fit[this_fit_ws.metabolites, :] + params_min_max_range[this_fit_ws.metabolites, :] / 2.0
+                this_fit_ws.params_max[this_fit_ws.metabolites, :] = this_fit_ws.params_fit[this_fit_ws.metabolites, :] + params_min_max_range / 2.0
                 
                 # with an exception for the concentration
                 this_fit_ws.params_min[:, xxx.p_cm] = 0.0
-                this_fit_ws.params_max[this_fit_ws.metabolites, xxx.p_cm] = this_fit_ws.params_fit[this_fit_ws.metabolites, xxx.p_cm] + params_min_max_range[this_fit_ws.metabolites, xxx.p_cm] / 2.0
+                this_fit_ws.params_max[this_fit_ws.metabolites, xxx.p_cm] = this_fit_ws.params_fit[this_fit_ws.metabolites, xxx.p_cm] + params_min_max_range[:, xxx.p_cm] / 2.0
                 
                 # force minimal dd
                 #this_fit_ws.params_min[xxx.m_All_MBs, xxx.p_dd] = this_linewidth_estimated * 0.3
@@ -387,10 +396,12 @@ for this_row_i, (this_index, this_row) in enumerate(df.iterrows()):
                    this_fit_ws.params_linklock[this_fit_ws.metabolites, xxx.p_dd] = 0
                 
                 this_fit_ws.params_init[this_fit_ws.metabolites, :] = this_fit_ws.params_fit[this_fit_ws.metabolites, :]
-                ind_init_below_min = (this_fit_ws.params_init <= this_fit_ws.params_min)
-                this_fit_ws.params_init[ind_init_below_min] = this_fit_ws.params_min[ind_init_below_min] + params_min_max_range[ind_init_below_min] * 0.01
-                ind_init_above_max = (this_fit_ws.params_init >=  this_fit_ws.params_max)
-                this_fit_ws.params_init[ind_init_above_max] = this_fit_ws.params_max[ind_init_above_max] - params_min_max_range[ind_init_above_max] * 0.01
+                
+                ind_init_below_min = (this_fit_ws.params_init[this_fit_ws.metabolites, :] <= this_fit_ws.params_min[this_fit_ws.metabolites, :])
+                this_fit_ws.params_init[this_fit_ws.metabolites, :][ind_init_below_min] = this_fit_ws.params_min[this_fit_ws.metabolites, :][ind_init_below_min] + params_min_max_range[ind_init_below_min] * 0.01
+                
+                ind_init_above_max = (this_fit_ws.params_init[this_fit_ws.metabolites, :] >=  this_fit_ws.params_max[this_fit_ws.metabolites, :])
+                this_fit_ws.params_init[this_fit_ws.metabolites, :][ind_init_above_max] = this_fit_ws.params_max[this_fit_ws.metabolites, :][ind_init_above_max] - params_min_max_range[ind_init_above_max] * 0.01
 
                 # run the fit
                 this_fit_ws.run()
@@ -406,10 +417,17 @@ for this_row_i, (this_index, this_row) in enumerate(df.iterrows()):
 
         # --- store progress ---
         prct_done = (this_row_i * len(fit_ws_list) + fit_ws_i) / (len(df) * len(fit_ws_list)) * 100.0
-        os.system("echo " + str(datetime.now()) + " " + os.path.basename(__file__) + "/" + os.path.basename(db_filepath) + ": %.1f%% >> progress.txt" % prct_done)
+        
+        # ETA estimation
+        if(prct_done > 0):
+            current_time = datetime.today()
+            eta_time = (100 - prct_done) * (current_time - start_time) / prct_done + start_time
+            os.system("echo " + str(datetime.now()) + " " + os.path.basename(__file__) + "/" + os.path.basename(db_filepath) + ": %.1f%% ETA = %s >> progress.txt" % (prct_done, str(eta_time)))
+        else:
+            os.system("echo " + str(datetime.now()) + " " + os.path.basename(__file__) + "/" + os.path.basename(db_filepath) + ": %.1f%% >> progress.txt" % prct_done)
 
-
+        
 # append all the results and store
 df_fit_results = pd.concat(fit_results_list, axis=0)
 db_filepath_noext, _ = os.path.splitext(db_filepath)
-df_fit_results.to_pickle(db_filepath_noext + "_fit.pkl")
+df_fit_results.to_pickle(db_filepath_noext + fit_suffix_pkl + ".pkl")
