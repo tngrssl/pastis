@@ -70,7 +70,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         Parameters
         ----------
-        data_filepath: string
+        data_filepath : string
             Full absolute file path pointing to the stored signal (DCM or TWIX file) or the folder assuming that a dcm file named "original-primary_e09_0001.dcm" is stored inside.
         physio_log_file : string
             Full absolute file path pointing to a IDEA VB17 respiratory log file
@@ -3874,14 +3874,14 @@ class pipeline:
     def _detect_data_ref(self, s, s_ref):
         """
         Detect highest SNR between these two datasets and return them in the right order.
-        
+
         Parameters
         ----------
         s : MRSData2 object
             Data supposed to be WS
         s_ref : MRSData2 object
             Data supposed to be noWS and used as a reference signal for phasing, etc.
-            
+
         Returns
         -------
         s2 : MRSData2 object
@@ -3892,13 +3892,13 @@ class pipeline:
         # compare FID max in magnitude (dirty but robust)
         s_ref_tmp = np.mean(np.abs(s_ref), axis=(0, 1))
         s_tmp = np.mean(np.abs(s), axis=(0, 1))
-        
+
         if(np.max(s_tmp) > np.max(s_ref_tmp)):
             # need to swap
             return(s_ref, s)
         else:
             return(s, s_ref)
-    
+
     def get_te_list(self):
         """
         Return the TEs for all the data signals in this pipeline.
@@ -4044,7 +4044,7 @@ class pipeline:
                 # reading WS data
                 log.info("reading data [" + this_legend + "]")
                 s = MRSData2(this_data_filename, this_physio_filename, this_imaging_filename)
-                
+
                 # reading noWS data
                 this_data_ref_filename = d[dtype]["files"][1]
                 if(this_data_ref_filename is not None):
@@ -4055,7 +4055,7 @@ class pipeline:
                     s, s_ref = self._detect_data_ref(s, s_ref)
                 else:
                     s_ref = None
-                
+
                 log.info("data : got a " + str(s.shape) + " vector")
                 # set ppm reference
                 s.ppm0 = self.settings["ppm0"]

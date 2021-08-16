@@ -34,7 +34,7 @@ p.settings["POI_SNR_range_ppm"] = [4, 5]
 p.settings["POI_LW_range_ppm"] = [4, 5]
 
 p.job_list = [  # p.job["displaying_anatomy"],
-                p.job["phasing"],
+                # p.job["phasing"],
                 p.job["scaling"],
                 # p.job["FID modulus"],
                 p.job["channel_combining"],
@@ -52,6 +52,8 @@ p.job_list = [  # p.job["displaying_anatomy"],
                 p.job["displaying"]
                 ]
 
+p.job["channel_combining"]["phasing"] = True
+
 # measure SNR on water during data rejecting
 p.job["data_rejecting"]["POI_SNR_range_ppm"] = [4, 5]
 
@@ -63,12 +65,23 @@ plt.close("all")
 
 p = reco.pipeline("heart")
 
-p.dataset[0]["legend"] = "test heart"
-p.dataset[0]["raw"]["files"] = ["/home/tangir/desktop/BUCHINGER-WILHELMI FASTING/test MR protocol/meas_MID00617_FID475565_eja_svs_press.dat",
-                                "/home/tangir/desktop/BUCHINGER-WILHELMI FASTING/test MR protocol/meas_MID00617_FID475565_eja_svs_press.dat"]
+p.dataset[0]["legend"] = "PRESS 1"
+p.dataset[0]["raw"]["files"] = ["/home/tangir/desktop/BUCHINGER-WILHELMI FASTING/test MR protocol/meas_MID00618_FID475566_eja_svs_press.dat"]
 p.dataset[0]["dcm"]["files"] = ["/home/tangir/desktop/BUCHINGER-WILHELMI FASTING/test MR protocol/Methordirm_Spectrocardiac/20210712/eja_svs_press_31/IM-0008-0001.dcm",
                                 "/home/tangir/desktop/BUCHINGER-WILHELMI FASTING/test MR protocol/Methordirm_Spectrocardiac/20210712/eja_svs_press_31/IM-0008-0001.dcm"]
 
+p.dataset[1]["legend"] = "PRESS 2"
+p.dataset[1]["raw"]["files"] = ["/home/tangir/desktop/BUCHINGER-WILHELMI FASTING/test MR protocol/meas_MID00617_FID475565_eja_svs_press.dat",
+                                "/home/tangir/desktop/BUCHINGER-WILHELMI FASTING/test MR protocol/meas_MID00617_FID475565_eja_svs_press.dat"]
+p.dataset[1]["dcm"]["files"] = ["/home/tangir/desktop/BUCHINGER-WILHELMI FASTING/test MR protocol/Methordirm_Spectrocardiac/20210712/eja_svs_press_32/IM-0009-0001.dcm",
+                                "/home/tangir/desktop/BUCHINGER-WILHELMI FASTING/test MR protocol/Methordirm_Spectrocardiac/20210712/eja_svs_press_32/IM-0009-0001.dcm"]
+
+p.dataset[2]["legend"] = "SVS_SE 2"
+
+p.dataset[2]["dcm"]["files"] = ["/home/tangir/desktop/BUCHINGER-WILHELMI FASTING/test MR protocol/Methordirm_Spectrocardiac/20210712/svs_se_30_BW2000_256_BH_1RR_35/IM-0012-0001.dcm",
+                                "/home/tangir/desktop/BUCHINGER-WILHELMI FASTING/test MR protocol/Methordirm_Spectrocardiac/20210712/svs_se_30_BW2000_256_BH_1RR_ref_34/IM-0011-0001.dcm"]
+
+p.settings["datasets_indexes"] = [0, 1]
 p.run()
 p.check_analyze_results(True)
 
