@@ -30,7 +30,7 @@ plt.rcParams['font.size'] = 9
 log.setLevel(log.INFO)
 
 # data to process is in here
-db_filepath = "/home/tangir/crmbm/acq_db/brain.pkl"
+db_filepath = "/home/tangir/crmbm/acq_db/sc_nodatarej_norea.pkl"
 fit_suffix_pkl = "_fit"
 
 # display real-time fit and other stuff?
@@ -77,11 +77,11 @@ fit_ws_list = []
 
 # --- list of sequence to try ---
 sequence_list = [None]
-sequence_list.append(sim.mrs_seq_press)
+#sequence_list.append(sim.mrs_seq_press)
 
-# --- list of metabolite lists to try ---
+# --- list of metabolite lists to try (18) ---
 metabolites_list_list = []
-
+"""
 metabolites_list_list.append(np.sort([
     xxx.m_LipA,
     xxx.m_LipB,
@@ -101,8 +101,8 @@ metabolites_list_list.append(np.sort([
     xxx.m_Tau,
     xxx.m_GABA,
     xxx.m_Glc]))
-
-# --- without Glc, GABA, Asp ---
+"""
+# --- without Glc, GABA, Asp (15) ---
 metabolites_list_list.append(np.sort([
     xxx.m_LipA,
     xxx.m_LipB,
@@ -120,7 +120,7 @@ metabolites_list_list.append(np.sort([
     xxx.m_Gsh,
     xxx.m_Tau]))
 
-# --- without Tau ---
+# --- without Tau (14) ---
 metabolites_list_list.append(np.sort([
     xxx.m_LipA,
     xxx.m_LipB,
@@ -137,8 +137,8 @@ metabolites_list_list.append(np.sort([
     xxx.m_Gln,
     xxx.m_Gsh]))
 
-constraint_shrink_list = [0.5, 1]
-constraint_type_list = ["lastallfree", "allfree", "2groups", "4groups", "alllinked"]
+constraint_shrink_list = [0.5] #[0.5, 1]
+constraint_type_list = ["2groups"] #["lastallfree", "allfree", "2groups", "4groups", "alllinked"]
 
 param_big_list = itertools.product(metabolites_list_list, sequence_list, constraint_shrink_list, constraint_type_list)
 
@@ -421,7 +421,7 @@ for this_row_i, (this_index, this_row) in enumerate(df.iterrows()):
         # ETA estimation
         if(prct_done > 0):
             current_time = datetime.today()
-            eta_time = (100 - prct_done) * (current_time - start_time) / prct_done + start_time
+            eta_time = ((100 - prct_done) / prct_done) * (current_time - start_time) + current_time
             os.system("echo " + str(datetime.now()) + " " + os.path.basename(__file__) + "/" + os.path.basename(db_filepath) + ": %.1f%% ETA = %s >> progress.txt" % (prct_done, str(eta_time)))
         else:
             os.system("echo " + str(datetime.now()) + " " + os.path.basename(__file__) + "/" + os.path.basename(db_filepath) + ": %.1f%% >> progress.txt" % prct_done)

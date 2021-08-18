@@ -17,6 +17,7 @@ from datetime import datetime
 import os
 import pydicom
 import hashlib
+import re
 
 try:
     import mapvbvd
@@ -42,19 +43,22 @@ def get_data_file_reader(data_fullfilepath):
         Class to use to read this data file
     """
     log.debug("checking data file path and extension...")
-    data_filename, data_file_extension = os.path.splitext(data_fullfilepath)
+    if(not os.path.isfile(data_fullfilepath)):
+        # this is a folder, not a file
 
-    if(len(data_file_extension) == 0):
-        # if empty extension, assuming the filename is not present in the path
-        # lasy-mode where I copy-pasted only the folder paths
-        # therefore, I will complete the path with the dicom name
-        # which has always been "original-primary_e09_0001.dcm" for me up to now
-        data_fullfilepath = data_fullfilepath + "/original-primary_e09_0001.dcm"
+        # I will try a complete the path to find a data file
+        filenames2try_list = ["original-primary_e09_0001.dcm", "fid"]
+        for this_filename in filenames2try_list:
+            data_fullfilepath_test = os.path.join(data_fullfilepath, this_filename)
+            if(os.path.isfile(data_fullfilepath_test)):
+                data_fullfilepath = data_fullfilepath_test
+                break
 
-    data_filename, data_file_extension = os.path.splitext(data_fullfilepath)
-    file_ext = data_file_extension.lower()
+    data_filename = os.path.basename(data_fullfilepath)
+    _, data_file_extension = os.path.splitext(data_fullfilepath)
+    data_file_extension = data_file_extension.lower()
 
-    if(file_ext == '.dcm'):
+    if(data_file_extension == '.dcm'):
         # dicom? get header and read soft version
         log.debug("reading DICOM header...")
         dcm_header = pydicom.dcmread(data_fullfilepath)
@@ -68,9 +72,14 @@ def get_data_file_reader(data_fullfilepath):
             return(SIEMENS_DICOM_reader_syngo_XA20(data_fullfilepath))
         else:
             log.error("sorry, I am not sure I can read this kind of DICOM files... :/")
-    elif(file_ext == '.dat'):
-        # twix?
+    elif(data_file_extension == '.dat'):
+        # SIEMENS twix file?
         return(SIEMENS_TWIX_reader_syngo_MR_B17(data_fullfilepath))
+    elif((data_filename == 'fid') or (data_filename == "fid.ref") or (data_filename == "fid.orig")):
+        # BRUKER fid, fid.ref, fid.orig file?
+        return(BRUKER_fid_reader(data_fullfilepath))
+    else:
+        log.error("sorry, I am not sure I can read this kind of files... :/")
 
 
 class data_file_reader(metaclass=ABCMeta):
@@ -1520,6 +1529,254 @@ class SIEMENS_DICOM_reader_syngo_XA20(SIEMENS_DICOM_reader_syngo_MR_B17):
         acq_time = float((AcquisitionTime_datetime - SeriesInstanceUID_datetime).seconds)
 
         return(acq_time)
+
+
+class BRUKER_fid_reader(data_file_reader):
+    """A class used to scrap parameters out of Bruker files."""
+
+    def __init__(self, data_fullfilepath):
+        """
+        Initialize by reading a DICOM or TWIX file in text mode and extracting the DICOM header with pydicom, if required.
+
+        Parameters
+        ----------
+        data_fullfilepath : string
+            Full path to the DICOM/TWIX file
+        """
+        super().__init__(data_fullfilepath)
+
+        data_path, data_filename = os.path.split(data_fullfilepath)
+
+        # find the method and acqp files
+        acqp_fullfilepath = os.path.join(data_path, "acqp")
+        if(not os.path.isfile(acqp_fullfilepath)):
+            log.error("no acqp file found (%s) !" % acqp_fullfilepath)
+        method_fullfilepath = os.path.join(data_path, "method")
+        if(not os.path.isfile(method_fullfilepath)):
+           log.error("no method file found (%s) !" % method_fullfilepath)
+
+        # read the method and acqp files
+        log.debug("reading method file...")
+        with open(acqp_fullfilepath) as f:
+            self.acqp_file_content = f.read()
+        log.debug("reading acqp file...")
+        with open(method_fullfilepath) as f:
+            self.method_file_content = f.read()
+
+        # merge both files
+        self.acqp_and_method_files_content = (self.acqp_file_content + self.method_file_content).lower()
+
+        # read data and store it
+        self.data = self._read_data()
+
+        # freeze
+        self.__isfrozen = True
+
+    def _read_data(self):
+        """
+        Read MRS data from file and return a suspect's MRSData object.
+
+        Returns
+        -------
+        MRSData_obj : MRSData object
+            MRS data read from fid file
+        """
+        log.debug("reading BRUKER fid file...")
+        MRSData_obj = suspect.io.load_svs_bruker(self.fullfilepath)
+
+        return(MRSData_obj)
+
+    def is_rawdata(self):
+        """Return true if data is read from a fid file."""
+        return(True)
+
+    def read_param_num(self, param_name):
+        """
+        Look for parameter in the acqp and method files and return its float value.
+
+        Parameters
+        ----------
+        param_name : string
+            Name of parameter to extract
+
+        Returns
+        -------
+        param_val : float
+            Value of parameter
+        """
+        # scrap out parameter value (clean RE way from from suspect package)
+        param_str = re.search(r"\$" + param_name.lower() + "=(.*)", self.acqp_and_method_files_content).group()
+        param_val_float = float(param_str.split("=")[1])
+
+        # return it
+        return(param_val_float)
+
+    def get_nucleus(self):
+        """
+        Return the nucleus setting used to acquire the MRS data.
+
+        Returns
+        -------
+        nucleus_str : string
+            String representing nucleus. Example: "1H"
+        """
+        param_str = re.search(r"\$" + "PVM_Nucleus1Enum".lower() + "=(\w+)", self.acqp_and_method_files_content)[1]
+        nucleus_str = param_str.replace("<", "").replace(">", "").strip().upper()
+
+        return(nucleus_str)
+
+    def get_patient_name(self):
+        """
+        Return the patient name field.
+
+        Returns
+        -------
+        patient_name_str : string
+            Patient name
+        """
+        log.warning("no patient data available in BRUKER method/acqp files!")
+        return("")
+
+    def get_patient_birthday(self):
+        """
+        Return the patient birthday field.
+
+        Returns
+        -------
+        patient_birthday_datetime : datetime
+            Patient birthday (or None if no date found)
+        """
+        log.warning("no patient data available in BRUKER method/acqp files!")
+        patient_birthday_datetime = datetime.today()
+        return(patient_birthday_datetime)
+
+    def get_patient_sex(self):
+        """
+        Return the patient sex field.
+
+        Returns
+        -------
+        patient_sex_str : string
+            Patient sex ('M', 'F' or 'O')
+        """
+        log.warning("no patient data available in BRUKER method/acqp files!")
+        return('O')
+
+    def get_patient_weight(self):
+        """
+        Return the patient weight field.
+
+        Returns
+        -------
+        patient_weight_kgs : float
+            Patient weight in kg
+        """
+        log.warning("no patient data available in BRUKER method/acqp files!")
+        return(0.0)
+
+    def get_patient_height(self):
+        """
+        Return the patient height field.
+
+        Returns
+        -------
+        patient_height_m : float
+            Patient height in meters
+        """
+        log.warning("no patient data available in BRUKER method/acqp files!")
+        return(0.0)
+
+    def get_patient_name(self):
+        """
+        Return the patient name field.
+
+        Returns
+        -------
+        patient_name_str : string
+            Patient name
+        """
+        return("")
+
+    def get_sequence(self):
+        """
+        Extract all parameters related to acquisition and sequence and return it as a sequence object.
+
+        Returns
+        -------
+        seq : mrs.sim.mrs_sequence
+            Sequence object
+        """
+        log.debug("reading sequence parameters...")
+
+        # echo time
+        te = self.read_param_num("PVM_EchoTime")
+        log.debug("extracted PVM_EchoTime (%.2f)" % te)
+
+        # repetion tim
+        tr = self.read_param_num("PVM_RepetitionTime")
+        log.debug("extracted PVM_RepetitionTime (%.2f)" % tr)
+
+        # averages
+        na = int(self.read_param_num("NA"))
+        log.debug("extracted NA (%d)" % na)
+
+        # dummy scans
+        ds = int(self.read_param_num("DS"))
+        log.debug("extracted DS (%d)" % ds)
+
+        # nucleus (used for sequence object)
+        nucleus = self.get_nucleus()
+        log.debug("extracted nuclei (%s)" % nucleus)
+
+        # number of points
+        npts = int(self.read_param_num("PVM_DigNp"))
+        log.debug("extracted PVM_DigNp (%d)" % npts)
+
+        # voxel size
+        re_voxel_size = re.search(r"\$pvm_voxarrsize=\( 1, 3 \)\n(\d) (\d) (\d)", self.acqp_and_method_files_content)
+        voxel_size = [float(re_voxel_size[1]), float(re_voxel_size[2]), float(re_voxel_size[3])]
+        log.debug("extracted voxel size (%.2f x %.2f x %.2f mm3)" % (voxel_size[0], voxel_size[1], voxel_size[2]))
+
+        # dwell time (btw already extracted within suspect, this is a bit redandent)
+        dt = self.read_param_num("PVM_DigShift") * 1e-3
+        log.debug("extracted dwell time (%.2f)" % dt)
+
+        # f0 frequency (btw already extracted within suspect, this is a bit redandent)
+        f0 = self.read_param_num("BF1")
+        log.debug("extracted f0 (%.6f)" % f0)
+
+        # --- sequence-specific parameters ---
+        sequence_name = self._get_sequence_name()
+        log.debug("extracted sequence name (%s)" % sequence_name)
+
+        if(sequence_name == "press"):
+            sequence_obj = sim.mrs_seq_svs_se(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0)
+
+        elif(sequence_name == "steam"):
+            sequence_obj = sim.mrs_seq_svs_st(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0)
+
+        elif(sequence_name is None):
+            sequence_obj = None
+
+        else:
+            # unknown!
+            log.error("ouch unknown sequence (%s) !" % sequence_name)
+
+        return(sequence_obj)
+
+    def _get_sequence_name(self):
+        """
+        Return the acquisition sequence name.
+
+        Returns
+        -------
+        sequence_name : string
+            Sequence used for the acquisition
+        """
+        param_str = re.search(r"\$" + "Method".lower() + "=(.*)", self.acqp_and_method_files_content)[1]
+        sequence_name = param_str.replace("<", "").replace(">", "").strip().lower()
+
+        return(sequence_name)
 
 
 def read_physio_file(physio_filepath):

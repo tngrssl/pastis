@@ -6,7 +6,7 @@ PASTIS stands for (P)rocessing (AS)sessment (T)echnique for (I)mproved (S)pectro
 
 PASTIS can be used to process and quantify single-voxel Magnetic Resonance SPectroscopy (MRS) data. It can also simulate MRS data using various MRS sequences for different B0 fields.
 
-PASTIS relies a lot on the suspect package.
+PASTIS relies a lot on the suspect package. More info here: https://github.com/openmrslab/suspect
 
 ## Requirements (see requirements.txt)
 
@@ -20,6 +20,7 @@ PASTIS relies a lot on the suspect package.
 ## Features
 
 * Read raw data from Siemens (TWIX MR Syngo VB17)
+* Read raw data from Bruker (fid files)
 * Read dicom data (standard dicom, Siemens MR Syngo VB17, Siemens MR Syngo XA20)
 * VOI overlay on anatomical image
 * Data processing
