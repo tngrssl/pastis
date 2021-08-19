@@ -1,5 +1,9 @@
 ## TODO
 
+* check for ppm0 bug/incompatibility for the fit
+
+* improve scaling job to make it automatic (normalization to a CONSTANT)
+
 * check and update metabolite chemical shifts and J-coupling values with recent literature (important if going for 1H UHF brain MRS for example):
 
 Article (Govindaraju2000)
