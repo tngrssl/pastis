@@ -61,7 +61,7 @@ template_name = "lipids_exvivo_bruker_500"
 p = reco.pipeline()
 p.settings["storage_file"] = "/home/tangir/crmbm/acq_db/%s.pkl" % template_name
 p.settings["POI_range_ppm"] = [1, 1.4]
-p.settings["POI_shift_range_ppm"] = [1, 1.4]
+p.settings["POI_shift_range_ppm"] = [4.5, 4.8]
 p.settings["POI_shift_true_ppm"] = 1.3
 p.settings["POI_SNR_range_ppm"] = [1, 2]
 p.settings["POI_LW_range_ppm"] = [1, 1.4]
@@ -70,28 +70,24 @@ p.settings["display_range_ppm"] = [0, 6]
 p.settings["display"] = True
 
 # warning: these spectra were acquired by centering the excitation on the highest peak, not water here but the lipid resonance at 1.3ppm
-p.settings["ppm0"] = 1.3
+#p.settings["ppm0"] = 1.3
 
 p.job_list = [  p.job["phasing"],
                 p.job["scaling"],
                 p.job["channel_combining"],
                 p.job["noise_estimation"],
                 p.job["averaging"],
-                #p.job["calibrating"],
+                p.job["calibrating"],
                 #p.job["water_removal"],
-                #p.job["cropping"],
+                p.job["cropping"],
                 p.job["phasing_suspect"],
                 p.job["apodizing"],
                 p.job["displaying"]
                 ]
 
 p.analyze_enable = False
-p.job["scaling"]["scaling_factor_dcm"] = 1 / 100
+p.job["scaling"]["scaling_factor_rawdata"] = 1 / 2.5e2
 p.job["cropping"]["final_npts"] = 1024
-
-p.job["water_removal"]["POI_range_ppm"] = [3, 6]
-p.job["water_removal"]["hsvd_components"] = 10
-
 p.save_template(template_name)
 
 # %% 23/04/2021 steam test on foie gras sample
@@ -137,10 +133,10 @@ plt.close("all")
 p = reco.pipeline("lipids_exvivo_bruker_500")
 
 p.dataset[0]["legend"] = "PRESS"
-p.dataset[0]["dcm"]["files"] = ["/home/tangir/desktop/4/fid"]
+p.dataset[0]["raw"]["files"] = ["/home/tangir/desktop/4/fid"]
 
-p.dataset[1]["legend"] = "STEAM"
-p.dataset[1]["dcm"]["files"] = ["/home/tangir/desktop/5/fid"]
+p.dataset[1]["legend"] = "STEAM2"
+p.dataset[1]["raw"]["files"] = ["/home/tangir/desktop/5/fid"]
 
 p.run()
 p.save_datasets()
