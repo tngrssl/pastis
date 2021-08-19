@@ -1020,7 +1020,7 @@ class mrs_sequence:
             for this_meta_key, this_meta_entry in self._meta_bs[this_metagroup_key]["metabolites"].items():
                 log.info("simulating MRS signal for metabolite [%s/%s]..." % (this_metagroup_key, this_meta_key))
                 s = self._run_sequence(this_meta_entry)
-                
+
                 # band pass filter?
                 if(self.bandpass_filter_range_ppm is not None):
                     #s = s.correct_bandpass_filtering_1d(self.bandpass_filter_range_ppm, np.ones)
@@ -1036,10 +1036,10 @@ class mrs_sequence:
                         # and remove them
                         if(n_peaks2remove > 0):
                             s = s.correct_peak_removal_1d(n_peaks2remove * 10, [max(self.bandpass_filter_range_ppm), max(this_meta_entry["ppm"] + 1)], False)
-                        
+
                 # build up the metabolite group
                 s_grp = s_grp + s
-                
+
             # append this metabolite group to the metabase
             self._meta_signals.append(s_grp)
 
@@ -2881,6 +2881,15 @@ class metabolite_basis_set(dict):
             f.write("n_All = " + str(n_meta + n_MM) + "\n")
             f.write("n_MBs = " + str(n_meta) + "\n")
             f.write("n_MMs = " + str(n_MM) + "\n")
+            f.write("\n")
+
+            # constants for link-lock vector
+            f.write("ll_FREE = " + str(0) + "\n")
+            f.write("ll_FIXED = " + str(1) + "\n")
+            for k in range(100):
+                f.write("ll_MASTER" + str(k+1) + " = " + str(-(k+2)) + "\n")
+                f.write("ll_SLAVE" + str(k+1) + " = " + str(+(k+2)) + "\n")
+
             f.write("\n")
 
     def get_literature_min(self):
