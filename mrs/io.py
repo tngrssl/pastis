@@ -1728,9 +1728,15 @@ class BRUKER_fid_reader(data_file_reader):
         nucleus = self.get_nucleus()
         log.debug("extracted nuclei (%s)" % nucleus)
 
+        # npts of points to remove because of the digital filter
+        npts_shift = int(self.read_param_num("PVM_DigShift"))
+        log.debug("extracted PVM_DigShift (%d)" % npts_shift)
+
         # number of points
         npts = int(self.read_param_num("PVM_DigNp"))
         log.debug("extracted PVM_DigNp (%d)" % npts)
+        npts = npts - npts_shift
+        log.debug("removed crappy digital filter points (%d)" % npts)
 
         # voxel size
         re_voxel_size = re.search(r"\$pvm_voxarrsize=\( 1, 3 \)\n(\d) (\d) (\d)", self.acqp_and_method_files_content)
@@ -1738,7 +1744,7 @@ class BRUKER_fid_reader(data_file_reader):
         log.debug("extracted voxel size (%.2f x %.2f x %.2f mm3)" % (voxel_size[0], voxel_size[1], voxel_size[2]))
 
         # dwell time (btw already extracted within suspect, this is a bit redandent)
-        dt = self.read_param_num("PVM_DigShift") * 1e-3
+        dt = self.read_param_num("PVM_DigDw") * 1e-3
         log.debug("extracted dwell time (%.2f)" % dt)
 
         # f0 frequency (btw already extracted within suspect, this is a bit redandent)
