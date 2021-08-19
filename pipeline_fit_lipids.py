@@ -27,7 +27,7 @@ plt.rcParams['font.size'] = 9
 log.setLevel(log.INFO)
 
 # data to process is in here
-db_filepath = "/home/tangir/crmbm/acq_db/lipids.pkl"
+db_filepath = "/home/tangir/crmbm/acq_db/lipids_exvivo_bruker_500.pkl"
 
 # %% retrieve data to fit
 
@@ -37,7 +37,7 @@ df = pd.read_pickle(db_filepath)
 # df = df.loc[df["reco_dataset_legend"].str.contains("T2 estimation 23/04/2021")]
 
 # 23/04/2021 steam test on foie gras sample
-df = df.loc[df["reco_dataset_legend"].str.contains("Steam 23/04/2021")]
+df = df.loc[df["reco_dataset_legend"].str.contains("STEAM2")]
 
 # test fitting simulation
 # s._noise_level = 0.01
@@ -65,7 +65,7 @@ metabolites_list = np.sort([
 
 fit_results_list = []
 
-for this_data in df["reco_dataset_dcm_data_obj"].to_list():
+for this_data in df["reco_dataset_raw_data_obj"].to_list():
 
     fittool = fit.fit_pastis(data=this_data, meta_bs=meta_bs)
 
@@ -107,11 +107,11 @@ for this_data in df["reco_dataset_dcm_data_obj"].to_list():
 
     # linklock: global phase, frequency and damping, independant amplitudes
     fittool.params_linklock[:] = 1
-    fittool.params_linklock[metabolites_list, :] = [0, 200, 0, 100]
-    fittool.params_linklock[xxx.m_LipA, :] = [0, -200, 0, -100]
+    fittool.params_linklock[metabolites_list, :] =  [xxx.ll_FREE, xxx.ll_SLAVE1, xxx.ll_FREE, xxx.ll_SLAVE2]
+    fittool.params_linklock[xxx.m_LipA, :] =        [xxx.ll_FREE, xxx.ll_MASTER1, xxx.ll_FREE, xxx.ll_MASTER2]
 
     # leave water free
-    fittool.params_linklock[xxx.m_Water, :] = [0, 0, 0, 0]
+    fittool.params_linklock[xxx.m_Water, :] =       [xxx.ll_FREE, xxx.ll_FREE, xxx.ll_FREE, xxx.ll_FREE]
 
     # run the fit
     fittool.run()
@@ -150,7 +150,7 @@ metabolites_list = np.sort([
 
 fit_results_list = []
 
-for this_data in df["reco_dataset_dcm_data_obj"].to_list():
+for this_data in df["reco_dataset_raw_data_obj"].to_list():
 
     fittool = fit.fit_pastis(data=this_data, meta_bs=meta_bs)
 
@@ -195,39 +195,39 @@ for this_data in df["reco_dataset_dcm_data_obj"].to_list():
     fittool.params_init[xxx.m_LipD2, xxx.p_dp] = np.pi
 
     # linklock: global damping, phase locked
-    fittool.params_linklock[:] = 1
-    fittool.params_linklock[metabolites_list, :] = [0, 200, 0, 1]
-    fittool.params_linklock[xxx.m_LipA1, :] = [0, -200, 0, 1]
+    fittool.params_linklock[:] = xxx.ll_FIXED
+    fittool.params_linklock[metabolites_list, :] =  [xxx.ll_FREE, xxx.ll_SLAVE1, xxx.ll_FREE, xxx.ll_FIXED]
+    fittool.params_linklock[xxx.m_LipA1, :] =       [xxx.ll_FREE, xxx.ll_MASTER1, xxx.ll_FREE, xxx.ll_FIXED]
 
     # crazy amplitudes linking here
     ##
-    fittool.params_linklock[xxx.m_LipA1, xxx.p_cm] = -50
-    fittool.params_linklock[xxx.m_LipC1, xxx.p_cm] = 50
-    fittool.params_linklock[xxx.m_LipE1, xxx.p_cm] = 50
-    # fittool.params_linklock[xxx.m_LipG1, xxx.p_cm] = 50
-    # fittool.params_linklock[xxx.m_LipH1, xxx.p_cm] = 50
-    # fittool.params_linklock[xxx.m_LipI1, xxx.p_cm] = 50
+    fittool.params_linklock[xxx.m_LipA1, xxx.p_cm] = xxx.ll_MASTER2
+    fittool.params_linklock[xxx.m_LipC1, xxx.p_cm] = xxx.ll_SLAVE2
+    fittool.params_linklock[xxx.m_LipE1, xxx.p_cm] = xxx.ll_SLAVE2
+    # fittool.params_linklock[xxx.m_LipG1, xxx.p_cm] = xxx.ll_SLAVE2
+    # fittool.params_linklock[xxx.m_LipH1, xxx.p_cm] = xxx.ll_SLAVE2
+    # fittool.params_linklock[xxx.m_LipI1, xxx.p_cm] = xxx.ll_SLAVE2
     ## (CL-4) is alone and free
-    fittool.params_linklock[xxx.m_LipB1, xxx.p_cm] = 0
+    fittool.params_linklock[xxx.m_LipB1, xxx.p_cm] = xxx.ll_FREE
     ## 2ndb group
-    fittool.params_linklock[xxx.m_LipB2, xxx.p_cm] = -30
-    fittool.params_linklock[xxx.m_LipD1, xxx.p_cm] = 30
-    # fittool.params_linklock[xxx.m_LipJ1, xxx.p_cm] = 30
+    fittool.params_linklock[xxx.m_LipB2, xxx.p_cm] = xxx.ll_MASTER3
+    fittool.params_linklock[xxx.m_LipD1, xxx.p_cm] = xxx.ll_SLAVE3
+    # fittool.params_linklock[xxx.m_LipJ1, xxx.p_cm] = xxx.ll_SLAVE3
     ## 2nmidb group
-    fittool.params_linklock[xxx.m_LipB3, xxx.p_cm] = 40
-    fittool.params_linklock[xxx.m_LipD2, xxx.p_cm] = 40
-    fittool.params_linklock[xxx.m_LipF1, xxx.p_cm] = -40
+    fittool.params_linklock[xxx.m_LipB3, xxx.p_cm] = xxx.ll_SLAVE4
+    fittool.params_linklock[xxx.m_LipD2, xxx.p_cm] = xxx.ll_SLAVE4
+    fittool.params_linklock[xxx.m_LipF1, xxx.p_cm] = xxx.ll_MASTER4
 
     ## link frequency shifts for positive-negative brother peaks
-    fittool.params_linklock[xxx.m_LipB1, xxx.p_df] = -400
-    fittool.params_linklock[xxx.m_LipB2, xxx.p_df] = 400
-    fittool.params_linklock[xxx.m_LipB3, xxx.p_df] = 400
+    fittool.params_linklock[xxx.m_LipB1, xxx.p_df] = xxx.ll_MASTER5
+    fittool.params_linklock[xxx.m_LipB2, xxx.p_df] = xxx.ll_SLAVE5
+    fittool.params_linklock[xxx.m_LipB3, xxx.p_df] = xxx.ll_SLAVE5
     #
-    fittool.params_linklock[xxx.m_LipD1, xxx.p_df] = -500
-    fittool.params_linklock[xxx.m_LipD2, xxx.p_df] = 500
+    fittool.params_linklock[xxx.m_LipD1, xxx.p_df] = xxx.ll_MASTER6
+    fittool.params_linklock[xxx.m_LipD2, xxx.p_df] = xxx.ll_SLAVE6
 
     # leave water free
-    fittool.params_linklock[xxx.m_Water, :] = [0, 0, 0, 0]
+    fittool.params_linklock[xxx.m_Water, :] = [xxx.ll_FREE, xxx.ll_FREE, xxx.ll_FREE, xxx.ll_FREE]
 
     # run the fit
     fittool.run()
