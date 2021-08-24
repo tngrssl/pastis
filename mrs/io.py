@@ -73,13 +73,58 @@ def get_data_file_reader(data_fullfilepath):
         else:
             log.error("sorry, I am not sure I can read this kind of DICOM files... :/")
     elif(data_file_extension == '.dat'):
-        # SIEMENS twix file?
-        return(SIEMENS_TWIX_reader_syngo_MR_B17(data_fullfilepath))
+        # SIEMENS twix file, but what version of MR Syngo?
+        syngo_version = get_twix_syngo_version(data_fullfilepath)
+        # chop last letter
+        syngo_version = syngo_version[0:-1]
+        if(syngo_version == "VB17"):
+            return(SIEMENS_TWIX_reader_syngo_MR_B17(data_fullfilepath))
+        elif(syngo_version == "VE11"):
+            return(SIEMENS_TWIX_reader_syngo_MR_E11(data_fullfilepath))
+        else:
+            log.error("sorry, I am not sure I can read this kind of TWIX files... :/")
+
     elif((data_filename == 'fid') or (data_filename == "fid.ref") or (data_filename == "fid.orig")):
         # BRUKER fid, fid.ref, fid.orig file?
         return(BRUKER_fid_reader(data_fullfilepath))
     else:
         log.error("sorry, I am not sure I can read this kind of files... :/")
+
+
+def get_twix_syngo_version(twix_dat_fullfilepath):
+    """
+    Find what version of MR Syngo was used to generate this TWIX file. Dirty!
+
+    Parameters
+    ----------
+    twix_dat_fullfilepath : string
+        Full path to the TWIX file
+
+    Returns
+    -------
+    version_str : string
+        Syngo version
+    """
+    # open file in text mode
+    log.debug("dumping file in ASCII mode...")
+    f = open(twix_dat_fullfilepath, "r", encoding="ISO-8859-1")
+    file_content_str = f.read()
+    f.close()
+
+    # look for baseline string
+    a = file_content_str.find('ConsistencyInfo.tBaselineString')
+    a = file_content_str.find('"', a)
+    b = file_content_str.find('"', a + 1)
+    baseline_str = file_content_str[(a + 1):b]
+    baseline_str = baseline_str.strip()
+
+    # extract version
+    a = baseline_str.find('_')
+    b = baseline_str.find('_', a + 1)
+    version_str = baseline_str[(a + 1):b]
+    version_str = version_str.strip()
+
+    return(version_str)
 
 
 class data_file_reader(metaclass=ABCMeta):
@@ -857,6 +902,196 @@ class SIEMENS_TWIX_reader_syngo_MR_B17(data_file_reader):
                 fin.seek(start_position + DMA_length)
 
         return(builder.build_mrsdata())
+
+
+class SIEMENS_TWIX_reader_syngo_MR_E11(SIEMENS_TWIX_reader_syngo_MR_B17):
+    """A class used to scrap parameters out of SIEMENS MR Syngo VE11 TWIX files, sometimes in a very dirty way."""
+
+    def __init__(self, data_fullfilepath):
+        """
+        Initialize by reading a TWIX file in text mode. Since VE11 stores multiple blocks of data and parameters, I will carefully crop the file_content_str (text view of the file)!
+
+        Parameters
+        ----------
+        data_fullfilepath : string
+            Full path to the TWIX file
+        """
+        super().__init__(data_fullfilepath)
+
+        # find index leaving only the actual MRS dataset parameters in the file content
+        log.debug("cropping ASCII dump...")
+        file_index_max = len(self.file_content_str)
+        file_index_step = int(file_index_max / 1000)
+
+        log.pause()
+
+        # iterative search for the name of the sequence
+        last_found_seq_name = None
+        for i in range(file_index_max, 0, -file_index_step):
+            found_seq_name = self._get_sequence_name(i)
+            if((found_seq_name is not None) and
+               (last_found_seq_name is not None) and
+               (found_seq_name != last_found_seq_name)):
+                # if we find a sequence name different from the previous one, we probably jumped into the previous block
+                break
+            last_found_seq_name = found_seq_name
+
+        log.resume()
+
+        # found last block index
+        i += file_index_step
+        # crop
+        self.file_content_str = self.file_content_str[i:]
+
+        # freeze
+        self.__isfrozen = True
+
+    def get_sequence(self):
+        """
+        Extract all parameters related to acquisition and sequence and return it as a sequence object. Overloading from TWIX VB17 to fix some issues extracting TE and TE on VE11.
+
+        Returns
+        -------
+        seq : mrs.sim.mrs_sequence
+            Sequence object
+        """
+        log.debug("reading sequence parameters...")
+
+        # use suspect to read echo time
+        te = self.data.te
+        log.debug("extracted echo time (%.2f)" % te)
+
+        # use suspect to read repetition time
+        tr = self.data.tr
+        log.debug("extracted repetition time (%.2f)" % tr)
+
+        # averages
+        na = int(self.read_param_num("lAverages"))
+        log.debug("extracted number of averages (%d)" % na)
+
+        # dummy scans
+        # for some reason, lPreparingScans is sometimes not set in the header...
+        ds = self.read_param_num("lPreparingScans")
+        if(np.isnan(ds)):
+            ds = 0 # I know, that is bad
+        else:
+            ds = int(ds)
+        log.debug("extracted number of dummy scans (%d)" % ds)
+
+        # reference voltage
+        vref = self.read_param_num("flReferenceAmplitude")
+        log.debug("extracted reference voltage (%.2fV)" % vref)
+
+        # 1st order shim X
+        shim_1st_X = self.read_param_num("lOffsetX")
+        log.debug("extracted 1st order shim value for X (%.2f)" % shim_1st_X)
+
+        # 1st order shim Y
+        shim_1st_Y = self.read_param_num("lOffsetY")
+        log.debug("extracted 1st order shim value for Y (%.2f)" % shim_1st_Y)
+
+        # 1st order shim Z
+        shim_1st_Z = self.read_param_num("lOffsetZ")
+        log.debug("extracted 1st order shim value for Z (%.2f)" % shim_1st_Z)
+
+        # 2nd / 3rd shims
+        shims_2nd_3rd_list = []
+        for i_shim in range(5):
+            this_shim_val = self.read_param_num("alShimCurrent[%d]" % i_shim)
+            shims_2nd_3rd_list.append(this_shim_val)
+        log.debug("extracted 2nd/3rd shims (" + str(shims_2nd_3rd_list) + ")")
+
+        # merge shims values into one vector
+        shims_values = [shim_1st_X, shim_1st_Y, shim_1st_Z] + shims_2nd_3rd_list
+
+        # nucleus (used for sequence object)
+        nucleus = self.get_nucleus()
+        log.debug("extracted nuclei (%s)" % nucleus)
+
+        # number of points
+        npts = int(self.read_param_num("lVectorSize"))
+        log.debug("extracted number of points (%d)" % npts)
+
+        # voxel size (job alraedy done by suspect, grab it from MRSData object)
+        voxel_size = self.data.voxel_size
+        log.debug("extracted voxel size (%.2f x %.2f x %.2f mm3)" % (voxel_size[0], voxel_size[1], voxel_size[2]))
+
+        # dwell time (btw already extracted within suspect, this is a bit redandent)
+        dt = self.read_param_num("DwellTime") * 1e-9
+        log.debug("extracted dwell time (%.2f)" % dt)
+
+        # f0 frequency (btw already extracted within suspect, this is a bit redandent)
+        f0 = self.read_param_num("Frequency") * 1e-6
+        log.debug("extracted f0 (%.6f)" % f0)
+
+        # special timestamp
+        ulTimeStamp_ms = self._get_sequence_timestamp()
+        log.debug("found a timestamp (%.0f)" % ulTimeStamp_ms)
+
+        # gating mode
+        gss = self._get_gating_mode()
+        log.debug("extracted gating mode (%d)" % gss.value)
+
+        # effective acquisition time
+        eff_acq_time = self._get_sequence_acquisition_time_effective()
+        log.debug("extracted effective acquisition time (%.0f)" % eff_acq_time)
+
+        # --- sequence-specific parameters ---
+        sequence_name = self._get_sequence_name()
+        log.debug("extracted sequence name (%s)" % sequence_name)
+
+        if(sequence_name == "eja_svs_slaser"):
+            log.debug("this a semi-LASER acquisition, let's extract some specific parameters!")
+
+            # afp pulse (fake) flip angle
+            pulse_laser_rfc_fa = self.read_param_num("adFlipAngleDegree[1]")
+            log.debug("extracted LASER AFP refocussing pulse flip angle (%.2f)" % pulse_laser_rfc_fa)
+
+            # afp pulse length
+            pulse_laser_rfc_length = self.read_param_num("sWiPMemBlock.alFree[1]")
+            log.debug("extracted LASER AFP refocussing pulse duration (%.2f)" % pulse_laser_rfc_length)
+
+            # afp pulse R
+            pulse_laser_rfc_r = self.read_param_num("sWiPMemBlock.alFree[49]")
+            log.debug("extracted LASER AFP refocussing pulse R (%.2f)" % pulse_laser_rfc_r)
+
+            # afp pulse N
+            pulse_laser_rfc_n = self.read_param_num("sWiPMemBlock.alFree[48]")
+            log.debug("extracted LASER AFP refocussing pulse N (%.2f)" % pulse_laser_rfc_n)
+
+            # afp pulse voltage
+            pulse_laser_rfc_voltage = self.read_param_num("aRFPULSE[1].flAmplitude")
+            log.debug("extracted LASER AFP refocussing pulse voltage (%.2f)" % pulse_laser_rfc_voltage)
+
+            # exc pulse duration
+            pulse_laser_exc_length = self.read_param_num("sWiPMemBlock.alFree[24]")
+            log.debug("extracted LASER exc. pulse length (%.2f)" % pulse_laser_exc_length)
+
+            # exc pulse voltage
+            pulse_laser_exc_voltage = self.read_param_num("aRFPULSE[0].flAmplitude")
+            log.debug("extracted LASER excitation pulse voltage (%.2f)" % pulse_laser_exc_voltage)
+
+            # spoiler length
+            spoiler_length = self.read_param_num("sWiPMemBlock.alFree[12]")
+            log.debug("extracted LASER spoiler length (%.2f)" % spoiler_length)
+
+            # build sequence object
+            sequence_obj = sim.mrs_seq_eja_svs_slaser(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0, pulse_laser_exc_length / 1000.0, pulse_laser_exc_voltage, pulse_laser_rfc_length / 1000.0, pulse_laser_rfc_fa, pulse_laser_rfc_r, pulse_laser_rfc_n, pulse_laser_rfc_voltage, spoiler_length / 1000.0)
+
+        elif(sequence_name == "eja_svs_press"):
+            sequence_obj = sim.mrs_seq_eja_svs_press(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
+
+        elif(sequence_name == "eja_svs_steam"):
+            sequence_obj = sim.mrs_seq_eja_svs_steam(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
+
+        elif(sequence_name is None):
+            sequence_obj = None
+
+        else:
+            # unknown!
+            log.error("ouch unknown sequence (%s) !" % sequence_name)
+
+        return(sequence_obj)
 
 
 class SIEMENS_DICOM_reader_syngo_MR_B17(data_file_reader):

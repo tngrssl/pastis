@@ -3895,6 +3895,7 @@ class pipeline:
 
         if(np.max(s_tmp) > np.max(s_ref_tmp)):
             # need to swap
+            log.debug("swapping signal of interest (WS) and reference signal (noWS)!")
             return(s_ref, s)
         else:
             return(s, s_ref)
