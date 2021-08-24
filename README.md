@@ -19,7 +19,7 @@ PASTIS relies a lot on the suspect package. More info here: https://github.com/o
 
 ## Features
 
-* Read raw data from Siemens (TWIX MR Syngo VB17)
+* Read raw data from Siemens (TWIX MR Syngo VB17 & VE11)
 * Read raw data from Bruker (fid files)
 * Read dicom data (standard dicom, Siemens MR Syngo VB17, Siemens MR Syngo XA20)
 * VOI overlay on anatomical image

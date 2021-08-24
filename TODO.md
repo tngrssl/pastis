@@ -1,5 +1,17 @@
 ## TODO
 
+* enable log file, do not use root logger but give it a name "pastis"
+
+* remove useless log messages using pause
+
+* fix reco_templates issue
+
+* clean-up git, remove datasets* files, notebooks and all unnecessary files from git, including their history (https://stackoverflow.com/questions/35115585/remove-files-completely-from-git-repository-along-with-its-history)
+
+* leave 2 demo files: reco and fit examples
+
+* complete readme with more information, code snippets, examples
+
 * improve scaling job to make it automatic (normalization to a CONSTANT)
 
 * check and update metabolite chemical shifts and J-coupling values with recent literature (important if going for 1H UHF brain MRS for example):
