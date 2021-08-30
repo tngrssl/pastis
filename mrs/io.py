@@ -58,7 +58,7 @@ def get_data_file_reader(data_fullfilepath):
     _, data_file_extension = os.path.splitext(data_fullfilepath)
     data_file_extension = data_file_extension.lower()
 
-    if(data_file_extension == '.dcm'):
+    if((data_file_extension == '.dcm') or (data_file_extension == '.ima')):
         # dicom? get header and read soft version
         log.debug("reading DICOM header...")
         dcm_header = pydicom.dcmread(data_fullfilepath)
