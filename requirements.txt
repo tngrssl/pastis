@@ -1,7 +1,0 @@
-numpy
-suspect
-pandas
-pymapvbvd
-xlrd
-termcolor
-
