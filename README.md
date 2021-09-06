@@ -8,14 +8,7 @@ PASTIS can be used to process and quantify single-voxel Magnetic Resonance SPect
 
 PASTIS relies a lot on the suspect package. More info here: https://github.com/openmrslab/suspect
 
-## Requirements (see requirements.txt)
-
-* Python 3.7
-* Python packages:
-    * pygamma numpy suspect pandas pymapvbvd xlrd termcolor
-
-* GAMMA library installed on system (https://scion.duhs.duke.edu/vespa/gamma/)
-    * apt-get install gamma (Debian/Ubuntu)
+## Credits
 
 ## Features
 
@@ -52,3 +45,33 @@ PASTIS relies a lot on the suspect package. More info here: https://github.com/o
 * Quantification using suspect's LCModel wrapper
 * Dataframe-based storage in pkl files
 * Reconstruction and quantification of diffusion-weighted MRS data (experimental)
+
+## Installation
+
+### Python package
+
+PASTIS was developped on Python 3.7 and can be installed with *pip* using this command line:
+
+```
+pip install -e path/to/the/folder/pastis
+```
+
+### GAMMA
+
+GAMMA is a system package used for NMR simulations. It can be installed on Debian-based system using this command-line:
+
+```
+apt-get install gamma
+```
+
+More info about GAMMA on https://scion.duhs.duke.edu/vespa/gamma/
+
+### GAMMA alternative
+
+
+
+## Usage
+
+Coming soon...
+
+### Data processing jobs

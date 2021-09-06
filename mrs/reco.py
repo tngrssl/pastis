@@ -800,11 +800,11 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         if(display):
             # display the cross-correlation plots
-            fig = plt.figure(100)
+            fig_title = "Analyzing physiological signal [%s]" % self.display_label
+            fig = plt.figure(fig_title)
             fig.clf()
+            fig.suptitle(fig_title)
             axs = fig.subplots(2, 2, sharex='all')
-            fig.canvas.set_window_title("analyze_physio_2d_1 (mrs.reco.MRSData2)")
-            fig.suptitle("analyzing physiological signals for [%s]" % self.display_label)
 
             p = 0
             for ix in range(2):
@@ -825,11 +825,11 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig.show()
 
             # display time signals
-            fig = plt.figure(101)
+            fig_title = "Physio. signal analysis (I) [%s]" % self.display_label
+            fig = plt.figure(fig_title)
             fig.clf()
+            fig.suptitle(fig_title)
             axs = fig.subplots(2, 2, sharex='all')
-            fig.canvas.set_window_title("analyze_physio_2d_2 (mrs.reco.MRSData2)")
-            fig.suptitle("analyzing physiological signals for [%s]" % self.display_label)
 
             p = 0
             for ix in range(2):
@@ -858,11 +858,11 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig.show()
 
             # display correlation plots
-            fig = plt.figure(102)
+            fig_title = "Physio. signal analysis (II) [%s]" % self.display_label
+            fig = plt.figure(fig_title)
             fig.clf()
+            fig.suptitle(fig_title)
             axs = fig.subplots(2, 2, sharex='all')
-            fig.canvas.set_window_title("analyze_physio_2d_3 (mrs.reco.MRSData2)")
-            fig.suptitle("analyzing physiological signals for [%s]" % self.display_label)
 
             p = 0
             for ix in range(2):
@@ -882,11 +882,11 @@ class MRSData2(suspect.mrsobjects.MRSData):
             fig.show()
 
             # display FFT plots
-            fig = plt.figure(103)
+            fig_title = "Physio. signal analysis (III) [%s]" % self.display_label
+            fig = plt.figure(fig_title)
             fig.clf()
+            fig.suptitle(fig_title)
             axs = fig.subplots(2, 2, sharex='all')
-            fig.canvas.set_window_title("analyze_physio_2d_4 (mrs.reco.MRSData2)")
-            fig.suptitle("analyzing physiological signals for [%s]" % self.display_label)
 
             p = 0
             for ix in range(2):
@@ -950,11 +950,11 @@ class MRSData2(suspect.mrsobjects.MRSData):
         s = self.copy()
         # display
         if(display):
-            fig = plt.figure(110)
+            fig_title = "SNR estimation [%s]" % self.display_label
+            fig = plt.figure(fig_title)
             fig.clf()
+            fig.suptitle(fig_title)
             axs = fig.subplots(2, 1, sharex='all', sharey='all')
-            fig.canvas.set_window_title("analyze_snr_1d (mrs.reco.MRSData2)")
-            fig.suptitle("analyzing SNR for [%s]" % self.display_label)
 
         # find maximum peak in range
         sf = s.spectrum()
@@ -1057,11 +1057,11 @@ class MRSData2(suspect.mrsobjects.MRSData):
             ppm = s.frequency_axis_ppm()
             sf = s.spectrum()
 
-            fig = plt.figure(120)
+            fig_title = "FWHM estimation [%s]" % self.display_label
+            fig = plt.figure(fig_title)
             fig.clf()
+            fig.suptitle(fig_title)
             axs = fig.subplots(2, 1, sharex='all', sharey='all')
-            fig.canvas.set_window_title("analyze_linewidth_1d (mrs.reco.MRSData2)")
-            fig.suptitle("analyzing peak linewidth for [%s]" % self.display_label)
 
             axs[0].plot(ppm, np.real(sf), 'k-', linewidth=1)
             axs[0].set_xlim(display_range[1], display_range[0])
@@ -1192,11 +1192,11 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 s_disp = np.mean(s_disp, axis=0)
                 s_zf_disp = np.mean(s_zf_disp, axis=0)
 
-            fig = plt.figure(130)
+            fig_title = "Zero-filling [%s]" % self.display_label
+            fig = plt.figure(fig_title)
             fig.clf()
+            fig.suptitle(fig_title)
             axs = fig.subplots(2, 2, sharex='row', sharey='row')
-            fig.canvas.set_window_title("correct_zerofill_nd (mrs.reco.MRSData2)")
-            fig.suptitle("zero_filling [%s]" % self.display_label)
 
             # no time axis, we want to see the number of points
             axs[0, 0].plot(np.real(s_disp), 'k-', linewidth=1)
@@ -1283,11 +1283,11 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 s_disp = np.mean(s_disp, axis=0)
                 s_shifted_disp = np.mean(s_shifted_disp, axis=0)
 
-            fig = plt.figure(140)
+            fig_title = "Time-shifting [%s]" % self.display_label
+            fig = plt.figure(fig_title)
             fig.clf()
+            fig.suptitle(fig_title)
             axs = fig.subplots(2, 2, sharex='row', sharey='row')
-            fig.canvas.set_window_title("correct_time_shift_nd (mrs.reco.MRSData2)")
-            fig.suptitle("time_shifting [%s]" % self.display_label)
 
             axs[0, 0].plot(t, np.real(s_disp), 'k-', linewidth=1)
             axs[0, 0].set_xlabel('time (us)')
@@ -1403,12 +1403,12 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 phase_method += 1
 
         if(display):
-            # prepare subplots
-            fig = plt.figure(150)
+            # prepare subplot
+            fig_title = "Phasing [%s]" % self.display_label
+            fig = plt.figure(fig_title)
             fig.clf()
+            fig.suptitle(fig_title)
             axs = fig.subplots(2, 3, sharex='col')
-            fig.canvas.set_window_title("correct_phase_3d (mrs.reco.MRSData2)")
-            fig.suptitle("phasing [%s]" % self.display_label)
 
         # display chosen method
         log.debug("phasing using method: " + list_phase_method[phase_method])
@@ -2015,12 +2015,15 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 # plot SNR / LW combinaisons and optimal choice
                 if(display):
                     # plot the SNRs versus LWs
-                    fig = plt.figure(159 + (iround_data_rej - 1) * 4 + 1)
+                    fig_title = "Data discarding [%s]: adjusting criteria" % self.display_label
+                    if(iround_data_rej > 1):
+                        fig_title += " (round #%d)" % iround_data_rej
+
+                    fig = plt.figure(fig_title)
                     if(not display_axes_ready[0]):
-                        # we just created the figure, let's create the axes
+                        # create the figure, let's create the axes
                         fig.clf()
-                        fig.canvas.set_window_title("correct_analyze_and_reject_2d (auto 1/2) (mrs.reco.MRSData2)")
-                        fig.suptitle("adjusting data rejection criteria for [%s] (round #%d)" % (self.display_label, iround_data_rej))
+                        fig.suptitle(fig_title)
                         fig.subplots(2, 2)
                         for a in fig.axes:
                             a.twinx()
@@ -2037,29 +2040,6 @@ class MRSData2(suspect.mrsobjects.MRSData):
                     fig.axes[this_auto_method.value + 4].plot(this_prop_range, test_lw_list, 'bx-', label='Linewidth')
                     fig.axes[this_auto_method.value + 4].set_ylabel('Estimated linewidth (Hz)')
                     fig.axes[this_auto_method.value + 4].legend(loc='lower right')
-
-                    fig.subplots_adjust()
-                    fig.show()
-
-                    # plot the data rejection percentage
-                    fig = plt.figure(159 + (iround_data_rej - 1) * 4 + 2)
-                    if(not display_axes_ready[1]):
-                        # we just created the figure, let's create the axes
-                        fig.clf()
-                        fig.canvas.set_window_title("correct_analyze_and_reject_2d (auto 2/2) (mrs.reco.MRSData2)")
-                        fig.suptitle("estimating data rejection rates for [%s] (round #%d)" % (self.display_label, iround_data_rej))
-                        fig.subplots(2, 2)
-                        for a in fig.axes:
-                            a.twinx()
-                        display_axes_ready[1] = True
-
-                    fig.axes[this_auto_method.value].plot(this_prop_range, test_nrej_list, 'ko-', label='Number of scans rejected')
-                    fig.axes[this_auto_method.value].set_xlabel(properties_names[this_auto_method.value][0].upper() + properties_names[this_auto_method.value][1:])
-                    fig.axes[this_auto_method.value].set_ylabel('Number of scans rejected')
-                    fig.axes[this_auto_method.value].grid('on')
-
-                    fig.axes[this_auto_method.value + 4].plot(this_prop_range, test_nrej_list / s_ma.shape[0] * 100, 'ko-', label='Total percentage of scans rejected')
-                    fig.axes[this_auto_method.value + 4].set_ylabel('Rejection percentage (%)')
 
                     fig.subplots_adjust()
                     fig.show()
@@ -2179,12 +2159,11 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         # final display
         if(display):
-
-            fig = plt.figure(159 + (iround_data_rej - 1) * 4 + 3)
+            fig_title = "Data discarding [%s]: summary" % self.display_label
+            fig = plt.figure(fig_title)
             fig.clf()
+            fig.suptitle(fig_title)
             axs = fig.subplots(2, 3, sharex='all')
-            fig.canvas.set_window_title("correct_analyze_and_reject_2d (summary) (mrs.reco.MRSData2)")
-            fig.suptitle("analyzing data and rejecting some for [%s] (round #%d)" % (self.display_label, iround_data_rej))
 
             k = 0
             for ix in range(2):
@@ -2270,36 +2249,6 @@ class MRSData2(suspect.mrsobjects.MRSData):
         log.resume()
         log.info("* Final post-data-rejection SNR = %.2f" % final_snr)
         log.info("* Final post-data-rejection linewidth = %.2f Hz" % final_lw)
-
-        # display corected and rejected spectra
-        if(display):
-            log.pause()
-            s_avg = s.correct_average_2d()
-            log.resume()
-
-            # change legends
-            s_avg.set_display_label("original spectrum")
-            s_cor_avg.set_display_label("corrected spectrum")
-            s_rej_avg.set_display_label("rejected spectrum")
-
-            fig = plt.figure(159 + (iround_data_rej - 1) * 4 + 4)
-            fig.clf()
-            ax = fig.subplots()
-            fig.canvas.set_window_title("correct_analyze_and_reject_2d (rej. data) (mrs.reco.MRSData2)")
-            fig.suptitle("original, corrected and rejected spectra for [%s] (round #%d)" % (self.display_label, iround_data_rej))
-
-            ax.plot(s_rej_avg.frequency_axis_ppm(), s_rej_avg.spectrum().real, 'r-', linewidth=1, label=s_rej_avg.display_label)
-            ax.plot(s_avg.frequency_axis_ppm(), s_avg.spectrum().real, 'k-', linewidth=1, label=s_avg.display_label)
-            ax.plot(s_cor_avg.frequency_axis_ppm(), s_cor_avg.spectrum().real, 'b-', linewidth=1, label=s_cor_avg.display_label)
-            ax.set_xlim(display_range[1], display_range[0])
-
-            ax.set_xlabel('chemical shift (ppm)')
-            ax.set_ylabel('spectrum')
-            ax.grid('on')
-            ax.legend()
-
-            fig.subplots_adjust()
-            fig.show()
 
         # fill up dict about this data rejection
         data_rej_dict = {}
@@ -2402,7 +2351,6 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 if(inter_corr_mode):
                     # compare this individual spectrum with the first,  using inter-correlation
 
-
                     # zero-fill and apodize moving average signal if needed
                     # btw, I only do this in the case of the intercorrelation mode because it is done internally for the peak-picking mode by the the method _analyze_peak_1d
                     log.pause()
@@ -2446,12 +2394,11 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
             # final display
             if(display):
-
-                fig = plt.figure(180)
+                fig_title = "Realigning individual spectra [%s]" % self.display_label
+                fig = plt.figure(fig_title)
                 fig.clf()
+                fig.suptitle(fig_title)
                 axs = fig.subplots(2, 3, sharex='all', sharey='all')
-                fig.canvas.set_window_title("correct_realign_2d (mrs.reco.MRSData2)")
-                fig.suptitle("frequency realigning [%s]" % self.display_label)
 
                 # display original averaged spectrum
                 axs[0, 0].plot(ppm, np.abs(s_avg.spectrum()), 'k-', linewidth=1)
@@ -2545,11 +2492,11 @@ class MRSData2(suspect.mrsobjects.MRSData):
                 ppm = s.frequency_axis_ppm()
                 ppm_mean = s_mean.frequency_axis_ppm()
 
-                fig = plt.figure(190)
+                fig_title = "Averaging [%s]" % self.display_label
+                fig = plt.figure(fig_title)
                 fig.clf()
+                fig.suptitle(fig_title)
                 axs = fig.subplots(2, 1, sharex='all', sharey='all')
-                fig.canvas.set_window_title("correct_average_2d (mrs.reco.MRSData2)")
-                fig.suptitle("averaging [%s]" % self.display_label)
 
                 axs[0].plot(ppm, s.spectrum().real.transpose(), 'k-', linewidth=1)
                 axs[0].set_xlim(display_range[1], display_range[0])
@@ -2626,11 +2573,11 @@ class MRSData2(suspect.mrsobjects.MRSData):
         s_phased = self.inherit(s_phased)
 
         if(display):
-            fig = plt.figure(200)
+            fig_title = "Phasing [%s] using suspect's routines" % self.display_label
+            fig = plt.figure(fig_title)
             fig.clf()
+            fig.suptitle(fig_title)
             axs = fig.subplots(2, 1, sharex='all', sharey='all')
-            fig.canvas.set_window_title("correct_phase_1d (mrs.reco.MRSData2)")
-            fig.suptitle("phasing (suspect) [%s]" % self.display_label)
 
             axs[0].plot(s.frequency_axis_ppm(), s.spectrum().real, 'k-', linewidth=1)
             axs[0].set_xlim(display_range[1], display_range[0])
@@ -2709,11 +2656,11 @@ class MRSData2(suspect.mrsobjects.MRSData):
             ppm = s_disp.frequency_axis_ppm()
             ppm_apo = s_apo_disp.frequency_axis_ppm()
 
-            fig = plt.figure(210)
+            fig_title = "Apodizing [%s]" % self.display_label
+            fig = plt.figure(fig_title)
             fig.clf()
+            fig.suptitle(fig_title)
             axs = fig.subplots(2, 2, sharex='row', sharey='row')
-            fig.canvas.set_window_title("correct_apodization (mrs.reco.MRSData2)")
-            fig.suptitle("apodizing [%s]" % self.display_label)
 
             axs[0, 0].plot(t, np.abs(s_disp).transpose(), 'k-', linewidth=1, label='fid')
             axs[0, 0].plot(t, w_apo * np.abs(s_disp.max()), 'r-', linewidth=1, label='apodization window')
@@ -2793,11 +2740,11 @@ class MRSData2(suspect.mrsobjects.MRSData):
             ppm = s.frequency_axis_ppm()
             ppm_crop = s_crop.frequency_axis_ppm()
 
-            fig = plt.figure(220)
+            fig_title = "Cropping [%s]" % self.display_label
+            fig = plt.figure(fig_title)
             fig.clf()
+            fig.suptitle(fig_title)
             axs = fig.subplots(2, 2, sharex='row', sharey='row')
-            fig.canvas.set_window_title("correct_crop_1d (mrs.reco.MRSData2)")
-            fig.suptitle("cropping [%s]" % self.display_label)
 
             axs[0, 0].plot(t, np.abs(s), 'k-', linewidth=1, label='fid')
             axs[0, 0].set_xlabel('time (s)')
@@ -2894,11 +2841,11 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         # display this over the data
         if(display):
-            fig = plt.figure(230)
+            fig_title = "Removing some peak(s) [%s]" % self.display_label
+            fig = plt.figure(fig_title)
             fig.clf()
+            fig.suptitle(fig_title)
             axs = fig.subplots(2, 1, sharex='all', sharey='all')
-            fig.canvas.set_window_title("correct_peak_removal_1d (mrs.reco.MRSData2)")
-            fig.suptitle("removing peak for [%s]" % self.display_label)
 
             # original spectrum
             axs[0].plot(ppm, s.spectrum().real, 'k-', linewidth=1, label='original data (real part)')
@@ -2972,11 +2919,11 @@ class MRSData2(suspect.mrsobjects.MRSData):
         s_shifted = s.adjust_frequency(-df)
 
         if(display):
-            fig = plt.figure(240)
+            fig_title = "Calibrating/frequency shifting [%s]" % self.display_label
+            fig = plt.figure(fig_title)
             fig.clf()
+            fig.suptitle(fig_title)
             axs = fig.subplots(2, 1, sharex='all', sharey='all')
-            fig.canvas.set_window_title("correct_freqshift_1d (mrs.reco.MRSData2)")
-            fig.suptitle("calibrating [%s]" % self.display_label)
 
             axs[0].plot(ppm, s.spectrum().real, 'k-', linewidth=1)
             axs[0].set_xlim(display_range[1], display_range[0])
@@ -3053,11 +3000,11 @@ class MRSData2(suspect.mrsobjects.MRSData):
         s_filtered = self.inherit(s_filtered)
 
         if(display):
-            fig = plt.figure(250)
+            fig_title = "Band-pass filtering [%s]" % self.display_label
+            fig = plt.figure(fig_title)
             fig.clf()
+            fig.suptitle(fig_title)
             axs = fig.subplots(2, 2)
-            fig.canvas.set_window_title("correct_bandpass_filtering_1d (mrs.reco.MRSData2)")
-            fig.suptitle("filtering [%s]" % self.display_label)
 
             axs[0, 0].plot(s.time_axis(), np.real(s), 'k-', linewidth=1)
             axs[0, 0].set_xlabel('time (s)')
@@ -3118,15 +3065,18 @@ class MRSData2(suspect.mrsobjects.MRSData):
                              [0,    -vx[1] / 20.0,   -vx[2] / 20.0]]
         corner_coords = np.array([t2w.from_scanner(*self.to_scanner(*coord)) for coord in corner_coords_pcg])
 
-        plt.figure(260).canvas.set_window_title("display_voi_anatomy_nd (mrs.reco.MRSData2)")
-        plt.cla()
+
+        fig_title = "Anatomical image display [%s]" % self.display_label
+        fig = plt.figure(fig_title)
+        fig.clf()
+        fig.suptitle(fig_title)
         plt.imshow(t2w[pcg_centre_index[2]], cmap=plt.cm.gray)
         plt.plot(corner_coords[:, 0], corner_coords[:, 1], 'red')
         plt.xticks([])
         plt.yticks([])
         plt.show()
 
-    def display_spectrum_1d(self, ifig=1, display_range=[1, 6], allowed_apodization=5.0, magnitude_mode=False):
+    def display_spectrum_1d(self, ifig="Displaying final spectra", display_range=[1, 6], allowed_apodization=5.0, magnitude_mode=False):
         """
         Display spectrum in figure 'ifig', overlaying if needed.
 
@@ -3134,7 +3084,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         Parameters
         ----------
-        ifig: int
+        ifig: int or str
             The figure index that shoud host the plot
         s : MRSData2 numpy array [timepoints]
             MRS data to display
@@ -3159,7 +3109,8 @@ class MRSData2(suspect.mrsobjects.MRSData):
         s = self.correct_apodization_nd(allowed_apodization)
         log.debug("displaying stuff!")
 
-        plt.figure(ifig).canvas.set_window_title("display_spectrum_1d (mrs.reco.MRSData2)")
+        fig = plt.figure(ifig)
+        fig.suptitle("Displaying final spectra")
         if(magnitude_mode):
             plt.plot(s.frequency_axis_ppm(), np.abs(s.spectrum()) + self.display_offset, linewidth=1, label=self.display_label)
         else:
@@ -3436,7 +3387,7 @@ class pipeline:
         # --- job: spectrum final display ---
         self.job["displaying"] = {"job_func": MRSData2.display_spectrum_1d, "job_name": "displaying",
                                   # figure index
-                                  "fig_index": 1,
+                                  "fig_index": "Displaying final spectra",
                                   # ppm range used for display
                                   "display_range_ppm": pipeline._get_setting,
                                   # apodization factor used for display (Hz)
@@ -3741,7 +3692,6 @@ class pipeline:
 
         # --- SNR/LW analysis ---
         self.analyze_enable = True
-        self.analyze_display = True
 
         # --- template loading if needed ---
         self.template_name = template_name
@@ -3787,7 +3737,6 @@ class pipeline:
             Stuff returned by the job
         """
         # get job name
-        log.info_line_break()
         log.info_line________________________()
         job_name = job["job_name"]
         log.info("%s on [%s]..." % (job_name, data.display_label))
@@ -3804,7 +3753,6 @@ class pipeline:
 
         # call job on data
         job_result = job_func(*job_args)
-        log.info_line________________________()
 
         # return
         return(job_result)
@@ -3866,8 +3814,8 @@ class pipeline:
         # output
         log.resume()
         job_label = "post-" + current_job["job_name"]
-        log.info(job_label + " SNR of [%s] = %.2f" % (data.display_label, data_snr))
-        log.info(job_label + " LW of [%s] = %.2f" % (data.display_label, data_lw))
+        log.debug(job_label + " SNR of [%s] = %.2f" % (data.display_label, data_snr))
+        log.debug(job_label + " LW of [%s] = %.2f" % (data.display_label, data_lw))
 
         return(data_snr, data_lw, ref_data_snr, ref_data_lw)
 
@@ -3900,50 +3848,16 @@ class pipeline:
         else:
             return(s, s_ref)
 
-    def get_te_list(self):
+    def _check_datasets(self, shrink_list=True):
         """
-        Return the TEs for all the data signals in this pipeline.
+        Check if the datasets list is well initialized by user.
 
-        Returns
-        -------
-        [s.te for s in self._data_list] : list
-            TEs for all signals stored in here
+        Parameters
+        ----------
+        shrink_list : boolean
+            After checking, keep only non-empty data entries in the list.
         """
-        return([d["raw"]["data"].te for d in self.dataset])
-
-    def run(self):
-        """
-        Run the pipeline for MRS reco. It includes.
-
-            * reading the data
-            * phasing
-            * combining channels
-            * analyze real noise level before going on with processing
-            * zero_filling
-            * peak analysis & data rejection
-            * realigning
-            * averaging
-            * checking original noise level
-            * apodizing
-            * cropping
-            * removing water reidue with HSVD
-            * shifting the spectrum
-            * analyzing the SNR
-            * analyzing the linewidth
-            * displaying the spectrum
-            +
-            * analyzing the SNR evolution during data processing
-            * analyzing the linewidth evolution during data processing
-
-        Returns
-        -------
-        self._data_list : list of MRSData2 objects
-            Final MRS data signals obtained from reconstruction pipeline stored in a MRSData2 object
-        """
-        # --- reading dataset dict
-        log.info_line________________________()
-        log.info("checking datasets...")
-        log.info_line________________________()
+        log.debug("checking datasets...")
 
         # for each data set, check dict fields
         ind_dataset_ok = []
@@ -3972,44 +3886,71 @@ class pipeline:
                     log.error("dataset[%d] has %d dicom-files! There should be 1 or 2. :(" % (i, len(d["dcm"]["files"])))
 
                 # clean and print strings
-                log.info("dataset[%d]:" % i)
+                log.debug("dataset[%d]:" % i)
                 # legend
                 if(legend_ok):
                     self.dataset[i]["legend"] = d["legend"].strip()
-                log.info("  legend = " + self.dataset[i]["legend"])
+                log.debug("  legend = " + self.dataset[i]["legend"])
                 # raw data
                 if(self.dataset[i]["raw"]["files"][0] is not None):
                     self.dataset[i]["raw"]["files"][0] = self.dataset[i]["raw"]["files"][0].strip()
-                    log.info("  raw #0 = " + self.dataset[i]["raw"]["files"][0])
+                    log.debug("  raw #0 = " + self.dataset[i]["raw"]["files"][0])
                 if(len(self.dataset[i]["raw"]["files"]) == 1):
                     self.dataset[i]["raw"]["files"].append(None)
                 if(self.dataset[i]["raw"]["files"][1] is not None):
                     self.dataset[i]["raw"]["files"][1] = self.dataset[i]["raw"]["files"][1].strip()
-                    log.info("  raw #1 [REF] = " + self.dataset[i]["raw"]["files"][1])
+                    log.debug("  raw #1 [REF] = " + self.dataset[i]["raw"]["files"][1])
                 else:
-                    log.info("  raw #1 [REF] = None")
+                    log.debug("  raw #1 [REF] = None")
                 # dicom
                 if(self.dataset[i]["dcm"]["files"][0] is not None):
                     self.dataset[i]["dcm"]["files"][0] = self.dataset[i]["dcm"]["files"][0].strip()
-                    log.info("  dicom #0 = " + self.dataset[i]["dcm"]["files"][0])
+                    log.debug("  dicom #0 = " + self.dataset[i]["dcm"]["files"][0])
                 if(len(self.dataset[i]["dcm"]["files"]) == 1):
                     self.dataset[i]["dcm"]["files"].append(None)
                 if(self.dataset[i]["dcm"]["files"][1] is not None):
                     self.dataset[i]["dcm"]["files"][1] = self.dataset[i]["dcm"]["files"][1].strip()
-                    log.info("  dicom #1 [REF] = " + self.dataset[i]["dcm"]["files"][1])
+                    log.debug("  dicom #1 [REF] = " + self.dataset[i]["dcm"]["files"][1])
                 else:
-                    log.info("  dicom #1 [REF] = None")
+                    log.debug("  dicom #1 [REF] = None")
                 # physio
                 if(physiofile_ok):
                     self.dataset[i]["physio_file"] = d["physio_file"].strip()
-                    log.info("  physio = " + self.dataset[i]["physio_file"])
+                    log.debug("  physio = " + self.dataset[i]["physio_file"])
                 # imaging
                 if(imagingfile_ok):
                     self.dataset[i]["imaging_file"] = d["imaging_file"].strip()
-                    log.info("  imaging = " + self.dataset[i]["imaging_file"])
+                    log.debug("  imaging = " + self.dataset[i]["imaging_file"])
 
                 # index of non-empty datasets
                 ind_dataset_ok.append(i)
+
+        # keep only the non-empty datasets
+        if(shrink_list):
+            self.dataset = [self.dataset[i] for i in ind_dataset_ok]
+
+    def get_te_list(self):
+        """
+        Return the TEs for all the data signals in this pipeline.
+
+        Returns
+        -------
+        [s.te for s in self._data_list] : list
+            TEs for all signals stored in here
+        """
+        return([d["raw"]["data"].te for d in self.dataset])
+
+    def run(self):
+        """
+        Run the pipeline for data MRS reconstruction.
+
+        Returns
+        -------
+        self._data_list : list of MRSData2 objects
+            Final MRS data signals obtained from reconstruction pipeline stored in a MRSData2 object
+        """
+        # --- reading and checking dataset list ---
+        self._check_datasets()
 
         # filter datasets
         if(self.settings["datasets_indexes"] is not None):
@@ -4019,17 +3960,10 @@ class pipeline:
 
             # keep only data to process
             self.dataset = [self.dataset[i] for i in self.settings["datasets_indexes"]]
-        else:
-            # keep only the non-empty datasets
-            self.dataset = [self.dataset[i] for i in ind_dataset_ok]
-        log.info_line________________________()
 
         # --- reading data ---
         # now let's read the data files
-        log.info_line_break()
-        log.info_line________________________()
         log.info("reading data files...")
-        log.info_line________________________()
         for i, d in enumerate(self.dataset):
             this_legend = d["legend"]
             this_physio_filename = d["physio_file"]
@@ -4063,9 +3997,9 @@ class pipeline:
                 # set legend & offset
                 this_new_legend = ("#%d " % i) + this_legend
                 if(s.is_rawdata):
-                    s.set_display_label(this_new_legend + " [RAW]")
+                    s.set_display_label(this_new_legend + " (RAW)")
                 else:
-                    s.set_display_label(this_new_legend + " [DCM]")
+                    s.set_display_label(this_new_legend + " (DCM)")
 
                 s.set_display_offset(self.settings["display_offset"])
                 # store
@@ -4092,12 +4026,9 @@ class pipeline:
                     # store
                     self.dataset[i][dtype]["data"].data_ref = s_ref
 
-                log.info_line________________________()
-
         # --- applying global settings ---
         log.info_line________________________()
         log.info("reading your job list...")
-        log.info_line________________________()
         # applying some global settings to jobs
         default_display_value = self._get_setting("display")
         for this_job_name in self.job:
@@ -4129,10 +4060,9 @@ class pipeline:
 
         # --- running job list ---
         # exception here: if any concatenate, we need to run the job list in two parts (before and after concatenation in order to reload the processed data)
-        log.info_line_break()
-        log.info_line________________________()
         log.info("running job list...")
-        log.info_line________________________()
+        log.info_line_break()
+
         # init job stacks
         concatenate_loop = int(self.job["concatenate"] in self.job_list) + 1
         jobs_stack_init = self.job_list[::-1].copy()
@@ -4151,7 +4081,6 @@ class pipeline:
                     if(this_data is None):
                         continue
 
-                    log.info_line_break()
                     log.info_line________________________()
                     log.info("processing [" + this_data.display_label + "]")
                     log.info_line________________________()
@@ -4197,7 +4126,6 @@ class pipeline:
 
                                 # store analysis results
                                 self.dataset[i][dtype]["analysis_results"][this_job_name] = {"snr": this_data_snr, "lw": this_data_lw}
-                                log.info_line________________________()
 
                     # we finish running all jobs on a dataset, storing
                     self.dataset[i][dtype]["data"] = this_data
@@ -4232,11 +4160,10 @@ class pipeline:
                 self.dataset[i][dtype]["ref_data_analysis_results"] = {"snr": this_data_ref_snr, "lw": this_data_ref_lw}
 
         # --- summary final linewidths ---
-        if(self.analyze_enable and self.settings["display"] is not False):
+        if(self.analyze_enable):
             self.display_analyze_results()
 
         log.info("pipeline terminated!")
-        log.info("returning processed signals!")
         return(self.dataset)
 
     def get_analyze_results(self):
@@ -4265,7 +4192,7 @@ class pipeline:
         lw_ref_dcm_list : numpy array (n)
             Peak linewidth estimated on reconstructed ref. data (dicom)
         """
-        log.info("converting analyze results to arrays...")
+        log.debug("converting analyze results to arrays...")
 
         # build label list
         data_labels = [d["legend"] for d in self.dataset]
@@ -4354,7 +4281,7 @@ class pipeline:
         lw_ref_raw_list : numpy array (n)
             Peak linewidth estimated on ref. data
         """
-        log.info("returning final analyze results...")
+        log.debug("returning final analyze results...")
 
         data_label_list, job_label_list, snr_raw_list, lw_raw_list, snr_dcm_list, lw_dcm_list, _, lw_ref_raw_list, _, lw_ref_dcm_list = self.get_analyze_results()
 
@@ -4381,7 +4308,7 @@ class pipeline:
         ignore_error : boolean
             Do not raise error if raw data reconstruction gave worst results than DICOM in terms of SNR and /or LW. If (False), just raise a warning.
         """
-        log.info("quality checking analyze results...")
+        log.debug("quality checking analyze results...")
 
         data_label_list, job_label_list, snr_raw_list, lw_raw_list, snr_dcm_list, lw_dcm_list, _, _, _, _ = self.get_analyze_results()
 
@@ -4407,8 +4334,14 @@ class pipeline:
             else:
                 log.warning(error_str[:-2])
 
-    def display_analyze_results(self):
-        """Print final SNR and peak-linewidth for each dataset. Plot bargraph showing evolution of SNR and linewidth during data processing (to check that a job did not destroy the data for example!) and compare with dicom when possible."""
+    def display_analyze_results(self, fig_index="Quality check results"):
+        """Print final SNR and peak-linewidth for each dataset. Plot bargraph showing evolution of SNR and linewidth during data processing (to check that a job did not destroy the data for example!) and compare with dicom when possible.
+
+        Parameters
+        ----------
+        fig_index: int or string
+            Figure handle
+        """
         log.info("displaying SNR and linewidth final results...")
 
         # get analyze data as list and np arrays
@@ -4437,12 +4370,11 @@ class pipeline:
         log.info_line________________________()
 
         # display SNR/LW evolution for all data and all jobs
-        if(self.analyze_display):
-            fig = plt.figure(300)
+        if(self.settings["display"]):
+            fig = plt.figure(fig_index)
             fig.clf()
+            fig.suptitle(fig_index)
             axs = fig.subplots(2, 1, sharex='row')
-            fig.canvas.set_window_title("display_analyze_results (mrs.reco.MRSData2)")
-            fig.suptitle("SNR/peak-linewidth results")
 
             # prepare bars
             nBars = len(data_label_list)
@@ -4497,12 +4429,22 @@ class pipeline:
             fig.subplots_adjust(bottom=0.2)
             fig.show()
 
-    def display_final_data(self):
-        """Plot final processed datasets."""
-        log.info("displaying final processed data...")
+    def display_final_data(self, fig_index="Final spectra display"):
+        """
+        Plot final processed datasets.
+
+        Parameters
+        ----------
+        fig_index: int or string
+            Figure handle
+        """
+        log.debug("displaying final processed data...")
 
         # get display job
         disp_job = self.job["displaying"]
+
+        # change fig index
+        disp_job["fig_index"] = fig_index
 
         # run a diplay job for each dataset
         for d in self.dataset:
@@ -4514,21 +4456,20 @@ class pipeline:
                 # run job on this dataset
                 self._run_job(disp_job, this_data)
 
-    def load_template(self, template_name):
+    def load_template(self, template_filename):
         """
         Load reco pipeline attributes from template previously saved.
 
         Parameters
         ----------
-        template_name: string
-            Template name
+        template_filename: string
+            Path to template file
         """
-        template_filename = template_name + ".pkl"
-        log.info("load pipeline from template file [%s]..." % template_filename)
+        log.debug("load pipeline from template file [%s]..." % template_filename)
         # check if exist
-        if(os.path.isfile(default_paths.DEFAULT_RECO_TEMPLATE_FOLDER + template_filename)):
+        if(os.path.isfile(template_filename)):
             # now open pkl file
-            with open(default_paths.DEFAULT_RECO_TEMPLATE_FOLDER + template_filename, 'rb') as f:
+            with open(template_filename, 'rb') as f:
                 [reco_pipe_template] = pickle.load(f)
 
             # copy attributes
@@ -4537,23 +4478,21 @@ class pipeline:
             self.job_list = reco_pipe_template.job_list
             self.analyze_job_list = reco_pipe_template.analyze_job_list
             self.analyze_enable = reco_pipe_template.analyze_enable
-            self.analyze_display = reco_pipe_template.analyze_display
         else:
-            log.error("no template [%s] found in [%s]!" % (template_filename, default_paths.DEFAULT_RECO_TEMPLATE_FOLDER))
+            log.error("file not found [%s]!" % template_filename)
 
-    def save_template(self, template_name):
+    def save_template(self, template_filename):
         """
         Save current pipeline object as template.
 
         Parameters
         ----------
-        template_name: string
-            Template name
+        template_filename: string
+            Pth to template file
         """
-        template_filename = template_name + ".pkl"
-        log.info("saving current pipeline to template file [%s]..." % template_filename)
+        log.debug("saving current pipeline to [%s]..." % template_filename)
         # save to pkl file
-        with open(default_paths.DEFAULT_RECO_TEMPLATE_FOLDER + template_filename, 'wb') as f:
+        with open(template_filename, 'wb') as f:
             pickle.dump([self], f)
 
     def _to_dataframe(self, prefix_str="reco_"):
@@ -4618,7 +4557,7 @@ class pipeline:
 
     def save_datasets(self):
         """Save corresponding this pipeline, all its parameters and its datasets to a dataframe stored on the disk."""
-        log.info("saving to disk...")
+        log.debug("saving to disk...")
 
         # check it we have specified a file path
         if(self.settings["storage_file"] is None):
@@ -4758,11 +4697,10 @@ def reco_spatial_select_profile(dcm_folders_list, legends_list, analyze_selectiv
     log.info_line________________________()
     log.info("displaying the 3 spatial profiles...")
     log.info_line________________________()
-    fig = plt.figure()
+    fig = plt.figure("Spatial selection profiles")
     fig.clf()
     axs = fig.subplots(2, 3)
-    fig.canvas.set_window_title("run (mrs.reco.voi_pipeline)")
-    fig.suptitle("spatial selection profiles")
+    fig.suptitle("Spatial selection profiles")
     for (sx, sy, sz, sx_ax, sy_ax, sz_ax, leg) in zip(xdata_list, ydata_list, zdata_list, xdata_axis_list, ydata_axis_list, zdata_axis_list, legends_list):
 
         axs[0, 0].plot(sx_ax, sx, linewidth=1, label=leg)

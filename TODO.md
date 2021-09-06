@@ -1,20 +1,18 @@
 ## TODO
 
-* enable log file, do not use root logger but give it a name "pastis"
+* Improve data file handling by reading folders of dicom and twix files and putting everything in order. Problem is to find some kind of UID to link raw data (TWIX) to reconstructed data (DICOM). Some ReferenceImage# field used to do the job in VB17 version, not anymore >=VE11...
 
-* remove useless log messages using pause
+* Extract VOI orientation from dcm/twix files and improve voxel_size, CSDE and VOI anatomy methods
 
-* fix reco_templates issue
+* Parallelize stuff for data rejecting approaches
 
-* clean-up git, remove datasets* files, notebooks and all unnecessary files from git, including their history (https://stackoverflow.com/questions/35115585/remove-files-completely-from-git-repository-along-with-its-history)
+* Find a gitable non-binary format to store the metabolite db and basis sets (I was thinking of FODS but it is not really implemented in conda...)
 
-* leave 2 demo files: reco and fit examples
+* HDF5/ISMRMD format save/load: for now, only save the MRS signal with a few attributes. If needed, will complete implementation
 
-* complete readme with more information, code snippets, examples
+* Implement partial volume stuff for absolute quantification
 
-* improve scaling job to make it automatic (normalization to a CONSTANT)
-
-* check and update metabolite chemical shifts and J-coupling values with recent literature (important if going for 1H UHF brain MRS for example):
+* Check and update metabolite chemical shifts and J-coupling values with recent literature (important if going for 1H UHF brain MRS for example):
 
 Article (Govindaraju2000)
 Govindaraju, V.; Young, K. & Maudsley, A. A.
@@ -40,13 +38,3 @@ Book (Graaf2019)
 de Graaf, R. A.
 In Vivo NMR Spectroscopy: Principles and Techniques
 Wiley-Interscience, 2019
-
-* extract VOI orientation from dcm/twix files and improve voxel_size, CSDE and VOI anatomy methods
-
-* Parallelize stuff: data rejecting approaches
-
-* Find a gitable non-binary format to store the metabolite db and basis sets (I was thinking of FODS but it is not really implemented in conda...)
-
-* HDF5/ISMRMD format save/load: for now, only save the MRS signal with a few attributes. If needed, will complete implementation
-
-* Implement partial volume stuff for absolute quantification
