@@ -1117,7 +1117,7 @@ class mrs_sequence:
 
         # check if below tolerance
         te_diff = np.abs(self.te - found_sequence.te)
-        if(te_diff > te_tol and self.meta_bs.non_coupled_only):
+        if(te_diff > te_tol):
             log.info("TE match: the difference might seem a lot but I see you want to generate only singulet's metabolites so that is really not a big deal ;)")
 
         # display
@@ -1890,11 +1890,11 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
         # display
         if(display):
             # display
-            fig = plt.figure(11)
+            fig_title = "HSn pulse generation | %.2f ms, BW = %.2f Hz, TBW/R = %.2f, n-order = %d, %d pts" % (Tp, bw, tbw, n, N)
+            fig = plt.figure(fig_title)
             fig.clf()
+            fig.suptitle(fig_title)
             axs = fig.subplots(3, 1)
-            fig.canvas.set_window_title("_rf_pulse_hsn (mrs.sim.mrs_seq_eja_svs_slaser)")
-            fig.suptitle("HSn pulse generation | %.2f ms, BW = %.2f Hz, TBW/R = %.2f, n-order = %d, %d pts" % (Tp, bw, tbw, n, N))
 
             axs[0].plot(t * 1000.0, pulse_amp, 'k-', linewidth=1)
             axs[0].set_xlabel('time (ms)')
@@ -2062,11 +2062,11 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
         peak_max_ppm = ppm[peak_max_ppm_index]
 
         # display
-        fig = plt.figure(10)
+        fig_title = "RF power optimization results for sLASER"
+        fig = plt.figure(fig_title)
         fig.clf()
+        fig.suptitle(fig_title)
         axs = fig.subplots(1, 2)
-        fig.canvas.set_window_title("_get_rfc_pulse_w1max_by_optim (mrs.sim.mrs_seq_eja_svs_slaser)")
-        fig.suptitle("RF power optimization results for sLASER")
 
         afactor = (w1_range_Hz[2] - w1_range_Hz[1]) / np.max(peak_intensity_abs)
         i = 0

@@ -185,7 +185,7 @@ class fit_lcmodel(fit_tool):
         params = {
             "FILBAS": self.lcmodel_filbas,
             "LCSV": self.lcmodel_lcsv,
-            "DGPPMN": -5, 
+            "DGPPMN": -5,
             "DGPPMX": 5
         }
         # call suspect to prepare LCModel files
@@ -401,8 +401,6 @@ class fit_pastis(fit_tool):
 
         # --- display options ---
         self.display_enable = True
-        # figure index
-        self.display_fig_index = 2000
         # ppm range
         self.display_range_ppm = [1, 6]  # ppm
         # display every n calls to error function
@@ -567,10 +565,11 @@ class fit_pastis(fit_tool):
         sf_real = np.real(sf)
 
         if(self.display_enable):
-            fig = plt.figure(self.display_fig_index)
+            fig_title = "Integrating peaks [%s]" % self.data.display_label
+            fig = plt.figure(fig_title)
             fig.clf()
+            fig.suptitle(fig_title)
             axs = fig.subplots()
-            fig.canvas.set_window_title("run (mrs.fit.fit_pastis)")
             axs.plot(self.data.frequency_axis_ppm(), self.data.spectrum().real, "k-", label="data")
 
         # now for each peak, integrate the area
@@ -855,10 +854,10 @@ class fit_pastis(fit_tool):
 
         # display
         if(self.display_enable and (fit_terminated or np.mod(self._model_call_count, self.display_frequency) == 0)):
-            fig = plt.figure(self.display_fig_index)
+            fig_title = "Fitting [%s]" % self.data.display_label
+            fig = plt.figure(fig_title)
             fig.clf()
             axs = fig.subplots(2, 4)
-            fig.canvas.set_window_title("_minimizeThis (mrs.fit.fit_pastis)")
 
             # display real-time bargraphs
             # real-time CRBs
@@ -966,10 +965,12 @@ class fit_pastis(fit_tool):
         if(self.display_enable):
             n_subplots = len(metabolites_to_test_list)
             n_subplots_side = int(np.ceil(np.sqrt(n_subplots)))
-            fig = plt.figure(self.display_fig_index)
+
+            fig_title = "Adjusting metabolite basis set [%s]" % self.data.display_label
+            fig = plt.figure(fig_title)
             fig.clf()
+            fig.suptitle(fig_title)
             axs = fig.subplots(n_subplots_side, n_subplots_side, sharex='all')
-            fig.canvas.set_window_title("adjust_metabolites (mrs.fit.fit_pastis)")
 
         for plot_index, m in enumerate(metabolites_to_test_list):
             # simulate its signal with the noise level estimated on the data
@@ -1149,7 +1150,7 @@ class fit_pastis(fit_tool):
         sf_analyze = np.real(sf)
         ippm_noise_range = (self.fqn_noise_range[0] < ppm) & (ppm < self.fqn_noise_range[1])
         data_noise_var = np.var(sf_analyze[ippm_noise_range])
-        
+
         # estimate variance of fit residual in user specified spectral region
         ppm = diff.frequency_axis_ppm()
         sf = np.squeeze(diff.spectrum())
