@@ -200,10 +200,6 @@ class data_file_reader(metaclass=ABCMeta):
             hasher.update(buf)
         return(hasher.hexdigest())
 
-    def get_unique_id(self):
-        """Return a unique id."""
-        pass
-
     def get_nucleus(self):
         """Return the nucleus setting used to acquire the MRS data."""
         pass
@@ -355,27 +351,6 @@ class SIEMENS_TWIX_reader_syngo_MR_B17(data_file_reader):
 
         # return it
         return(param_val_float)
-
-    def get_unique_id(self):
-        """
-        Return a unique id.
-
-        Returns
-        -------
-        uid_str : string
-            String corresponding to the tReferenceImage0, rReferenceImage1 and rReferenceImage2 fields that can be found in the headers.
-        """
-        uid_str = ""
-        for i in range(3):
-            a = self.file_content_str.find("tReferenceImage%d" % i)
-            a = self.file_content_str.find("{", a + 1)
-            b = self.file_content_str.find("\n", a + 2)
-            this_uid_str = self.file_content_str[(a + 1):b]
-            this_uid_str = this_uid_str.replace('"', '')
-            this_uid_str = this_uid_str.strip()
-            uid_str = uid_str + this_uid_str + '|'
-
-        return(uid_str)
 
     def get_nucleus(self):
         """
@@ -1250,27 +1225,6 @@ class SIEMENS_DICOM_reader_syngo_MR_B17(data_file_reader):
         nucleus_str = nucleus_str.strip()
 
         return(nucleus_str)
-
-    def get_unique_id(self):
-        """
-        Return a unique id.
-
-        Returns
-        -------
-        uid_str : string
-            String corresponding to the tReferenceImage0, rReferenceImage1 and rReferenceImage2 fields that can be found in the headers.
-        """
-        uid_str = ""
-        for i in range(3):
-            a = self.file_content_str.find("tReferenceImage%d" % i)
-            a = self.file_content_str.find("=", a + 1)
-            b = self.file_content_str.find("\n", a + 1)
-            this_uid_str = self.file_content_str[(a + 1):b]
-            this_uid_str = this_uid_str.replace('"', '')
-            this_uid_str = this_uid_str.strip()
-            uid_str = uid_str + this_uid_str + '|'
-
-        return(uid_str)
 
     def get_patient_name(self):
         """

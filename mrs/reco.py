@@ -3355,6 +3355,8 @@ class pipeline:
         # --- global settings ---
         self.settings = {   # option to process only a set of datasets: list of indexes
                             "datasets_indexes": None,
+                            # folder to search for supplementary datasets
+                            "folder_additional_datasets": None,
                             # ppm scale reference
                             "ppm0": 4.7,
                             # ppm range to search for peak used for phasing, etc.
@@ -3371,6 +3373,8 @@ class pipeline:
                             "POI_ref_range_ppm": [4.5, 5.2],
                             # apodization factor used during signal analysis, never actually applied for signal correction
                             "allowed_apodization": 1.0,
+                            # no phasing using reference data for already reconstructed data
+                            "no_phasing_using_ref_for_dcm_data": True,
                             # path to pkl file to store processed data
                             "storage_file": None,
                             # force display off if needed
@@ -3929,6 +3933,159 @@ class pipeline:
         if(shrink_list):
             self.dataset = [self.dataset[i] for i in ind_dataset_ok]
 
+    def _complete_missing_datasets(self, accepted_dcm_file_ext_list=[".dcm", ".ima"], accepted_raw_file_ext_list=[".dat"]):
+        """
+        Attempt to complete datasets by finding corresponding reconstructed (DCM/IMA) files or raw data (DAT) files. This method really works with SIEMENS data.
+
+        Parameters
+        ----------
+        accepted_dcm_file_ext_list : list
+            List of file extension to consider for reconstructed data (dicoms generally for now)
+        accepted_raw_file_ext_list : list
+            List of file extension to consider for raw data (TWIX .dat files for now)
+        """
+        log.debug("find missing datasets...")
+
+        # now browse folder and subfolders
+        if(self.settings["folder_additional_datasets"] is None):
+            log.warning("no [folder_additional_datasets] setting specified: will not look for additional datasets!")
+            return
+
+        # first let's check if we have missing files
+        n_missing_dcm_files = 0
+        n_missing_raw_files = 0
+        for i, d in enumerate(self.dataset):
+            for dc in d["dcm"]["files"]:
+                if(dc is None):
+                    n_missing_dcm_files += 1
+            for dr in d["raw"]["files"]:
+                if(dr is None):
+                    n_missing_raw_files += 1
+
+        if((n_missing_dcm_files == 0) and (n_missing_raw_files == 0)):
+            log.error("no files in dataset list!")
+        elif(n_missing_dcm_files != n_missing_raw_files):
+            if(n_missing_dcm_files > n_missing_raw_files):
+                log.debug("%d reconstructed data (DCM/IMA) files missing!" % (n_missing_dcm_files - n_missing_raw_files))
+            else:
+                log.debug("%d reconstructed data (DAT/TWIX) files missing!" % (n_missing_raw_files - n_missing_dcm_files))
+        else:
+            log.debug("no files missing :)")
+            return
+
+        # now load previous dataframe if any
+        csv_filename = os.path.join(self.settings["folder_additional_datasets"], ".pastis.csv")
+        if(os.path.isfile(csv_filename)):
+            df = pd.read_csv(csv_filename)
+            log.debug("found cache file [%s] containing %d file IDs :)" % (csv_filename, len(df)))
+        else:
+            log.info("no cache file found: please be patient will browsing folders (next time will be faster)...")
+            df = pd.DataFrame({}, columns=['filename', 'dataType', 'lProtID'])
+
+        # convert all relative paths to absolute
+        df["filename"] = [os.path.normpath(os.path.join(self.settings["folder_additional_datasets"], f)) for f in df["filename"]]
+
+        # initialize lists
+        file_name_list = []
+        file_type_list = []
+        file_lprotid_list = []
+        n_files_read = 0
+        for root, dirs, files in os.walk(self.settings["folder_additional_datasets"], topdown=False):
+
+            # read file only if .dat or if .dcm/.ima and if only .dcm/.ima in folder
+            this_file_list = []
+            n_dcm_files_here = 0
+            n_raw_files_here = 0
+            for this_filename in files:
+                _, this_ext = os.path.splitext(this_filename.lower())
+                if(this_ext in accepted_dcm_file_ext_list):
+                    n_dcm_files_here += 1
+                    this_file_list.append(this_filename)
+                elif(this_ext in accepted_raw_file_ext_list):
+                    n_raw_files_here += 1
+                    this_file_list.append(this_filename)
+                else:
+                    # weird extension
+                    pass
+
+            # check for weird exception: a folder containing a IMA and a DICOM file representing the same data...
+            if((n_dcm_files_here == 2) and (n_raw_files_here == 0)):
+                _, this_ext0 = os.path.splitext(this_file_list[0].lower())
+                _, this_ext1 = os.path.splitext(this_file_list[1].lower())
+                if(this_ext0 != this_ext1):
+                    # remove last file from list
+                    this_file_list = this_file_list[0]
+                    # and pretent there is only one file in there
+                    n_dcm_files_here = 1
+
+            if( ((n_dcm_files_here == 0) and (n_raw_files_here > 0)) or (n_dcm_files_here == 1) ):
+                # we reach here if (no dicom files but at least on .dat file) or (1 dicom file) is in folder
+                # to accelerate search!
+
+                for this_filename in this_file_list:
+                    # try to read file if not already in df (accelerate!)
+                    this_filename_fullpath = os.path.join(root, this_filename)
+                    if(this_filename_fullpath not in df['filename'].to_list()):
+                        log.pause()
+                        try:
+                            mfr = io.get_data_file_reader(this_filename_fullpath)
+                            pid = mfr.read_param_num("lProtID")
+                            file_name_list.append(this_filename_fullpath)
+                            file_lprotid_list.append(pid)
+
+                            # file type
+                            _, this_ext = os.path.splitext(this_filename.lower())
+                            if(this_ext in accepted_dcm_file_ext_list):
+                                file_type_list.append('dcm')
+                            elif(this_ext in accepted_raw_file_ext_list):
+                                file_type_list.append('raw')
+                            else:
+                                # weird extension
+                                pass
+
+                            n_files_read += 1
+                        except:
+                            pass
+                        log.resume()
+
+        log.debug("found %d new files!" % n_files_read)
+
+        # build dataframe and append
+        new_df = pd.DataFrame(list(zip(file_name_list, file_type_list, file_lprotid_list)), columns=['filename', 'dataType', 'lProtID'])
+        df = pd.concat([df, new_df])
+
+        # now browse dataset list and fix missing files
+        for i, this_dataset in enumerate(self.dataset):
+            for a, b in zip(["dcm", 'raw'], ["raw", "dcm"]):
+                # let's fix only when both files are missing
+                if((this_dataset[a]["files"] == [None, None]) and (this_dataset[b]["files"] != [None, None])):
+                    # originaly, this code was made to find dicoms knowing twix files: a/b are there to do both
+                    # get corresponding raw data files
+                    raw_file_list = this_dataset[b]["files"]
+                    # find corresponding PIDs in df
+                    raw_file_pid_list = df.loc[(df["filename"].isin(raw_file_list) ) &
+                                           (df["dataType"] == b)]["lProtID"].tolist()
+                    # find corresponding dicom files in df
+                    dcm_file_list = df.loc[(df["lProtID"].isin(raw_file_pid_list) ) &
+                                           (df["dataType"] == a)]["filename"].tolist()
+                    # complete with Nones if needed
+                    dcm_file_list = dcm_file_list + [None] * (2 - len(dcm_file_list))
+                    # and rewrite dicom file list
+                    self.dataset[i][a]["files"] = dcm_file_list
+                    log.info("added following files to dataset list: " + str(dcm_file_list))
+
+        # convert all paths to relative
+        df["filename"] = [os.path.relpath(f, self.settings["folder_additional_datasets"]) for f in df["filename"]]
+
+        # store dataframe in a .hidden file if possible
+        try:
+            df.to_csv(csv_filename, index=False)
+            log.debug("updated cache file [%s] with a total of %d file IDs :)" % (csv_filename, len(df)))
+        except:
+            log.debug("could not store cache file in folder [%s]. Probably no write permissions?" % self.settings["folder_additional_datasets"])
+
+        # done: dataset list completed
+
     def get_te_list(self):
         """
         Return the TEs for all the data signals in this pipeline.
@@ -3951,6 +4108,9 @@ class pipeline:
         """
         # --- reading and checking dataset list ---
         self._check_datasets()
+
+        # try to fix missing files in dataset list
+        self._complete_missing_datasets()
 
         # filter datasets
         if(self.settings["datasets_indexes"] is not None):
@@ -4096,6 +4256,14 @@ class pipeline:
                             break
 
                         # run job on this dataset
+
+                        # nasty exception: phasing using ref on dicoms
+                        # dicom data is already phased
+                        # it only makes things worse to use ref. data, just disable it
+                        if((dtype == "dcm") and (job == self.job["phasing"])):
+                            log.warning("changing phasing setting [using_ref_data] to %d for this dataset!" % (not self.settings["no_phasing_using_ref_for_dcm_data"]))
+                            job["using_ref_data"] = not self.settings["no_phasing_using_ref_for_dcm_data"]
+
                         job_result = self._run_job(job, this_data)
 
                         # push job in the stack of jobs done
