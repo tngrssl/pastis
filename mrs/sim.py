@@ -1118,7 +1118,7 @@ class mrs_sequence:
         # check if below tolerance
         te_diff = np.abs(self.te - found_sequence.te)
         if(te_diff > te_tol):
-            log.info("TE match: the difference might seem a lot but I see you want to generate only singulet's metabolites so that is really not a big deal ;)")
+            log.warning("TE match: the difference might seem a lot! That is fine if you do not want to consider J-coupling effects ;)")
 
         # display
         log.info("comparing what you asked/what you got...")

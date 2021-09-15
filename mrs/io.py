@@ -1060,8 +1060,18 @@ class SIEMENS_TWIX_reader_syngo_MR_E11(SIEMENS_TWIX_reader_syngo_MR_B17):
             pulse_laser_rfc_fa = self.read_param_num("adFlipAngleDegree[1]")
             log.debug("extracted LASER AFP refocussing pulse flip angle (%.2f)" % pulse_laser_rfc_fa)
 
-            # afp pulse length
-            pulse_laser_rfc_length = self.read_param_num("sWipMemBlock.alFree[1]")
+            # afp pulse length (very dirty fix)
+            ind = 1
+            pulse_laser_rfc_length = np.nan
+            for ind_power in range(10):
+                last_pulse_laser_rfc_length = pulse_laser_rfc_length
+                pulse_laser_rfc_length = self.read_param_num("sWipMemBlock.alFree[1]", ind)
+                ind *= 10**ind_power
+                if(pulse_laser_rfc_length is np.nan):
+                    break
+
+            pulse_laser_rfc_length = last_pulse_laser_rfc_length
+
             log.debug("extracted LASER AFP refocussing pulse duration (%.2f)" % pulse_laser_rfc_length)
 
             # afp pulse R
