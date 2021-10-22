@@ -20,6 +20,7 @@ import matplotlib._pylab_helpers
 from datetime import datetime
 import pickle
 import os
+import re
 from enum import Enum
 from mrs import io
 from mrs import log
@@ -4013,8 +4014,8 @@ class pipeline:
                 _, this_ext0 = os.path.splitext(this_file_list[0].lower())
                 _, this_ext1 = os.path.splitext(this_file_list[1].lower())
                 if(this_ext0 != this_ext1):
-                    # remove last file from list
-                    this_file_list = this_file_list[0]
+                    # keep only first file
+                    this_file_list = [this_file_list[0]]
                     # and pretent there is only one file in there
                     n_dcm_files_here = 1
 
@@ -4026,6 +4027,7 @@ class pipeline:
                     # try to read file if not already in df (accelerate!)
                     this_filename_fullpath = os.path.join(root, this_filename)
                     if(this_filename_fullpath not in df['filename'].to_list()):
+                        log.debug("reading header from %s" % this_filename_fullpath)
                         log.pause()
                         try:
                             mfr = io.get_data_file_reader(this_filename_fullpath)
@@ -4502,13 +4504,15 @@ class pipeline:
             else:
                 log.warning(error_str[:-2])
 
-    def display_analyze_results(self, fig_index="Quality check results"):
+    def display_analyze_results(self, fig_index="Quality check results", save2file=False):
         """Print final SNR and peak-linewidth for each dataset. Plot bargraph showing evolution of SNR and linewidth during data processing (to check that a job did not destroy the data for example!) and compare with dicom when possible.
 
         Parameters
         ----------
         fig_index: int or string
             Figure handle
+        save2file: boolean
+            Save figure to png file in current folder
         """
         log.info("displaying SNR and linewidth final results...")
 
@@ -4597,7 +4601,17 @@ class pipeline:
             fig.subplots_adjust(bottom=0.2)
             fig.show()
 
-    def display_final_data(self, fig_index="Final spectra display"):
+            # save figure as png if needed
+            if(save2file):
+                this_filename = re.sub('[^\w\-_\. ]', '_', fig_index)
+                this_filename = this_filename.replace(" ", "_")
+                while(this_filename[0] == "_"):
+                    this_filename = this_filename[1:]
+
+                this_filename += ".png"
+                fig.savefig(this_filename)
+
+    def display_final_data(self, fig_index="Final spectra display", save2file=False):
         """
         Plot final processed datasets.
 
@@ -4605,6 +4619,8 @@ class pipeline:
         ----------
         fig_index: int or string
             Figure handle
+        save2file: boolean
+            Save figure to png file in current folder
         """
         log.debug("displaying final processed data...")
 
@@ -4622,7 +4638,17 @@ class pipeline:
                 if(this_data is None):
                     continue
                 # run job on this dataset
-                self._run_job(disp_job, this_data)
+                fig = self._run_job(disp_job, this_data)
+
+        # save figure as png if needed
+        if(save2file):
+            this_filename = re.sub('[^\w\-_\. ]', '_', fig_index)
+            this_filename = this_filename.replace(" ", "_")
+            while(this_filename[0] == "_"):
+                this_filename = this_filename[1:]
+
+            this_filename += ".png"
+            fig.savefig(this_filename)
 
     def load_template(self, template_filename):
         """
