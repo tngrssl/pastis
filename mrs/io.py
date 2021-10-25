@@ -1029,8 +1029,8 @@ class SIEMENS_TWIX_reader_syngo_MR_E11(SIEMENS_TWIX_reader_syngo_MR_B17):
         voxel_size = self.data.voxel_size
         log.debug("extracted voxel size (%.2f x %.2f x %.2f mm3)" % (voxel_size[0], voxel_size[1], voxel_size[2]))
 
-        # dwell time (btw already extracted within suspect, this is a bit redandent)
-        dt = self.read_param_num("DwellTime") * 1e-9
+        # use suspect to read dwell time
+        dt = self.data.dt
         log.debug("extracted dwell time (%.2f)" % dt)
 
         # use suspect to read f0 frequency
