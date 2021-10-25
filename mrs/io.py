@@ -1033,8 +1033,8 @@ class SIEMENS_TWIX_reader_syngo_MR_E11(SIEMENS_TWIX_reader_syngo_MR_B17):
         dt = self.read_param_num("DwellTime") * 1e-9
         log.debug("extracted dwell time (%.2f)" % dt)
 
-        # f0 frequency (btw already extracted within suspect, this is a bit redandent)
-        f0 = self.read_param_num("Frequency") * 1e-6
+        # use suspect to read f0 frequency
+        f0 = self.data.f0
         log.debug("extracted f0 (%.6f)" % f0)
 
         # special timestamp
