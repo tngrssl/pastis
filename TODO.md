@@ -1,5 +1,7 @@
 ## TODO
 
+* Make sure that the gamma library is not needed for pygamma to run. If confirmed, removed all code related to storing/loading of metabolite basis sets in PKL file?
+
 * Improve data file handling by reading folders of dicom and twix files and putting everything in order. Problem is to find some kind of UID to link raw data (TWIX) to reconstructed data (DICOM). Some ReferenceImage# field used to do the job in VB17 version, not anymore >=VE11...
 
 * Extract VOI orientation from dcm/twix files and improve voxel_size, CSDE and VOI anatomy methods

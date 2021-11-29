@@ -62,18 +62,6 @@ PASTIS was developped on Python 3.7 and can be installed with *pip* using this c
 $ pip install -e path/to/the/folder/pastis
 ```
 
-### GAMMA
-
-GAMMA is a system package used for NMR simulations. It can be installed on Debian-based system using this command-line:
-
-```console
-$ sudo apt-get install gamma
-```
-
-More info about GAMMA on https://scion.duhs.duke.edu/vespa/gamma/ and https://github.com/c42f/gamma/
-
-If the gamma library is not available on your system, you will not be able to simulate and fit MRS signals. The MRS data reconstruction should however work normally.
-
 ## Usage
 
 In practice, PASTIS is accessible via the Python package called **mrs**.
