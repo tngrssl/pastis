@@ -2607,6 +2607,84 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
         return(s_phased)
 
+    def correct_first_order_phase_1d(self, coeff_rad_ppm=0.15, display=False, display_range=[1, 6]):
+        """
+        Correct for first-order phase along the chemical shift axis using a coefficient set manually.
+
+        * Works only with a 1D [timepoints] signal.
+        * Returns a 1D [timepoints] signal.
+
+        Parameters
+        ----------
+        coeff_rad_ppm : float
+            First-order phase coefficient in rad/ppm
+        display : boolean
+            Display correction process (True) or not (False)
+        display_range : list [2]
+            Range in ppm used for display
+
+        Returns
+        -------
+        s_phased : MRSData2 numpy array [timepoints]
+            Resulting phased data stored in a MRSData2 object
+        """
+        log.debug("phasing using first-order phasing [%s]..." % self.display_label)
+        # dimensions check
+        if(self.ndim != 1):
+            log.error("this method only works for 1D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
+
+        # init
+        s = self.copy()
+
+        # get spectrum and apply linear phase along ppm axis
+        sf_phased = s.spectrum() * np.exp(1j * np.pi * (s.frequency_axis_ppm() - s.ppm0) * coeff_rad_ppm)
+
+        # fft back and convert back to MRSData2
+        s_phased = np.fft.ifft(np.fft.ifftshift(sf_phased))
+
+        # convert back to MRSData2
+        s_phased = self.inherit(s_phased)
+
+        if(display):
+            fig_title = "First-order Phasing [%s]" % self.display_label
+            fig = plt.figure(fig_title)
+            fig.clf()
+            fig.suptitle(fig_title)
+            axs = fig.subplots(2, 2, sharex='all', sharey='col')
+
+            axs[0, 0].plot(s.frequency_axis_ppm(), s.spectrum().real, 'k-', linewidth=1)
+            axs[0, 0].set_xlim(display_range[1], display_range[0])
+            axs[0, 0].set_xlabel('chemical shift (ppm)')
+            axs[0, 0].set_ylabel('original real spectrum')
+            axs[0, 0].grid('on')
+
+            axs[0, 1].plot(s.frequency_axis_ppm(), np.unwrap(np.angle(s.spectrum())), 'k-', linewidth=1)
+            axs[0, 1].set_xlim(display_range[1], display_range[0])
+            axs[0, 1].set_xlabel('chemical shift (ppm)')
+            axs[0, 1].set_ylabel('original unwrapped phase (rad)')
+            axs[0, 1].grid('on')
+
+            axs[1, 0].plot(s_phased.frequency_axis_ppm(), s_phased.spectrum().real, 'b-', linewidth=1)
+            axs[1, 0].set_xlim(display_range[1], display_range[0])
+            axs[1, 0].set_xlabel('chemical shift (ppm)')
+            axs[1, 0].set_ylabel('phased real spectrum')
+            axs[1, 0].grid('on')
+
+            axs[1, 1].plot(s_phased.frequency_axis_ppm(), np.unwrap(np.angle(s_phased.spectrum())), 'b-', linewidth=1)
+            axs[1, 1].set_xlim(display_range[1], display_range[0])
+            axs[1, 1].set_xlabel('chemical shift (ppm)')
+            axs[1, 1].set_ylabel('phased real spectrum')
+            axs[1, 1].grid('on')
+
+            fig.subplots_adjust()
+            fig.show()
+
+        # if any ref data available, we phase it too (silently)
+        if(s_phased.data_ref is not None):
+            s_phased.data_ref = s_phased.data_ref.correct_first_order_phase_1d(coeff_rad_ppm)
+
+        return(s_phased)
+
     def correct_apodization_nd(self, apo_factor=1.0, display=False, display_range=[1, 6]):
         """
         Apodize signal using an exponential window adjusted by a linewidth parameter in Hz.
@@ -3564,6 +3642,15 @@ class pipeline:
                                          "display": True,
                                          "display_range_ppm": pipeline._get_setting
                                          }
+
+        # --- job: first-order phasing ---
+        self.job["phasing_first_order"] = {  "job_func": MRSData2.correct_first_order_phase_1d, "job_name": "first-order phasing",
+                                             # phasing coeficient
+                                             "coeff_rad_ppm": 0.15,
+                                             # display all this process to check what the hell is going on
+                                             "display": True,
+                                             "display_range_ppm": pipeline._get_setting
+                                             }
 
         # --- job: noise level analysis ---
         self.job["noise_estimation"] = {"job_func": MRSData2.analyze_noise_nd, "job_name": "estimating noise level",
