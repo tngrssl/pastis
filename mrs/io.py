@@ -18,12 +18,14 @@ import os
 import pydicom
 import hashlib
 import re
+import pickle
 
-try:
-    import mapvbvd
-    MAPVBVD_LIB_LOADED = True
-except ImportError:
-    MAPVBVD_LIB_LOADED = False
+# data formats
+import mapvbvd
+import scipy.io as sio
+import ismrmrd
+import nibabel as nib
+import json
 
 import pdb
 
@@ -84,6 +86,7 @@ def get_data_file_reader(data_fullfilepath):
             return(SIEMENS_DICOM_reader_syngo_XA20(data_fullfilepath))
         else:
             log.error("sorry, I am not sure I can read this kind of DICOM files... :/")
+
     elif(data_file_extension == '.dat'):
         # SIEMENS twix file, but what version of MR Syngo?
         syngo_version = get_twix_syngo_version(data_fullfilepath)
@@ -96,6 +99,14 @@ def get_data_file_reader(data_fullfilepath):
         else:
             log.error("sorry, I am not sure I can read this kind of TWIX files... :/")
 
+    elif(data_file_extension == '.gz'):
+        # NIFTI-MRS file
+        return(NIFTI_MRS_reader(data_fullfilepath))
+
+    elif(data_file_extension == '.h5'):
+        # ISMRMD file
+        return(ISMRMRD_reader(data_fullfilepath))
+
     elif((data_filename == 'fid') or (data_filename == "fid.ref") or (data_filename == "fid.orig")):
         # BRUKER fid, fid.ref, fid.orig file?
         return(BRUKER_fid_reader(data_fullfilepath))
@@ -105,7 +116,7 @@ def get_data_file_reader(data_fullfilepath):
 
 def get_twix_syngo_version(twix_dat_fullfilepath):
     """
-    Find what version of MR Syngo was used to generate this TWIX file. Dirty!
+    Find what version of MR Syngo was used to generate this TWIX file. Dirty.
 
     Parameters
     ----------
@@ -278,13 +289,10 @@ class SIEMENS_TWIX_reader_syngo_MR_B17(data_file_reader):
             log.debug("reading TWIX file...")
             MRSData_obj = suspect.io.load_twix(self.fullfilepath)
         except:
-            if(MAPVBVD_LIB_LOADED):
-                # well maybe it is broken, maybe the acquisition was interrupted
-                # let's try to read it using this modified verion of suspect.io.load_twix
-                log.debug("reading broken TWIX file...")
-                MRSData_obj = self._load_broken_twix()
-            else:
-                log.error("the TWIX file looks broken and the pymapvdvb library could not be loaded (probably due to your old python version?).")
+            # well maybe it is broken, maybe the acquisition was interrupted
+            # let's try to read it using this modified verion of suspect.io.load_twix
+            log.debug("reading broken TWIX file...")
+            MRSData_obj = self._load_broken_twix()
 
         return(MRSData_obj)
 
@@ -489,7 +497,7 @@ class SIEMENS_TWIX_reader_syngo_MR_B17(data_file_reader):
         te = self.read_param_num("alTE") / 1000.0
         log.debug("extracted echo time (%.2f)" % te)
 
-        # repetion time (btw already extracted within suspect, this is a bit redandent)
+        # repetition time (btw already extracted within suspect, this is a bit redandent)
         tr = self.read_param_num("alTR") / 1000.0
         log.debug("extracted repetition time (%.2f)" % tr)
 
@@ -638,6 +646,13 @@ class SIEMENS_TWIX_reader_syngo_MR_B17(data_file_reader):
         elif(sequence_name == "svs_DW_slaser_b"):
             # TODO : read DW parameters such as bvalues, directions and number b0 from file and input it when creating sequence object
             sequence_obj = sim.mrs_seq_svs_DW_slaser_b(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
+
+        # backup solutions for generi press or steam
+        elif("press" in sequence_name):
+            sequence_obj = sim.mrs_seq_press(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
+
+        elif("steam" in sequence_name):
+            sequence_obj = sim.mrs_seq_steam(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0, vref, shims_values, ulTimeStamp_ms, gss, eff_acq_time, 1.0)
 
         elif(sequence_name is None):
             sequence_obj = None
@@ -1318,7 +1333,7 @@ class SIEMENS_DICOM_reader_syngo_MR_B17(data_file_reader):
         te = self.data.te
         log.debug("extracted echo time (%.2f)" % te)
 
-        # repetion time (btw already extracted within suspect, this is a bit redandent)
+        # repetition time (btw already extracted within suspect, this is a bit redandent)
         tr = self.data.tr
         log.debug("extracted repetition time (%.2f)" % tr)
 
@@ -1605,7 +1620,7 @@ class SIEMENS_DICOM_reader_syngo_MR_E11(SIEMENS_DICOM_reader_syngo_MR_B17):
         te = self.data.te
         log.debug("extracted echo time (%.2f)" % te)
 
-        # repetion time (btw already extracted within suspect, this is a bit redandent)
+        # repetition time (btw already extracted within suspect, this is a bit redandent)
         tr = self.data.tr
         log.debug("extracted repetition time (%.2f)" % tr)
 
@@ -1829,7 +1844,7 @@ class SIEMENS_DICOM_reader_syngo_XA20(SIEMENS_DICOM_reader_syngo_MR_B17):
         # echo time (btw already extracted within suspect, this is a bit redandent)
         te = self.data.te
 
-        # repetion time (btw already extracted within suspect, this is a bit redandent)
+        # repetition time (btw already extracted within suspect, this is a bit redandent)
         tr = self.data.tr
 
         # averages
@@ -1954,12 +1969,12 @@ class BRUKER_fid_reader(data_file_reader):
 
     def __init__(self, data_fullfilepath):
         """
-        Initialize by reading a DICOM or TWIX file in text mode and extracting the DICOM header with pydicom, if required.
+        Initialize by reading the method and acqp files.
 
         Parameters
         ----------
         data_fullfilepath : string
-            Full path to the DICOM/TWIX file
+            Full path to the fid file
         """
         super().__init__(data_fullfilepath)
 
@@ -2078,7 +2093,8 @@ class BRUKER_fid_reader(data_file_reader):
             Patient sex ('M', 'F' or 'O')
         """
         log.warning("no patient data available in BRUKER method/acqp files!")
-        return('O')
+        patient_sex_str = 'O'
+        return(patient_sex_str)
 
     def get_patient_weight(self):
         """
@@ -2090,7 +2106,8 @@ class BRUKER_fid_reader(data_file_reader):
             Patient weight in kg
         """
         log.warning("no patient data available in BRUKER method/acqp files!")
-        return(0.0)
+        patient_weight_kgs = 0.0
+        return(patient_weight_kgs)
 
     def get_patient_height(self):
         """
@@ -2102,18 +2119,8 @@ class BRUKER_fid_reader(data_file_reader):
             Patient height in meters
         """
         log.warning("no patient data available in BRUKER method/acqp files!")
-        return(0.0)
-
-    def get_patient_name(self):
-        """
-        Return the patient name field.
-
-        Returns
-        -------
-        patient_name_str : string
-            Patient name
-        """
-        return("")
+        patient_height_m = 0.0
+        return(patient_height_m)
 
     def get_sequence(self):
         """
@@ -2130,7 +2137,7 @@ class BRUKER_fid_reader(data_file_reader):
         te = self.read_param_num("PVM_EchoTime")
         log.debug("extracted PVM_EchoTime (%.2f)" % te)
 
-        # repetion tim
+        # repetition tim
         tr = self.read_param_num("PVM_RepetitionTime")
         log.debug("extracted PVM_RepetitionTime (%.2f)" % tr)
 
@@ -2201,6 +2208,678 @@ class BRUKER_fid_reader(data_file_reader):
         sequence_name = param_str.replace("<", "").replace(">", "").strip().lower()
 
         return(sequence_name)
+
+
+class NIFTI_MRS_reader(data_file_reader):
+    """A class used to scrap parameters out of NIFTI MRS files. See https://github.com/wtclarke/mrs_nifti_standard ."""
+
+    def __init__(self, data_fullfilepath):
+        """
+        Initialize by reading a NIFTI MRS file and extracting the header.
+
+        Parameters
+        ----------
+        data_fullfilepath : string
+            Full path to the NIFTI MRS file
+        """
+        super().__init__(data_fullfilepath)
+
+        # read data and store it
+        self.data = self._read_data()
+
+        # freeze
+        self.__isfrozen = True
+
+    def _read_data(self):
+        """
+        Read MRS data from file and return a suspect's MRSData object.
+
+        Returns
+        -------
+        MRSData_obj : MRSData object
+            MRS data read from fid file
+        """
+        log.debug("reading NIFTI MRS fid file...")
+
+        self._nifti_obj = nib.load(self.fullfilepath)
+
+        # prepare header
+        header_bytes = self._nifti_obj.header.extensions[0].get_content().decode('utf-8')
+        self.header_dict = json.loads(header_bytes)
+        # merge with main header dict
+        self.header_dict.update(self._nifti_obj.header)
+
+        # get dwell time
+        dt = self.header_dict["pixdim"][4]
+
+        # extract parameters from header
+        f0 = self.header_dict["SpectrometerFrequency"][0]
+        te_ms = self.header_dict["EchoTime"] * 1000.0
+        tr_ms = self.header_dict["RepetitionTime"] * 1000.0
+        if(self.header_dict["ResonantNucleus"][0] == '1H'):
+            ppm0 = 4.7
+        else:
+            ppm0 = 0.0
+
+        # get orientation stuff
+        # TODO: check this code!
+        transform = self._nifti_obj.affine.copy()
+        voxel_dim = tuple(np.abs(transform.diagonal())[:3])
+
+        # actual data
+        np_arr_obj = np.squeeze(self._nifti_obj._data)
+        np_arr_obj = np.transpose(np_arr_obj, [2, 1, 0])
+        MRSData_obj = suspect.MRSData(np_arr_obj, dt, f0, te_ms, tr_ms, ppm0, voxel_dim, transform)
+
+        return(MRSData_obj)
+
+    def is_rawdata(self):
+        """Return true."""
+        return(True)
+
+    def read_param_num(self, param_name):
+        """
+        Look for parameter in the acqp and method files and return its float value.
+
+        Parameters
+        ----------
+        param_name : string
+            Name of parameter to extract
+
+        Returns
+        -------
+        param_val : float
+            Value of parameter
+        """
+        if(param_name in self.header_dict):
+            return(self.header_dict[param_name])
+        else:
+            return(None)
+
+    def get_nucleus(self):
+        """
+        Return the nucleus setting used to acquire the MRS data.
+
+        Returns
+        -------
+        nucleus_str : string
+            String representing nucleus. Example: "1H"
+        """
+        return(self.header_dict["ResonantNucleus"][0])
+
+    def get_patient_name(self):
+        """
+        Return the patient name field.
+
+        Returns
+        -------
+        patient_name_str : string
+            Patient name
+        """
+        if("PatientName" in self.header_dict):
+            return(self.header_dict["PatientName"])
+        else:
+            return("")
+
+    def get_patient_birthday(self):
+        """
+        Return the patient birthday field.
+
+        Returns
+        -------
+        patient_birthday_datetime : ???
+            Patient birthday (or None if no date found)
+        """
+        if("PatientDoB" in self.header_dict):
+            patient_birthday_datetime = self.header_dict["PatientDoB"]
+            # TODO: convert whatever we have to a datetime object here
+        else:
+            patient_birthday_datetime = datetime.today()
+        return(patient_birthday_datetime)
+
+    def get_patient_sex(self):
+        """
+        Return the patient sex field.
+
+        Returns
+        -------
+        patient_sex_str : string
+            Patient sex ('M', 'F' or 'O')
+        """
+        if("PatientSex" in self.header_dict):
+            patient_sex_str = self.header_dict["PatientSex"]
+        else:
+            patient_sex_str = 'O'
+
+        return(patient_sex_str)
+
+    def get_patient_weight(self):
+        """
+        Return the patient weight field.
+
+        Returns
+        -------
+        patient_weight_kgs : float
+            Patient weight in kg
+        """
+        patient_weight_kgs = self.read_param_num("PatientWeight")
+        if(patient_weight_kgs is None):
+            patient_weight_kgs = 0.0
+
+        return(patient_weight_kgs)
+
+    def get_patient_height(self):
+        """
+        Return the patient height field.
+
+        Returns
+        -------
+        patient_height_m : float
+            Patient height in meters
+        """
+        patient_height_m = self.read_param_num("PatientHeight")
+        if(patient_height_m is None):
+            patient_height_m = 0.0
+
+        return(patient_height_m)
+
+    def get_sequence(self):
+        """
+        Extract all parameters related to acquisition and sequence and return it as a sequence object.
+
+        Returns
+        -------
+        seq : mrs.sim.mrs_sequence
+            Sequence object
+        """
+        log.debug("reading sequence parameters...")
+
+        # echo time
+        te = self.read_param_num("EchoTime")
+        log.debug("extracted EchoTime (%.2f)" % te)
+        te_ms = te * 1000.0
+
+        # repetition time
+        tr = self.read_param_num("RepetitionTime")
+        log.debug("extracted RepetitionTime (%.2f)" % tr)
+        tr_ms = tr * 1000.0
+
+        # averages
+        na = int(self._nifti_obj.shape[5])
+        log.debug("extracted shape[5] / NA (%d)" % na)
+
+        # nucleus (used for sequence object)
+        nucleus = self.get_nucleus()
+        log.debug("extracted nuclei (%s)" % nucleus)
+
+        # number of points
+        npts = int(self._nifti_obj.shape[3])
+        log.debug("extracted shape[3] / npts (%d)" % npts)
+
+        # dwell time (btw already extracted within suspect, this is a bit redandent)
+        dt_s = self.read_param_num("pixdim")[4]
+        log.debug("extracted pixdim[4] / dwell time (%.6f)" % dt_s)
+
+        # f0 frequency
+        f0 = self.read_param_num("SpectrometerFrequency")[0]
+        log.debug("extracted f0 (%.2f)" % f0)
+
+        # --- sequence-specific parameters ---
+        sequence_name = self._get_sequence_name()
+        log.debug("extracted sequence name (%s)" % sequence_name)
+
+        if("press" in sequence_name):
+            sequence_obj = sim.mrs_seq_svs_se(te_ms, tr_ms, na, nuclei=nucleus, npts=npts, fs=(1.0 / dt_s), f0=f0)
+
+        elif("steam" in sequence_name):
+            sequence_obj = sim.mrs_seq_svs_st(te_ms, tr_ms, na, nuclei=nucleus, npts=npts, fs=(1.0 / dt_s), f0=f0)
+
+        else:
+            # unknown!
+            log.error("ouch unknown sequence (%s) !" % sequence_name)
+
+        return(sequence_obj)
+
+    def _get_sequence_name(self):
+        """
+        Return the acquisition sequence name.
+
+        Returns
+        -------
+        sequence_name : string
+            Sequence used for the acquisition
+        """
+        if("siemens_sequence_info" in self.header_dict):
+            if("sequence" in self.header_dict["siemens_sequence_info"]):
+                sequence_name = self.header_dict["siemens_sequence_info"]["sequence"].split("\\")[1].lower()
+            else:
+                return(None)
+        else:
+            return(None)
+
+        return(sequence_name)
+
+
+class ISMRMRD_reader(data_file_reader):
+    """A class used to scrap parameters out of ISMRMRD files."""
+
+    def __init__(self, data_fullfilepath):
+        """
+        Initialize by reading the ISMRMD file and its header.
+
+        Parameters
+        ----------
+        data_fullfilepath : string
+            Full path to the ISMRMRD file
+        """
+        super().__init__(data_fullfilepath)
+
+        # read data and store it
+        self.data = self._read_data()
+
+        # freeze
+        self.__isfrozen = True
+
+    def _read_data(self):
+        """
+        Read MRS data from file and return a suspect's MRSData object.
+
+        Returns
+        -------
+        MRSData_obj : MRSData object
+            MRS data read from fid file
+        """
+        log.debug("reading ISMRMRD fid file...")
+
+        self.dset = ismrmrd.Dataset(self.fullfilepath)
+        self.header = ismrmrd.xsd.CreateFromDocument(self.dset.read_xml_header())
+
+        # number of averages
+        na = self.dset.number_of_acquisitions() - 1
+
+        # read raw data
+        raw_data_shape = self.dset.read_acquisition(na).data.shape
+        raw_data = np.zeros([na] + list(raw_data_shape), dtype=np.complex64)
+        for na_ind in np.arange(1, na + 1):
+            raw_data[na_ind - 1, :, :] = self.dset.read_acquisition(na_ind).data
+
+        # extract parameters from header
+        f0 = float(self.header.experimentalConditions.H1resonanceFrequency_Hz) / 1e6
+        te_ms = self.header.sequenceParameters.TE[0]
+        tr_ms = self.header.sequenceParameters.TR[0]
+
+        # meta stuff
+        # TODO: see write function problem: these meta-informations are somehow lost when I write the ISMRMRD file...
+        dt = self.header.Meta["dwell_time_s"]
+        ppm0 = self.header.Meta["ppm0"]
+        transform = self.header.Meta["transform"]
+        voxel_dimensions = self.header.Meta["voxel_dimensions"]
+
+        # build object
+        MRSData_obj = suspect.MRSData(raw_data, dt, f0, te_ms, tr_ms, ppm0, voxel_dimensions, transform)
+
+        return(MRSData_obj)
+
+    def is_rawdata(self):
+        """Return true."""
+        return(True)
+
+    def read_param_num(self, param_name):
+        """
+        Since the parameters are stored in not iterable structure header, this function cannot be really used.
+
+        Parameters
+        ----------
+        param_name : string
+            Name of parameter to extract
+        """
+        return(None)
+
+    def get_nucleus(self):
+        """
+        Return the nucleus setting used to acquire the MRS data.
+
+        Returns
+        -------
+        nucleus_str : string
+            String representing nucleus. Example: "1H"
+        """
+        if("nucleus" in self.header.Meta):
+            return(self.header.Meta["nucleus"])
+        else:
+            return("")
+
+    def get_patient_name(self):
+        """
+        Return the patient name field.
+
+        Returns
+        -------
+        patient_name_str : string
+            Patient name
+        """
+        if("PatientName" in self.header.Meta["nucleus"]):
+            return(self.header_dict["PatientName"])
+        else:
+            return("")
+
+    def get_patient_birthday(self):
+        """
+        Return the patient birthday field.
+
+        Returns
+        -------
+        patient_birthday_datetime : ???
+            Patient birthday (or None if no date found)
+        """
+        if("PatientDoB" in self.header_dict):
+            patient_birthday_datetime = self.header_dict["PatientDoB"]
+            # TODO: convert whatever we have to a datetime object here
+        else:
+            patient_birthday_datetime = datetime.today()
+        return(patient_birthday_datetime)
+
+    def get_patient_sex(self):
+        """
+        Return the patient sex field.
+
+        Returns
+        -------
+        patient_sex_str : string
+            Patient sex ('M', 'F' or 'O')
+        """
+        if("PatientSex" in self.header_dict):
+            patient_sex_str = self.header_dict["PatientSex"]
+        else:
+            patient_sex_str = 'O'
+
+        return(patient_sex_str)
+
+    def get_patient_weight(self):
+        """
+        Return the patient weight field.
+
+        Returns
+        -------
+        patient_weight_kgs : float
+            Patient weight in kg
+        """
+        patient_weight_kgs = self.read_param_num("PatientWeight")
+        if(patient_weight_kgs is None):
+            patient_weight_kgs = 0.0
+
+        return(patient_weight_kgs)
+
+    def get_patient_height(self):
+        """
+        Return the patient height field.
+
+        Returns
+        -------
+        patient_height_m : float
+            Patient height in meters
+        """
+        patient_height_m = self.read_param_num("PatientHeight")
+        if(patient_height_m is None):
+            patient_height_m = 0.0
+
+        return(patient_height_m)
+
+    def get_sequence(self):
+        """
+        Extract all parameters related to acquisition and sequence and return it as a sequence object.
+
+        Returns
+        -------
+        seq : mrs.sim.mrs_sequence
+            Sequence object
+        """
+        log.debug("reading sequence parameters...")
+
+        # echo time
+        te = self.read_param_num("EchoTime")
+        log.debug("extracted EchoTime (%.2f)" % te)
+        te_ms = te * 1000.0
+
+        # repetition time
+        tr = self.read_param_num("RepetitionTime")
+        log.debug("extracted RepetitionTime (%.2f)" % tr)
+        tr_ms = tr * 1000.0
+
+        # averages
+        na = int(self._nifti_obj.shape[5])
+        log.debug("extracted shape[5] / NA (%d)" % na)
+
+        # nucleus (used for sequence object)
+        nucleus = self.get_nucleus()
+        log.debug("extracted nuclei (%s)" % nucleus)
+
+        # number of points
+        npts = int(self._nifti_obj.shape[3])
+        log.debug("extracted shape[3] / npts (%d)" % npts)
+
+        # dwell time (btw already extracted within suspect, this is a bit redandent)
+        dt_s = self.read_param_num("pixdim")[4]
+        log.debug("extracted pixdim[4] / dwell time (%.6f)" % dt_s)
+
+        # f0 frequency
+        f0 = self.read_param_num("SpectrometerFrequency")[0]
+        log.debug("extracted f0 (%.2f)" % f0)
+
+        # --- sequence-specific parameters ---
+        sequence_name = self._get_sequence_name()
+        log.debug("extracted sequence name (%s)" % sequence_name)
+
+        if("press" in sequence_name):
+            sequence_obj = sim.mrs_seq_svs_se(te_ms, tr_ms, na, nuclei=nucleus, npts=npts, fs=(1.0 / dt_s), f0=f0)
+
+        elif("steam" in sequence_name):
+            sequence_obj = sim.mrs_seq_svs_st(te_ms, tr_ms, na, nuclei=nucleus, npts=npts, fs=(1.0 / dt_s), f0=f0)
+
+        else:
+            # unknown!
+            log.error("ouch unknown sequence (%s) !" % sequence_name)
+
+        return(sequence_obj)
+
+    def _get_sequence_name(self):
+        """
+        Return the acquisition sequence name.
+
+        Returns
+        -------
+        sequence_name : string
+            Sequence used for the acquisition
+        """
+        return(self.header.Meta["sequence_name"])
+
+
+def write_ismrmd(s, h5_filepath):
+    """
+    Save the MRSData2 object to a ISMRMRD format file. This function depends on ismrmrd-python, available at https://github.com/ismrmrd/ismrmrd-python. General info about this open file format is available here: https://ismrmrd.github.io/. Got inspired by this example: https://github.com/ismrmrd/ismrmrd-python-tools/blob/master/generate_cartesian_shepp_logan_dataset.py .
+
+    Parameters
+    ----------
+    s : reco.MRSData2 object
+        MRS dataset to save to disk
+    h5_filepath: string
+        Full absolute file path pointing to h5 file
+    """
+    log.debug("saving MRS signal to " + h5_filepath + "...")
+
+    # TODO: need to add more info to the header: voxel size/position, etc.
+
+    # open  dataset
+    dset = ismrmrd.Dataset(h5_filepath, "dataset", create_if_needed=True)
+
+    # create the XML header
+    header = ismrmrd.xsd.ismrmrdHeader()
+
+    # subject stuff
+    subj = ismrmrd.xsd.subjectInformationType()
+    subj.patientName = s.patient["name"]
+    subj.patientID = s.patient["name"]
+    # TODO: fix bug here...
+    # subj.patientBirthdate = self.patient["birthday"].strftime('%Y-%m-%d')
+    subj.patientGender = s.patient["sex"]
+    subj.patientWeight_kg = s.patient["weight"]
+    # no patient height in the ismrmrd format!?
+    # add to header
+    header.subjectInformation = subj
+
+    # sequence stuff
+    seq = ismrmrd.xsd.sequenceParametersType()
+    seq.TR = s.sequence.tr
+    seq.TE = [s.sequence.te]
+    seq.sequence_type = s.sequence.name
+    # add to header
+    header.sequenceParameters = seq
+
+    # experimental conditions
+    exp = ismrmrd.xsd.experimentalConditionsType()
+    exp.H1resonanceFrequency_Hz = s.f0 * 1e6
+    header.experimentalConditions = exp
+
+    # meta stuff
+    # TODO: need to add these MRS meta-information in the header but cannot figure it out
+    meta_dict = {}
+    meta_dict["dwell_time_s"] = s.dt
+    meta_dict["ppm0"] = s.ppm0
+    meta_dict["transform"] = s.transform
+    meta_dict["voxel_dimensions"] = s.voxel_dimensions
+    meta_dict["sequence_name"] = s.sequence.name
+    meta_dict["nucleus"] = s.sequence.nuclei
+
+    # this seems to work but the Meta string is not included in XML string, why?
+    meta = ismrmrd.Meta(meta_dict)
+    header.Meta = meta.serialize()
+
+    # write header
+    dset.write_xml_header(header.toXML('utf-8'))
+
+    # data
+    acq = ismrmrd.Acquisition()
+    if(s.ndim == 1):
+        # 1D MRS data
+        acq.resize(s.shape[2], 0)
+        acq.data[:] = s
+        dset.append_acquisition(acq)
+    elif(s.ndim == 2):
+        # 2D MRS data
+        acq.resize(s.shape[2], s.shape[1])
+        acq.data[:] = s
+        dset.append_acquisition(acq)
+    elif(s.ndim == 3):
+        # 3D MRS raw data
+        for na_ind in range(s.shape[0]):
+            # average loop
+            acq.resize(s.shape[2], s.shape[1])
+            acq.data[:] = np.squeeze(s[na_ind, :, :])
+            dset.append_acquisition(acq)
+    else:
+        log.error("this function only works for 1, 2 or 3D signals! You are feeding it with %d-dimensional data. :s" % s.ndim)
+
+    # done
+    dset.close()
+
+
+def write_nifti_mrs(s, nifti_mrs_filepath):
+    """
+    Save this MRS signal to a NIFTI MRS file. More info here : https://github.com/wtclarke/mrs_nifti_standard .
+
+    Parameters
+    ----------
+    s : reco.MRSData2 object
+        MRS dataset to save to disk
+    nifti_mrs_filepath: string
+        Full absolute file path pointing to the nifti file
+    """
+    log.debug("saving MRS signal to " + nifti_mrs_filepath + "...")
+
+    dim_dict = {}
+
+    meta_dict = {**dim_dict,
+                 'SpectrometerFrequency': [s.f0, ],
+                 'ResonantNucleus': [s.sequence.nuclei, ],
+                 'EchoTime': (s.te / 1000),
+                 'RepetitionTime': (s.tr / 1000),
+                 'DeviceSerialNumber': "",
+                 'Manufacturer': "",
+                 'ManufacturersModelName': "",
+                 'SoftwareVersions': "",
+                 'PatientDoB': s.patient["birthday"].strftime("%Y%m%d"),
+                 'PatientName': s.patient["name"],
+                 'PatientPosition': "",
+                 'PatientSex': s.patient["sex"],
+                 'PatientWeight': s.patient["weight"],
+                 'ConversionMethod': "Manual",
+                 'ConversionTime': datetime.now().isoformat(sep='T', timespec='milliseconds'),
+                 'OriginalFile': ""}
+    meta_dict['siemens_sequence_info'] = {'sequence': '%%CustomerSeq%%\\%s' % s.sequence.name}
+
+    json_full = json.dumps(meta_dict)
+
+    # data
+    np_arr_obj = np.array(s)
+    # currently we have averages,channels,timepoints
+    # we want timepoints, channels, averages
+    np_arr_obj = np.transpose(np_arr_obj, [2, 1, 0])
+    # add dummy singleton spatial dimensions
+    np_arr_obj = np_arr_obj[np.newaxis, np.newaxis, np.newaxis, :]
+
+    # orientation
+    transf = -s.transform.copy()
+    transf[2, :] *= -1
+
+    # create object
+    nifti_mrs_obj = nib.nifti2.Nifti2Image(np_arr_obj, transf)
+
+    # write new header
+    pixDim = nifti_mrs_obj.header['pixdim']
+    pixDim[4] = s.dt
+    nifti_mrs_obj.header['pixdim'] = pixDim
+
+    # set q_form >0 (???)
+    nifti_mrs_obj.header.set_qform(transf)
+
+    # write extension with ecode 44
+    extension = nib.nifti1.Nifti1Extension(44, json_full.encode('UTF-8'))
+    nifti_mrs_obj.header.extensions.append(extension)
+
+    # write
+    nib.save(nifti_mrs_obj, nifti_mrs_filepath)
+
+
+def write_mat(s, mat_filepath):
+    """
+    Save the numpy array content to a MATLAB mat file.
+
+    Parameters
+    ----------
+    s : reco.MRSData2 object
+        MRS dataset to save to disk
+    mat_filepath: string
+        Full absolute file path pointing to the mat file
+    """
+    # TODO: need to add some header info
+    log.debug("saving MRS signal to " + mat_filepath + "...")
+    sio.savemat(mat_filepath, {'MRSdata': s})
+
+
+def write_pkl(s, pkl_filepath):
+    """
+    Save the whole object to a pickle file.
+
+    Parameters
+    ----------
+    s : reco.MRSData2 object
+        MRS dataset to save to disk
+    pkl_filepath: string
+        Full absolute file path pointing to pkl file
+    """
+    log.debug("saving MRS signal to " + pkl_filepath + "...")
+    with open(pkl_filepath, 'wb') as f:
+        pickle.dump(s, f)
 
 
 def read_physio_file(physio_filepath):

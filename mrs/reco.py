@@ -14,7 +14,6 @@ import numpy as np
 import pandas as pd
 from scipy import signal
 from scipy import interpolate
-import scipy.io as sio
 import matplotlib.pylab as plt
 import matplotlib._pylab_helpers
 from datetime import datetime
@@ -3217,103 +3216,25 @@ class MRSData2(suspect.mrsobjects.MRSData):
 
     def save_ismrmd(self, h5_filepath):
         """
-        Save the MRSData2 object to a ISMRMRD format file. This function depends on ismrmrd-python, available at https://github.com/ismrmrd/ismrmrd-python. General info about this open file format is available here: https://ismrmrd.github.io/. Got inspired by this example: https://github.com/ismrmrd/ismrmrd-python-tools/blob/master/generate_cartesian_shepp_logan_dataset.py .
+        Save the MRSData2 object to a ISMRMRD format file.
 
         Parameters
         ----------
         h5_filepath: string
             Full absolute file path pointing to h5 file
         """
-        log.debug("saving MRS signal to " + h5_filepath + "...")
-        # dimensions check
-        if(self.ndim != 1):
-            log.error("this method only works for 3D signals! You are feeding it with %d-dimensional data. :s" % self.ndim)
+        io.write_ismrmd(self, h5_filepath)
 
-        # try importing here in order not to break everything because you do not have this dependency
-        import ismrmrd
+    def save_nifti_mrs(self, nifti_mrs_filepath):
+        """
+        Save this MRS signal to a NIFTI MRS file.
 
-        # TODO: need to add more info to the header: voxel size/position, etc.
-
-        # open  dataset
-        dset = ismrmrd.Dataset(h5_filepath, "dataset", create_if_needed=True)
-
-        # create the XML header
-        header = ismrmrd.xsd.ismrmrdHeader()
-
-        # subject stuff
-        subj = ismrmrd.xsd.subjectInformationType()
-        subj.patientName = self.patient["name"]
-        subj.patientID = self.patient["name"]
-        # bug here...
-        # subj.patientBirthdate = self.patient["birthday"].strftime('%Y-%m-%d')
-        if(self.patient["sex"] == 0):
-            subj.patientGender = "M"
-        elif(self.patient["sex"] == 1):
-            subj.patientGender = "F"
-        elif(self.patient["sex"] == 2):
-            subj.patientGender = "O"
-        else:
-            log.error("patient gender unknown!")
-        subj.patientWeight_kg = self.patient["weight"]
-        # no patient height in the ismrmrd format!?
-        # add to header
-        header.subjectInformation = subj
-
-        # sequence stuff
-        seq = ismrmrd.xsd.sequenceParametersType()
-        seq.TR = self.sequence.tr
-        seq.TE = [self.sequence.te]
-        seq.sequence_type = self.sequence.name
-        # add to header
-        header.sequenceParameters = seq
-
-        # experimental conditions
-        exp = ismrmrd.xsd.experimentalConditionsType()
-        exp.H1resonanceFrequency_Hz = self.f0 * 1e6
-        header.experimentalConditions = exp
-
-        # dummy encoding
-        encoding = ismrmrd.xsd.encoding()
-        encoding.trajectory = ismrmrd.xsd.trajectoryType.cartesian
-        efov = ismrmrd.xsd.fieldOfView_mm()
-        efov.x = 1
-        efov.y = 1
-        efov.z = 1
-        rfov = ismrmrd.xsd.fieldOfView_mm()
-        rfov.x = 1
-        rfov.y = 1
-        rfov.z = 1
-        ematrix = ismrmrd.xsd.matrixSize()
-        ematrix.x = 1
-        ematrix.y = 1
-        ematrix.z = 1
-        rmatrix = ismrmrd.xsd.matrixSize()
-        rmatrix.x = 1
-        rmatrix.y = 1
-        rmatrix.z = 1
-        espace = ismrmrd.xsd.encodingSpaceType()
-        espace.matrixSize = ematrix
-        espace.fieldOfView_mm = efov
-        rspace = ismrmrd.xsd.encodingSpaceType()
-        rspace.matrixSize = rmatrix
-        rspace.fieldOfView_mm = rfov
-        encoding.encodedSpace = espace
-        encoding.reconSpace = rspace
-        limits = ismrmrd.xsd.encodingLimitsType()
-        encoding.encodingLimits = limits
-        header.encoding.append(encoding)
-
-        # write header
-        dset.write_xml_header(header.toxml('utf-8'))
-
-        # data
-        acq = ismrmrd.Acquisition()
-        acq.resize(self.shape[0], 0)
-        acq.data[:] = self[:]
-        dset.append_acquisition(acq)
-
-        # done
-        dset.close()
+        Parameters
+        ----------
+        nifti_mrs_filepath: string
+            Full absolute file path pointing to the nifti file
+        """
+        io.write_nifti_mrs(self, nifti_mrs_filepath)
 
     def save_mat(self, mat_filepath):
         """
@@ -3322,11 +3243,9 @@ class MRSData2(suspect.mrsobjects.MRSData):
         Parameters
         ----------
         mat_filepath: string
-            Full absolute file path pointing to mat file
+            Full absolute file path pointing to the mat file
         """
-        # TODO: need to add some header info
-        log.debug("saving MRS signal to " + mat_filepath + "...")
-        sio.savemat(mat_filepath, {'MRSdata': self})
+        io.write_mat(self, mat_filepath)
 
     def save_pkl(self, pkl_filepath):
         """
@@ -3337,9 +3256,7 @@ class MRSData2(suspect.mrsobjects.MRSData):
         pkl_filepath: string
             Full absolute file path pointing to pkl file
         """
-        log.debug("saving MRS signal to " + pkl_filepath + "...")
-        with open(pkl_filepath, 'wb') as f:
-            pickle.dump(self, f)
+        io.write_pkl(self, pkl_filepath)
 
     def __reduce__(self):
         """Reduce internal pickling method used when dumping. Modified so that MRSData2 attributes are not forgotten. See for more info: https://docs.python.org/3/library/pickle.html ."""
