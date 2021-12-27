@@ -21,6 +21,7 @@ Roussel T, Le Fur Y, Guye M, Viout P, Ranjeva JP and Callot V
 * Read raw data from Siemens (TWIX MR Syngo VB17 & VE11)
 * Read raw data from Bruker (fid files)
 * Read dicom data (standard dicom, Siemens MR Syngo VB17, Siemens MR Syngo XA20)
+* Read and write NIFTI MRS files
 * VOI overlay on anatomical image
 * Data processing
 	* Automatic phasing
@@ -56,7 +57,7 @@ Roussel T, Le Fur Y, Guye M, Viout P, Ranjeva JP and Callot V
 
 ### Python package
 
-PASTIS was developped on Python 3.7 and can be installed with *pip* using this command line:
+PASTIS was developped on Python 3.8 and can be installed with *pip* using this command line:
 
 ```console
 $ pip install -e path/to/the/folder/pastis

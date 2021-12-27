@@ -1,5 +1,7 @@
 ## TODO
 
+* ISMRMD format read/write: need to include some meta information related to MRS (dwell time, ppm0, sequence, etc.) but cannot figure it out...
+
 * Make sure that the gamma library is not needed for pygamma to run. If confirmed, removed all code related to storing/loading of metabolite basis sets in PKL file?
 
 * Improve data file handling by reading folders of dicom and twix files and putting everything in order. Problem is to find some kind of UID to link raw data (TWIX) to reconstructed data (DICOM). Some ReferenceImage# field used to do the job in VB17 version, not anymore >=VE11...
@@ -9,8 +11,6 @@
 * Parallelize stuff for data rejecting approaches
 
 * Find a gitable non-binary format to store the metabolite db and basis sets (I was thinking of FODS but it is not really implemented in conda...)
-
-* HDF5/ISMRMD format save/load: for now, only save the MRS signal with a few attributes. If needed, will complete implementation
 
 * Implement partial volume stuff for absolute quantification
 
