@@ -4,7 +4,7 @@
 
 PASTIS stands for (P)rocessing (AS)sessment (T)echnique for (I)mproved (S)pectroscopy ;)
 
-PASTIS can be used to process and quantify single-voxel Magnetic Resonance SPectroscopy (MRS) data. It can also simulate MRS data using various MRS sequences for different B0 fields.
+PASTIS can be used to process and quantify single-voxel Magnetic Resonance SPectroscopy (MRS) data. It can also simulate MRS data using various MRS sequences for different B0 fields. It was originally developed to reconstruct, process and quantify spinal cord MRS data at 7 T and has therefore special features related to motion detection and compensation. For these reasons, it was later on used for cardiac MRS but could work for any organ really :)
 
 PASTIS relies a lot on the suspect package. More info here: https://github.com/openmrslab/suspect
 
@@ -14,7 +14,7 @@ PASTIS was originally written by Tangi Roussel. If you are using PASTIS or part 
 
 Respiratory-triggered quantitative MR spectroscopy of the human cervical spinal cord at 7 T.
 Roussel T, Le Fur Y, Guye M, Viout P, Ranjeva JP and Callot V
-(submitted)
+(accepted)
 
 ## Features
 
@@ -27,7 +27,7 @@ Roussel T, Le Fur Y, Guye M, Viout P, Ranjeva JP and Callot V
 	* Automatic phasing
 	* Automatic channel combination
 	* Zero-filling
-	* Fully automatic data rejection for SNR and FWHM enhancement
+	* Fully automatic data discard for SNR and FWHM enhancement
 	* Automatic frequency realignment
 	* Apodization
 	* Peak HSVD removal
