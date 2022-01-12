@@ -22,10 +22,10 @@ from IPython.display import display
 from xlrd import open_workbook
 from termcolor import cprint
 from enum import Enum
-from mrs import reco
-from mrs import aliases as xxx
-from mrs import log
-from mrs import paths as default_paths
+from pastis import reco
+from pastis import aliases as xxx
+from pastis import log
+from pastis import paths as default_paths
 import copy as copy
 
 import pdb
