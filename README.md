@@ -76,12 +76,12 @@ Let's say you acquired some MRS data on a MRI scanner and the raw data is stored
 
 Let's start with package imports. The **reco** submodule is required for anything that has to do with data reconstruction.
 ```python
-import mrs.reco as reco
+import pastis.reco as reco
 ```
 
 PASTIS also uses a logger to output some information in the console (see the **log** submodule). You can choose the amount of debug messages to output with the setLevel (more info about Python loggers here: https://docs.python.org/3/howto/logging.html)
 ```python
-import mrs.log as log
+import pastis.log as log
 log.setLevel(log.INFO)
 ```
 
@@ -124,8 +124,8 @@ my_mrs_signal.display_spectrum_1d()
 
 The **fit** submodule is required for anything that has to do with data quantification. Some useful aliases are declared in the submodule **xxx**.
 ```python
-import mrs.fit as fit
-import mrs.aliases as xxx
+import pastis.fit as fit
+import pastis.aliases as xxx
 ```
 
 Let's create a fitting tool for our dataset:
