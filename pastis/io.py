@@ -9,8 +9,8 @@ Stuff related to MRS data file reading.
 import suspect
 import suspect.io.twix as sit
 import numpy as np
-from mrs import sim
-from mrs import log
+from pastis import sim
+from pastis import log
 import struct
 from abc import ABCMeta
 from datetime import datetime

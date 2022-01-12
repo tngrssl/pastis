@@ -21,9 +21,8 @@ import pickle
 import os
 import re
 from enum import Enum
-from mrs import io
-from mrs import log
-from mrs import paths as default_paths
+from pastis import io
+from pastis import log
 
 import pdb
 

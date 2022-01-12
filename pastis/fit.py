@@ -9,9 +9,9 @@ A fit_tool class that deals with the quantification of MRS data based on the sci
 import numpy as np
 import pandas as pd
 import suspect
-from mrs import sim
-from mrs import log
-from mrs import aliases as xxx
+from pastis import sim
+from pastis import log
+from pastis import aliases as xxx
 import matplotlib.pylab as plt
 import scipy.optimize as optimize
 import matplotlib._color_data as mcd
