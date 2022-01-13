@@ -27,6 +27,7 @@ from pastis import aliases as xxx
 from pastis import log
 from pastis import paths as default_paths
 import copy as copy
+import json
 
 import pdb
 
@@ -372,7 +373,7 @@ class params(np.ndarray):
         p.errors[:, xxx.p_cm] = p.errors[:, xxx.p_cm] * multiplication_factor
         return(p)
 
-    def get_absolutes(self, mIndex=xxx.m_Water, m_concentration_mmolkg=55000.0, params_ref=None):
+    def get_absolutes(self, mIndex=None, m_concentration_mmolkg=55000.0, params_ref=None):
         """
         Calculate the metabolic concentration values relative to a metabolite. The metabolite relative concentration can be taken from the current params vector or another params vector (params_ref), assuming the absolute metabolite concentration value. Usefull to get concentrations relative to water (called absolute concentrations).
 
@@ -393,6 +394,14 @@ class params(np.ndarray):
         # init: check ref params
         if(params_ref is None):
             params_ref = self.copy()
+
+        # use water by default
+        if(mIndex is None):
+            if("m_Water" in dir(xxx)):
+                log.warning("using default water concentration for absolute calculation!")
+                mIndex = xxx.m_Water
+            else:
+                log.error("no reference metabolite (mIndex argument) specified for absolute concentration calculation!")
 
         # init: we are working on copies
         p1 = self.copy()
@@ -512,7 +521,10 @@ class params(np.ndarray):
         # link all to the NAA singlet
         self.linklock[:] = np.tile([0, 2, 3, 4], (xxx.n_All, 1))
         self.linklock[xxx.m_Ref_MB, :] = [0, -2, -3, -4]
-        self.linklock[xxx.m_Water, :] = 0
+
+        # set water
+        if("m_Water" in dir(xxx)):
+            self.linklock[xxx.m_Water, :] = 0
 
         # no MMs
         self.linklock[xxx.m_All_MMs, :] = 1
@@ -539,7 +551,10 @@ class params(np.ndarray):
         # link all to the NAA singlet
         self.linklock[:] = np.tile([0, 2, 3, 4], (xxx.n_All, 1))
         self.linklock[xxx.m_Ref_MB, :] = [0, -2, -3, -4]
-        self.linklock[xxx.m_Water, :] = 0
+
+        # set water
+        if("m_Water" in dir(xxx)):
+            self.linklock[xxx.m_Water, :] = 0
 
         # no MMs
         self.linklock[xxx.m_All_MMs, :] = 1
@@ -564,7 +579,11 @@ class params(np.ndarray):
 
         # lock everything except water
         self.linklock[:] = 1
-        self.linklock[xxx.m_Water, :] = 0
+
+        # set water
+        if("m_Water" in dir(xxx)):
+            self.linklock[xxx.m_Water, :] = 0
+
         return(self.copy())
 
     def set_default_water_max(self):
@@ -582,11 +601,18 @@ class params(np.ndarray):
 
         # water max values
         self[xxx.m_All_MBs, xxx.p_df] = +20.0
-        self[xxx.m_Water, 0] = 100000.0
+
+        # set water
+        if("m_Water" in dir(xxx)):
+            self.linklock[xxx.m_Water, 0] = 100000.0
 
         # lock everything except water
         self.linklock[:] = 1
-        self.linklock[xxx.m_Water, :] = 0
+
+        # set water
+        if("m_Water" in dir(xxx)):
+            self.linklock[xxx.m_Water, :] = 0
+
         return(self.copy())
 
     def add_macromolecules_min(self):
@@ -1743,8 +1769,12 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
         self.pulse_rfc_optim_power_voltage_range = [0, 500]
         # number of measurements in the previous range
         self.pulse_rfc_optim_power_voltage_n = 50
-        # which metabolites should we test (separately)
-        self.pulse_rfc_optim_power_metabolites = [xxx.m_Water]
+        # which metabolites should we test (water by default)
+        if("m_Water" in dir(xxx)):
+            self.pulse_rfc_optim_power_metabolites = [xxx.m_Water]
+        else:
+            self.pulse_rfc_optim_power_metabolites = None
+
         # margins/threshold parameters to estimate optimal RF power. By default:
         # [0] 10% last points (for higher power) used for plateau estimation
         # [1] 10% change allowed
@@ -2648,10 +2678,8 @@ class metabolite_basis_set(dict):
             Excel file containing metabolite chemical shifts, J-coupling, etc.
         """
         super(metabolite_basis_set, self).__init__()
-        # xls file that contains metabolites properties (you should not change that)
-        # xls file that contains your metabolite basis set
         self.basis_set_name = basis_set_name
-        self._xls_file = default_paths.DEFAULT_META_DB_FILE
+        self._xls_file = database_xls_file
 
         log.info("initializing metabolite database...")
         self._read_xls_file()
@@ -2991,3 +3019,40 @@ class metabolite_basis_set(dict):
         df = df.add_prefix(prefix_str)
 
         return(df)
+
+    def to_json(self, json_file_full_path, ignore_J_couplings=True):
+        """
+        Convert this metabolite basis set to a JSON file compatible with FSL-MRS.
+
+        Parameters
+        ----------
+        json_file_full_path : string
+            Full path to JSON file
+        ignore_J_couplings : boolean
+            Set all J couplings to 0Hz if (True)
+        """
+        log.debug("converting to FSL-MRS JSON file (%s)..." % json_file_full_path)
+
+        if(not ignore_J_couplings):
+            log.error("J-couplings are not yet handled for FSL-MRS JSON conversion, sorry.")
+
+        # initialize empty json dict
+        json_dict = {}
+
+        # copy metabolite_db to json
+        for metagroup_key in self:
+            for meta_key in self[metagroup_key]["metabolites"]:
+                # create sys entry
+                json_key = "sys" + meta_key
+                json_dict[json_key] = {}
+
+                # for this metabolite
+                json_dict[json_key]["name"] = meta_key
+                json_dict[json_key]["shifts"] = list(self[metagroup_key]["metabolites"][meta_key]["ppm"])
+                json_dict[json_key]["scaleFactor"] = 1
+                json_dict[json_key]["j"] = (self[metagroup_key]["metabolites"][meta_key]["J"] * 0.0).tolist()
+
+        # serializing
+        json_object = json.dumps(json_dict, sort_keys=True, indent='\t')
+        with open(json_file_full_path, "w") as fh:
+            fh.write(json_object)
