@@ -1298,6 +1298,31 @@ class mrs_sequence:
 
         return(j)
 
+    def correct_T2s(self, te):
+        """
+        Correct the metabolite simulated signal basis set by rescaling the intensities according to the TE. The T2 correction is usually performed AFTER quantification directly on the estimated concentrations. Here, we are applying this correction BEFORE quantification directly on the simulated metabolite signals used during modelling.
+
+        Parameters
+        ----------
+        te : float
+            Echo time in (ms)
+        """
+        log.info("correcting for T2 effects the metabolite basis set...")
+
+        # browse though the database and find T2s
+        params_T2s = []
+        for this_metagroup_key, this_metagroup_entry in self._meta_bs.items():
+            params_T2s.append(this_metagroup_entry["T2"])
+
+        # convert to np
+        params_T2s = np.array(params_T2s)
+
+        # scaling metabolite signals
+        for k, s_meta in enumerate(self._meta_signals):
+            # intensity scaling factor if we were at TE=0ms
+            multiplication_factor = 1 / np.exp(-te / params_T2s[k])
+            self._meta_signals[k] = s_meta * multiplication_factor
+
     def simulate_signal(self, p, sigma_noise=0.0, na=1, lbl="simulated MRS signal"):
         """
         Print out the parameter values and returns the modeled signal using above member function.
