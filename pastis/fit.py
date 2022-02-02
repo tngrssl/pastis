@@ -753,7 +753,7 @@ class fit_pastis(fit_tool):
             self.sequence._ready = False
 
         # initialize sequence if needed with correct ppm range
-        if((not self.sequence.ready) or () ):
+        if(not self.sequence.ready):
             self.sequence.initialize(self.meta_bs)
 
         # reset linklock
