@@ -2518,7 +2518,7 @@ class mrs_seq_svs_se(mrs_seq_press):
         te2 : float
             Second part of TE (ms)
         """
-        super().__init__(te, tr, na, nuclei, npts, voxel_size, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor, te1, te2)
+        super().__init__(te, tr, na, ds, nuclei, npts, voxel_size, fs, f0, vref, shims, timestamp, gating_mode, eff_acquisition_time, scaling_factor, te1, te2)
         # name of sequence
         self.name = "svs_se"
 

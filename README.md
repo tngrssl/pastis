@@ -130,7 +130,7 @@ import pastis.aliases as xxx
 
 Let's create a fitting tool for our dataset:
 ```python
-my_fitting_tool = fit.fit_pastis(my_mrs_signal)
+my_fit_tool = fit.fit_pastis(my_mrs_signal)
 ```
 
 Before running the fit, we need to configure the fitting tool. First, let's define which metabolite to fit.

@@ -109,7 +109,12 @@ def get_data_file_reader(data_fullfilepath):
 
     elif((data_filename == 'fid') or (data_filename == "fid.ref") or (data_filename == "fid.orig")):
         # BRUKER fid, fid.ref, fid.orig file?
-        return(BRUKER_fid_reader(data_fullfilepath))
+        return(BRUKER_fid_reader_PV5(data_fullfilepath))
+
+    elif(data_filename == "rawdata.job0"):
+        # BRUKER PV6 rawdata
+        return(BRUKER_rawdata_reader_PV6(data_fullfilepath))
+
     else:
         log.error("sorry, I am not sure I can read this kind of files... :/")
 
@@ -1964,8 +1969,8 @@ class SIEMENS_DICOM_reader_syngo_XA20(SIEMENS_DICOM_reader_syngo_MR_B17):
         return(acq_time)
 
 
-class BRUKER_fid_reader(data_file_reader):
-    """A class used to scrap parameters out of Bruker files."""
+class BRUKER_fid_reader_PV5(data_file_reader):
+    """A class used to scrap parameters out of Bruker PV5 fid files."""
 
     def __init__(self, data_fullfilepath):
         """
@@ -2180,7 +2185,7 @@ class BRUKER_fid_reader(data_file_reader):
         sequence_name = self._get_sequence_name()
         log.debug("extracted sequence name (%s)" % sequence_name)
 
-        if(sequence_name == "press"):
+        if((sequence_name == "press") or (sequence_name == "bruker:press")):
             sequence_obj = sim.mrs_seq_svs_se(te, tr, na, ds, nucleus, npts, voxel_size, 1.0 / dt, f0)
 
         elif(sequence_name == "steam"):
@@ -2208,6 +2213,39 @@ class BRUKER_fid_reader(data_file_reader):
         sequence_name = param_str.replace("<", "").replace(">", "").strip().lower()
 
         return(sequence_name)
+
+
+class BRUKER_rawdata_reader_PV6(BRUKER_fid_reader_PV5):
+    """A class used to scrap parameters out of Bruker PV6 raw data files."""
+
+    def __init__(self, data_fullfilepath):
+        """
+        Initialize by reading the method and acqp files.
+
+        Parameters
+        ----------
+        data_fullfilepath : string
+            Full path to the fid file
+        """
+        super().__init__(data_fullfilepath)
+
+        # freeze
+        self.__isfrozen = True
+
+    def _read_data(self):
+        """
+        Read MRS data from file and return a suspect's MRSData object.
+
+        Returns
+        -------
+        MRSData_obj : MRSData object
+            MRS data read from fid file
+        """
+        log.debug("reading BRUKER rawdata file...")
+
+        MRSData_obj = suspect.io.load_svs_bruker(self.fullfilepath)
+
+        return(MRSData_obj)
 
 
 class NIFTI_MRS_reader(data_file_reader):
