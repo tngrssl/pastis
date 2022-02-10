@@ -724,7 +724,7 @@ class params(np.ndarray):
         super().__setstate__(d[0:-1])
         return(self)
 
-    def to_dataframe(self, prefix_str="params_"):
+    def to_dataframe(self, prefix_str="params_", single_line=True):
         """
         Convert this params object to dataframe.
 
@@ -732,6 +732,8 @@ class params(np.ndarray):
         ----------
         prefix_str : string
             Prefix string to add to column names
+        single_line : boolean
+            Produces a dataframe with one line (True) or 2D (False)
 
         Returns
         -------
@@ -746,10 +748,38 @@ class params(np.ndarray):
         meta_names = self.get_meta_names()
         par_names = ["cm", "dd", "df", "dp"]
 
-        for im, m in enumerate(meta_names):
+        if(single_line):
+            # 1D dataframe for storage
+
+            # create columns
+            col_list = []
+            for im, m in enumerate(meta_names):
+                for ip, p in enumerate(par_names):
+                    col_list.append(p + "|" + m + "|val")
+                    col_list.append(p + "|" + m + "|err")
+
+            df = pd.DataFrame([], columns=col_list)
+            for im, m in enumerate(meta_names):
+                for ip, p in enumerate(par_names):
+                    df.at[0, p + "|" + m + "|val"] = self[im, ip]
+                    df.at[0, p + "|" + m + "|err"] = self._errors[im, ip]
+        else:
+            # 2D dataframe more human friendly
+
+            # create columns
+            col_list = []
             for ip, p in enumerate(par_names):
-                df[p + "|" + m + "|val"] = self[im, ip]
-                df[p + "|" + m + "|err"] = self._errors[im, ip]
+                col_list.append(p + "|val")
+                col_list.append(p + "|err")
+
+            df = pd.DataFrame([],
+                              columns=col_list,
+                              index=meta_names)
+
+            for im, m in enumerate(meta_names):
+                for ip, p in enumerate(par_names):
+                    df.loc[m, p + "|val"] = self[im, ip]
+                    df.loc[m, p + "|err"] = self._errors[im, ip]
 
         # add prefix
         df = df.add_prefix(prefix_str)
@@ -1019,7 +1049,7 @@ class mrs_sequence:
         data = pg.FID(sigma0, pg.gen_op(D), H, dt, self.npts)  # acquisition
 
         # extract complex time data points
-        s = np.full([self.npts, ], np.nan, dtype=np.complex)
+        s = np.full([self.npts, ], np.nan, dtype=np.complex128)
         for i in range(self.npts):
             s[i] = -afactor * amp_factor_spins * (data.getRe(i) - 1j * data.getIm(i))
 
@@ -1535,7 +1565,7 @@ class mrs_seq_press(mrs_sequence):
         data = pg.FID(sigma0, pg.gen_op(D), H, dt, self.npts)  # acquisition
 
         # extract complex time data points
-        s = np.full([self.npts, ], np.nan, dtype=np.complex)
+        s = np.full([self.npts, ], np.nan, dtype=np.complex128)
         for i in range(self.npts):
             s[i] = -afactor * amp_factor_spins * (data.getRe(i) - 1j * data.getIm(i))
 
@@ -1696,7 +1726,7 @@ class mrs_seq_steam(mrs_sequence):
         data = pg.FID(sigma0, pg.gen_op(D), H, dt, self.npts)  # acquisition
 
         # extract complex time data points
-        s = np.full([self.npts, ], np.nan, dtype=np.complex)
+        s = np.full([self.npts, ], np.nan, dtype=np.complex128)
         for i in range(self.npts):
             s[i] = -afactor * amp_factor_spins * (data.getRe(i) - 1j * data.getIm(i))
 
@@ -2318,7 +2348,7 @@ class mrs_seq_eja_svs_slaser(mrs_sequence):
         data = pg.FID(sigma0, pg.gen_op(D), H, dt, self.npts)  # acquisition
 
         # extract complex time data points
-        s = np.full([self.npts, ], np.nan, dtype=np.complex)
+        s = np.full([self.npts, ], np.nan, dtype=np.complex128)
         for i in range(self.npts):
             s[i] = -afactor * amp_factor_spins * (data.getRe(i) - 1j * data.getIm(i))
 
