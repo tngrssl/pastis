@@ -1440,7 +1440,7 @@ def disp_fit(ax, data, params, seq, LL_exluding=True, LL_merging=False, mIndex_l
     mod = seq._model(params_full)
     if(zerofilling_final_npts is not None):
         mod = mod.correct_zerofill_nd(zerofilling_final_npts)
-    ax.plot(mod.frequency_axis_ppm(), mod.spectrum().real, 'k-', linewidth=2, label='model')
+    ax.plot(mod.frequency_axis_ppm(), mod.spectrum().real, 'k-', linewidth=1, label='model')
     # the residue
     diff = data - mod
     ax.plot(diff.frequency_axis_ppm(), diff.spectrum().real, 'g-', linewidth=0.25, label='residue')
@@ -1544,7 +1544,7 @@ def disp_fit(ax, data, params, seq, LL_exluding=True, LL_merging=False, mIndex_l
         # plot the a single MM keeping the same offset
         ax.plot(s_single_MM.frequency_axis_ppm(), s_single_MM.spectrum().real - ygap * (koffset + 2), 'r--')
 
-    ax.text(display_range[1] - 0.5, -ygap * (koffset + 2) + ygap / 5, 'Lip baseline')
+    ax.text(display_range[1] - 0.5, -ygap * (koffset + 2) + ygap / 5, 'Baseline')
 
     # finalize the plot
     ax.set_xticks(np.arange(-1, 10, 0.5))
