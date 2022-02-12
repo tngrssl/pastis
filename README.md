@@ -13,8 +13,7 @@ PASTIS relies a lot on the suspect package. More info here: https://github.com/o
 PASTIS was originally written by Tangi Roussel. If you are using PASTIS or part of it in your work, please cite the original paper:
 
 Respiratory-triggered quantitative MR spectroscopy of the human cervical spinal cord at 7 T.
-Roussel T, Le Fur Y, Guye M, Viout P, Ranjeva JP and Callot V
-(accepted)
+Roussel T, Le Fur Y, Guye M, Viout P, Ranjeva JP and Callot V. Magn Reson Med. 2022 https://doi.org/10.1002/mrm.29182
 
 ## Features
 
