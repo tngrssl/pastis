@@ -1403,7 +1403,7 @@ class fit_pastis(fit_tool):
         return(df)
 
 
-def disp_fit(ax, data, params, seq, LL_exluding=True, LL_merging=False, mIndex_list=None, water_only=False, display_range=[1, 5], zerofilling_final_npts=16384):
+def disp_fit(ax, data, params, seq, LL_exluding=True, LL_merging=False, mIndex_list=None, water_only=False, display_range=[1, 5], display_cm=False, zerofilling_final_npts=16384):
     """
     Plot a bargraph of concentrations.
 
@@ -1425,6 +1425,8 @@ def disp_fit(ax, data, params, seq, LL_exluding=True, LL_merging=False, mIndex_l
         If only water is displayed
     display_range : list [2]
         Range in ppm used for display
+    display_cm : boolean
+        Display concentration value on plot (False by default)
     zerofilling_final_npts : int
         Final npts of points after zero-filling data to smooth display; if (None), no zero-filling
     """
@@ -1509,6 +1511,10 @@ def disp_fit(ax, data, params, seq, LL_exluding=True, LL_merging=False, mIndex_l
                 if(mLL):
                     this_meta_name = this_meta_name + mName + " & "
             this_meta_name = this_meta_name[:-3]
+
+            # add cm value ?
+            if(display_cm):
+                this_meta_name = this_meta_name + " %.3f" % params_full[im, xxx.p_cm]
 
             # prepare parameters
             this_params = p_allzeros.copy()
