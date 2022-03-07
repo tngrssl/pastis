@@ -214,6 +214,7 @@ class data_file_reader(metaclass=ABCMeta):
         with open(self.fullfilepath, 'rb') as f:
             buf = f.read()
             hasher.update(buf)
+        f.close()
         return(hasher.hexdigest())
 
     def get_nucleus(self):
@@ -718,6 +719,7 @@ class SIEMENS_TWIX_reader_syngo_MR_B17(data_file_reader):
         # we do it here and not in the __init__ because we only do that once
         f = open(self.fullfilepath, "rb")
         binaryDump = f.read()
+        f.close()
         hdr_len = struct.unpack("i", binaryDump[:4])
         sMDH = struct.unpack("iiiii", binaryDump[hdr_len[0]:hdr_len[0] + 20])
         # and extract timestamp
@@ -1547,6 +1549,7 @@ class SIEMENS_DICOM_reader_syngo_MR_B17(data_file_reader):
         # we do it here and not in the __init__ because we only do that once
         f = open(self.fullfilepath, "rb")
         binaryDump = f.read()
+        f.close()
         hdr_len = struct.unpack("i", binaryDump[:4])
         sMDH = struct.unpack("iiiii", binaryDump[hdr_len[0]:hdr_len[0] + 20])
         # and extract timestamp
@@ -1997,9 +2000,12 @@ class BRUKER_fid_reader_PV5(data_file_reader):
         log.debug("reading method file...")
         with open(acqp_fullfilepath) as f:
             self.acqp_file_content = f.read()
+        f.close()
+
         log.debug("reading acqp file...")
         with open(method_fullfilepath) as f:
             self.method_file_content = f.read()
+        f.close()
 
         # merge both files
         self.acqp_and_method_files_content = (self.acqp_file_content + self.method_file_content).lower()
