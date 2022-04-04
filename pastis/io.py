@@ -2064,9 +2064,17 @@ class BRUKER_fid_reader_PV5(data_file_reader):
         nucleus_str : string
             String representing nucleus. Example: "1H"
         """
-        param_str = re.search(r"\$" + "PVM_Nucleus1Enum".lower() + "=(\w+)", self.acqp_and_method_files_content)[1]
-        nucleus_str = param_str.replace("<", "").replace(">", "").strip().upper()
+        re_result = re.search(r"\$" + "PVM_Nucleus1Enum".lower() + "=(\w+)", self.acqp_and_method_files_content)
+        if(re_result is not None):
+            param_str = re_result[1]
+        else:
+            # old school
+            a = self.acqp_and_method_files_content.find("PVM_Nucleus1Enum".lower())
+            a = self.acqp_and_method_files_content.find("=".lower(), a)
+            b = self.acqp_and_method_files_content.find("\n".lower(), a)
+            param_str = self.acqp_and_method_files_content[(a+1):b]
 
+        nucleus_str = param_str.replace("<", "").replace(">", "").strip().upper()
         return(nucleus_str)
 
     def get_patient_name(self):
@@ -2175,8 +2183,11 @@ class BRUKER_fid_reader_PV5(data_file_reader):
         log.debug("removed crappy digital filter points (%d)" % npts)
 
         # voxel size
-        re_voxel_size = re.search(r"\$pvm_voxarrsize=\( 1, 3 \)\n(\d) (\d) (\d)", self.acqp_and_method_files_content)
-        voxel_size = [float(re_voxel_size[1]), float(re_voxel_size[2]), float(re_voxel_size[3])]
+        a = self.acqp_and_method_files_content.find("PVM_VoxArrSize".lower())
+        a = self.acqp_and_method_files_content.find("\n".lower(), a)
+        b = self.acqp_and_method_files_content.find("\n".lower(), a + 2)
+        param_str = self.acqp_and_method_files_content[(a + 1):b]
+        voxel_size = [float(v) for v in param_str.strip().split(" ")]
         log.debug("extracted voxel size (%.2f x %.2f x %.2f mm3)" % (voxel_size[0], voxel_size[1], voxel_size[2]))
 
         # dwell time (btw already extracted within suspect, this is a bit redandent)
