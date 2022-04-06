@@ -107,13 +107,23 @@ def get_data_file_reader(data_fullfilepath):
         # ISMRMD file
         return(ISMRMRD_reader(data_fullfilepath))
 
-    elif((data_filename == 'fid') or (data_filename == "fid.ref") or (data_filename == "fid.orig")):
-        # BRUKER fid, fid.ref, fid.orig file?
-        return(BRUKER_fid_reader_PV5(data_fullfilepath))
+    elif((data_filename == 'fid') or (data_filename == "fid.ref") or (data_filename == "fid.orig") or (data_filename == "rawdata.job0")):
+        # BRUKER stuff
+        pv_ver_str = get_paravision_version(data_fullfilepath)
+        pv_ver_int = int(pv_ver_str[0])
 
-    elif(data_filename == "rawdata.job0"):
-        # BRUKER PV6 rawdata
-        return(BRUKER_rawdata_reader_PV6(data_fullfilepath))
+        # version switch
+        if((pv_ver_int == 5) and ((data_filename == "fid") or (data_filename == "fid.ref") or (data_filename == "fid.orig"))):
+            # BRUKER PV5 fid, fid.ref or fid.orig file?
+            return(BRUKER_fid_reader_PV5(data_fullfilepath))
+        elif((pv_ver_int == 6) and ((data_filename == "fid") or (data_filename == "fid.ref") or (data_filename == "fid.orig"))):
+            # BRUKER PV6 fid, fid.ref or fid.orig file?
+            return(BRUKER_fid_reader_PV6(data_fullfilepath))
+        elif((pv_ver_int == 6) and (data_filename == "rawdata.job0")):
+            # BRUKER PV6 rawdata.job0 file?
+            return(BRUKER_rawdata_reader_PV6(data_fullfilepath))
+        else:
+            log.error("sorry, I am not sure I can read this kind of BRUKER files... :/")
 
     else:
         log.error("sorry, I am not sure I can read this kind of files... :/")
@@ -150,6 +160,40 @@ def get_twix_syngo_version(twix_dat_fullfilepath):
     a = baseline_str.find('_')
     b = baseline_str.find('_', a + 1)
     version_str = baseline_str[(a + 1):b]
+    version_str = version_str.strip()
+
+    return(version_str)
+
+
+def get_paravision_version(bruker_fullfilepath):
+    """
+    Find what version of Bruker Paravision we are dealing with.
+
+    Parameters
+    ----------
+    bruker_fullfilepath : string
+        Full path to the bruker paravision file
+
+    Returns
+    -------
+    version_str : string
+        Bruker Paravision version
+    """
+    # open acqp file
+    log.debug("looking for PV version in acqp file...")
+
+    bruker_file_folder = os.path.dirname(bruker_fullfilepath)
+    acqp_fullfilepath = os.path.join(bruker_file_folder, "acqp")
+
+    f = open(acqp_fullfilepath, "r")
+    file_content_str = f.read()
+    f.close()
+
+    # look for version string
+    a = file_content_str.find('ACQ_sw_version')
+    a = file_content_str.find('<PV', a)
+    b = file_content_str.find('>', a + 1)
+    version_str = file_content_str[(a + 3):b]
     version_str = version_str.strip()
 
     return(version_str)
@@ -2031,7 +2075,7 @@ class BRUKER_fid_reader_PV5(data_file_reader):
         return(MRSData_obj)
 
     def is_rawdata(self):
-        """Return true if data is read from a fid file."""
+        """Return true because PV5 fid files are for raw data."""
         return(True)
 
     def read_param_num(self, param_name):
@@ -2232,6 +2276,28 @@ class BRUKER_fid_reader_PV5(data_file_reader):
         return(sequence_name)
 
 
+class BRUKER_fid_reader_PV6(BRUKER_fid_reader_PV5):
+    """A class used to scrap parameters out of Bruker PV6 raw data files."""
+
+    def __init__(self, data_fullfilepath):
+        """
+        Initialize by reading the method and acqp files.
+
+        Parameters
+        ----------
+        data_fullfilepath : string
+            Full path to the fid file
+        """
+        super().__init__(data_fullfilepath)
+
+        # freeze
+        self.__isfrozen = True
+
+    def is_rawdata(self):
+        """Return false because PV6 fid files actually contain averaged data."""
+        return(False)
+
+
 class BRUKER_rawdata_reader_PV6(BRUKER_fid_reader_PV5):
     """A class used to scrap parameters out of Bruker PV6 raw data files."""
 
@@ -2249,6 +2315,10 @@ class BRUKER_rawdata_reader_PV6(BRUKER_fid_reader_PV5):
         # freeze
         self.__isfrozen = True
 
+    def is_rawdata(self):
+        """Return true because PV6 raw data files are really raw data."""
+        return(True)
+
     def _read_data(self):
         """
         Read MRS data from file and return a suspect's MRSData object.
@@ -2260,7 +2330,32 @@ class BRUKER_rawdata_reader_PV6(BRUKER_fid_reader_PV5):
         """
         log.debug("reading BRUKER rawdata file...")
 
-        MRSData_obj = suspect.io.load_svs_bruker(self.fullfilepath)
+        # use brukerapi to read raw data
+        dataset = Dataset(self.fullfilepath)
+
+        # assume that there is a fid file there too and read it
+        MRSData_fid_obj = suspect.io.load_svs_bruker(self.fullfilepath.replace("rawdata.job0", "fid"))
+
+        # crop first time points of fid signals
+        index_start = dataset.shape[0] - MRSData_fid_obj.shape[0]
+        raw_data_arr = dataset.data[index_start:, :]
+        # conjugate real<>imag
+        raw_data_arr = np.conjugate(raw_data_arr)
+
+        # assume single coil for now!
+        # TODO: fix in case of several rx channels!
+        raw_data_arr = raw_data_arr.reshape((1,) + raw_data_arr.shape)
+        raw_data_arr = np.transpose(raw_data_arr, axes=(2, 0, 1))
+
+        # build MRSData object
+        MRSData_obj = suspect.MRSData(raw_data_arr,
+                                      MRSData_fid_obj.dt,
+                                      MRSData_fid_obj.f0,
+                                      MRSData_fid_obj.te,
+                                      MRSData_fid_obj.tr,
+                                      MRSData_fid_obj.ppm0,
+                                      MRSData_fid_obj.voxel_dimensions,
+                                      MRSData_fid_obj.transform)
 
         return(MRSData_obj)
 

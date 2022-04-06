@@ -18,7 +18,7 @@ Roussel T, Le Fur Y, Guye M, Viout P, Ranjeva JP and Callot V. Magn Reson Med. 2
 ## Features
 
 * Read raw data from Siemens (TWIX MR Syngo VB17 & VE11)
-* Read raw data from Bruker (fid files)
+* Read raw data from Bruker (fid & rawdata files)
 * Read dicom data (standard dicom, Siemens MR Syngo VB17, Siemens MR Syngo XA20)
 * Read and write NIFTI MRS files
 * VOI overlay on anatomical image
