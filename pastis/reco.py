@@ -3378,6 +3378,8 @@ class pipeline:
                             "display_range_ppm": [1, 6],
                             # y offset used for display
                             "display_offset": 0.0,
+                            # automatically check which dataset is noWS or WS and swap if needed
+                            "auto_detect_ref_scan": True,
                             # raise error if raw data looks worse than dcm
                             "raise_error_on_badreco": True}
 
@@ -4151,8 +4153,10 @@ class pipeline:
                     log.info_line_break()
                     log.info("reading data [" + this_legend + "]")
                     s_ref = MRSData2(this_data_ref_filename, None)
-                    # find ref data (highest snr)
-                    s, s_ref = self._detect_data_ref(s, s_ref)
+
+                    if(self.settings["auto_detect_ref_scan"]):
+                        # find ref data (highest snr) and swap if needed
+                        s, s_ref = self._detect_data_ref(s, s_ref)
                 else:
                     s_ref = None
 
