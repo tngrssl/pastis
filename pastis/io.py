@@ -23,8 +23,8 @@ import pickle
 # data formats
 import mapvbvd
 import scipy.io as sio
-import ismrmrd
 import nibabel as nib
+from brukerapi.dataset import Dataset
 import json
 
 import pdb
@@ -2546,6 +2546,12 @@ class ISMRMRD_reader(data_file_reader):
         """
         log.debug("reading ISMRMRD fid file...")
 
+        # try to import if possible
+        try:
+            import ismrmrd
+        except:
+            log.error("could not import the python ismrmd package! :(")
+
         self.dset = ismrmrd.Dataset(self.fullfilepath)
         self.header = ismrmrd.xsd.CreateFromDocument(self.dset.read_xml_header())
 
@@ -2761,6 +2767,12 @@ def write_ismrmd(s, h5_filepath):
         Full absolute file path pointing to h5 file
     """
     log.debug("saving MRS signal to " + h5_filepath + "...")
+
+    # try to import if possible
+    try:
+        import ismrmrd
+    except:
+        log.error("could not import the python ismrmd package! :(")
 
     # TODO: need to add more info to the header: voxel size/position, etc.
 
