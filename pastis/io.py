@@ -604,7 +604,7 @@ class SIEMENS_TWIX_reader_syngo_MR_B17(data_file_reader):
 
         # dwell time (btw already extracted within suspect, this is a bit redandent)
         dt = self.read_param_num("DwellTime") * 1e-9
-        log.debug("extracted dwell time (%.2f)" % dt)
+        log.debug("extracted dwell time (%.6f)" % dt)
 
         # f0 frequency (btw already extracted within suspect, this is a bit redandent)
         f0 = self.read_param_num("Frequency") * 1e-6
@@ -1097,7 +1097,7 @@ class SIEMENS_TWIX_reader_syngo_MR_E11(SIEMENS_TWIX_reader_syngo_MR_B17):
 
         # use suspect to read dwell time
         dt = self.data.dt
-        log.debug("extracted dwell time (%.2f)" % dt)
+        log.debug("extracted dwell time (%.6f)" % dt)
 
         # use suspect to read f0 frequency
         f0 = self.data.f0
@@ -1441,7 +1441,7 @@ class SIEMENS_DICOM_reader_syngo_MR_B17(data_file_reader):
 
         # dwell time (btw already extracted within suspect, this is a bit redandent)
         dt = self.read_param_num("DwellTime") * 1e-9
-        log.debug("extracted dwell time (%.2f)" % dt)
+        log.debug("extracted dwell time (%.6f)" % dt)
 
         # f0 frequency (btw already extracted within suspect, this is a bit redandent)
         f0 = self.read_param_num("Frequency") * 1e-6
@@ -1728,8 +1728,8 @@ class SIEMENS_DICOM_reader_syngo_MR_E11(SIEMENS_DICOM_reader_syngo_MR_B17):
         log.debug("extracted voxel size (%.2f x %.2f x %.2f mm3)" % (voxel_size[0], voxel_size[1], voxel_size[2]))
 
         # dwell time (btw already extracted within suspect, this is a bit redandent)
-        dt = self.read_param_num("DwellTime") * 1e-9
-        log.debug("extracted dwell time (%.2f)" % dt)
+        dt = self.data.dt
+        log.debug("extracted dwell time (%.6f)" % dt)
 
         # f0 frequency (btw already extracted within suspect, this is a bit redandent)
         f0 = self.read_param_num("Frequency") * 1e-6
@@ -2236,7 +2236,7 @@ class BRUKER_fid_reader_PV5(data_file_reader):
 
         # dwell time (btw already extracted within suspect, this is a bit redandent)
         dt = self.read_param_num("PVM_DigDw") * 1e-3
-        log.debug("extracted dwell time (%.2f)" % dt)
+        log.debug("extracted dwell time (%.6f)" % dt)
 
         # f0 frequency (btw already extracted within suspect, this is a bit redandent)
         f0 = self.read_param_num("BF1")
