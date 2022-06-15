@@ -1072,7 +1072,10 @@ class fit_pastis(fit_tool):
         F = np.dot(j_free, np.transpose(j_free))
 
         # covariance
-        covar = np.linalg.inv(np.real(F))
+        try:
+            covar = np.linalg.inv(np.real(F))
+        except:
+            covar = np.linalg.inv(np.real(F) + 1e-9)
 
         # CRBs
         CRBs = np.zeros(covar.shape[0])
