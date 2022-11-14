@@ -20,4 +20,4 @@ DEFAULT_META_DB_FILE = os.path.join(pkg_path + "/metabolites_1H.xls")
 DEFAULT_META_BASIS_SET_NAME = "Brain_7T"
 
 # pkl file where all the processed data is stored
-DEFAULT_RECO_DATA_DB_FILE = "/home/tangir/crmbm/acq_db/db.pkl"
+DEFAULT_RECO_DATA_DB_FILE = "/home/troussel/crmbm/acq_db/db.pkl"

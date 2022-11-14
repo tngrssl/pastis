@@ -3,7 +3,7 @@
 """
 Functions to deal with console logging and debugging.
 
-@author: tangir
+@author: Tangi Roussel
 """
 
 import os

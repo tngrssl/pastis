@@ -3,7 +3,7 @@
 """
 Stuff related to MRS data file reading.
 
-@author: tangir
+@author: Tangi Roussel
 """
 
 import suspect

@@ -109,9 +109,9 @@ class fit_lcmodel(fit_tool):
         super().__init__(data)
 
         # some LCModel parameters
-        self.lcmodel_executable_fullpath = "/home/tangir/crmbm/soft/lcmodel/lcm-64/bin/lcmodel"
-        self.lcmodel_rawfile_fullpath = "/home/tangir/crmbm/soft/lcmodel/data/data.raw"
-        self.lcmodel_filbas = "/home/tangir/crmbm/soft/lcmodel/metabolite_basis_sets/7t/gamma_press_te{}_7t_v1.basis"
+        self.lcmodel_executable_fullpath = "/home/troussel/crmbm/soft/lcmodel/lcm-64/bin/lcmodel"
+        self.lcmodel_rawfile_fullpath = "/home/troussel/crmbm/soft/lcmodel/data/data.raw"
+        self.lcmodel_filbas = "/home/troussel/crmbm/soft/lcmodel/metabolite_basis_sets/7t/gamma_press_te{}_7t_v1.basis"
         self.lcmodel_lcsv = True
 
         # data
