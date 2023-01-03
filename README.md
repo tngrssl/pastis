@@ -54,6 +54,15 @@ Roussel T, Le Fur Y, Guye M, Viout P, Ranjeva JP and Callot V. Magn Reson Med. 2
 
 ## Installation
 
+### Requirements
+
+PASTIS relies on suspect. Some parts of the code is unfortunately getting deprecated (numpy updates). Please install suspect from my git repo:
+
+```console
+$ git clone https://github.com/tngrssl/suspect
+$ pip install -e path/to/the/folder/suspect
+```
+
 ### Python package
 
 PASTIS was developped on Python 3.8 and can be installed with *pip* using this command line:
